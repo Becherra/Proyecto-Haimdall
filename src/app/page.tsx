@@ -1,17 +1,20 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
 import LocationSearch from "../components/LocationSearch";
 import { initialLocationFlow, locationFlowReducer } from "../lib/ui/locationFlow";
 import type { LocationResult } from "../types";
 
 const GlobeScene = dynamic(() => import("../components/GlobeScene"), { ssr: false, loading: () => <div className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.03] text-sm text-ash-gray" role="status">Cargando globo…</div> });
 const MapScene = dynamic(() => import("../components/MapScene"), { ssr: false, loading: () => <div className="flex min-h-[360px] w-full items-center justify-center text-sm text-ash-gray" role="status">Cargando mapa…</div> });
+const ParticleWorld = dynamic(() => import("../components/ParticleWorld"), { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-ash-gray" role="status">Preparando partículas…</div> });
 
+const subscribePreview = () => () => {};
 export default function Home() {
   const [flow, dispatch] = useReducer(locationFlowReducer, initialLocationFlow);
   const [mapLocation, setMapLocation] = useState<LocationResult | null>(null);
+  const particlesPreview = useSyncExternalStore(subscribePreview, () => new URLSearchParams(window.location.search).get("particles") === "1", () => false);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [webglAvailable] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -28,6 +31,7 @@ export default function Home() {
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
+
 
   useEffect(() => {
     if (flow.status !== "flying" && flow.status !== "transitioning") return;
@@ -51,8 +55,8 @@ export default function Home() {
         <p className="mx-auto mt-3 max-w-[460px] text-sm leading-7 text-ash-gray sm:text-base lg:mx-0">Marca tu finca y compara rotaciones de cultivo con evidencia, riesgos y lo que aún no sabemos.</p>
         <div className="mt-7"><LocationSearch onLocationSelected={onLocationSelected} onGpsStart={() => dispatch({ type: "locating" })} onGpsLocationSelected={onGpsLocationSelected} onGpsError={(message) => dispatch({ type: "gpsError", message })} /></div>
       </div>
-      <div className={`order-1 mx-auto h-[min(39svh,340px)] w-full max-w-[610px] transition-opacity duration-500 motion-reduce:transition-none sm:h-[min(48svh,460px)] lg:order-2 lg:h-[min(78svh,740px)] ${globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
-        <GlobeScene location={location} active={!showMap && !globeFading} />
+      <div className={`relative isolate order-1 mx-auto h-[min(39svh,340px)] w-full max-w-[610px] transition-opacity duration-500 motion-reduce:transition-none sm:h-[min(48svh,460px)] lg:order-2 lg:h-[min(78svh,740px)] ${globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
+        {particlesPreview ? <ParticleWorld /> : <GlobeScene location={location} active={!showMap && !globeFading} />}
       </div>
       {flow.status === "flying" && location && <p className="order-3 text-center text-sm text-saffron-spark" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
       <footer className="order-4 mt-2 space-y-1 text-center text-xs text-ash-gray lg:col-span-2"><p>© Colaboradores de OpenStreetMap</p><p>Imagen: NASA Blue Marble, con tratamiento de color propio</p></footer>
