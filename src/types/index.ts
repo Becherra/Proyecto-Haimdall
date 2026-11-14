@@ -54,6 +54,8 @@ export const cropSchema = z.object({
   id: z.string().min(1), name: z.string().min(1), waterUse: score, nitrogenFixation: score, erosionReduction: score,
   organicMatter: score, forageValue: score, marketPotential: score, heatTolerance: score, droughtTolerance: score,
   cycleDays: z.number().int().positive(), sowingMonths: z.array(z.number().int().min(1).max(12)), source: z.string().min(1),
+  /** Familia botánica en español (p. ej. "Leguminosas"). Opcional para no romper catálogos previos; sin ella no se evalúa si la rotación alterna familias. */
+  family: z.string().min(1).optional(),
 });
 export type Crop = z.infer<typeof cropSchema>;
 
