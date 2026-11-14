@@ -6,8 +6,8 @@ import LocationSearch from "../components/LocationSearch";
 import { initialLocationFlow, locationFlowReducer } from "../lib/ui/locationFlow";
 import type { LocationResult } from "../types";
 
-const GlobeScene = dynamic(() => import("../components/GlobeScene"), { ssr: false, loading: () => <div className="flex h-[320px] w-full max-w-[560px] items-center justify-center rounded-full border border-white/10 bg-slate-900/70 text-sm text-slate-400" role="status">Cargando globo…</div> });
-const MapScene = dynamic(() => import("../components/MapScene"), { ssr: false, loading: () => <div className="flex min-h-[420px] w-full items-center justify-center rounded-2xl border border-white/10 bg-slate-900/70 text-sm text-slate-400" role="status">Cargando mapa…</div> });
+const GlobeScene = dynamic(() => import("../components/GlobeScene"), { ssr: false, loading: () => <div className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.03] text-sm text-ash-gray" role="status">Cargando globo…</div> });
+const MapScene = dynamic(() => import("../components/MapScene"), { ssr: false, loading: () => <div className="flex min-h-[360px] w-full items-center justify-center text-sm text-ash-gray" role="status">Cargando mapa…</div> });
 
 export default function Home() {
   const [flow, dispatch] = useReducer(locationFlowReducer, initialLocationFlow);
@@ -23,38 +23,42 @@ export default function Home() {
   const gpsAccuracyMeters = "accuracyMeters" in flow ? flow.accuracyMeters : undefined;
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updateMotion = () => setReducedMotion(mediaQuery.matches);
-    updateMotion();
-    mediaQuery.addEventListener("change", updateMotion);
-    return () => mediaQuery.removeEventListener("change", updateMotion);
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
   }, []);
 
   useEffect(() => {
     if (flow.status !== "flying" && flow.status !== "transitioning") return;
-    const instantaneo = reducedMotion || !webglAvailable;
-    const delay = flow.status === "flying" ? (instantaneo ? 0 : 1800) : (instantaneo ? 0 : 500);
-    const timer = window.setTimeout(() => dispatch({ type: "vueloTerminado", instantaneo }), delay);
+    const instant = reducedMotion || !webglAvailable;
+    const delay = flow.status === "flying" ? (instant ? 0 : 1800) : (instant ? 0 : 500);
+    const timer = window.setTimeout(() => dispatch({ type: "vueloTerminado", instantaneo: instant }), delay);
     return () => window.clearTimeout(timer);
   }, [flow.status, reducedMotion, webglAvailable]);
 
-  const onLocationSelected = (selectedLocation: LocationResult) => { setMapLocation(null); dispatch({ type: "buscar", location: selectedLocation }); };
-  const onGpsLocationSelected = (selectedLocation: LocationResult, accuracyMeters: number) => { setMapLocation(null); dispatch({ type: "gpsOk", location: selectedLocation, accuracyMeters }); };
+  const onLocationSelected = (selected: LocationResult) => { setMapLocation(null); dispatch({ type: "buscar", location: selected }); };
+  const onGpsLocationSelected = (selected: LocationResult, accuracyMeters: number) => { setMapLocation(null); dispatch({ type: "gpsOk", location: selected, accuracyMeters }); };
   const onBackToGlobe = () => { setMapLocation(null); dispatch({ type: "volver" }); };
   const globeFading = flow.status === "transitioning";
-  return <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-[#030712] px-4 py-6 text-slate-100 sm:py-8">
-    <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_50%_20%,rgba(14,116,144,0.25),transparent_32%),radial-gradient(circle_at_10%_80%,rgba(30,64,175,0.16),transparent_28%)]" />
-    <section className="relative z-10 flex w-full max-w-5xl flex-col items-center text-center">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.45em] text-cyan-300">NASA · agricultura · futuro</p>
-      <h1 className={`font-semibold tracking-[0.18em] text-white ${showMap ? "text-3xl sm:text-5xl" : "text-5xl sm:text-7xl"}`}>HEIMDALL</h1>
-      <p className={`max-w-md text-slate-300 ${showMap ? "mt-1 text-sm" : "mt-4 text-base sm:text-lg"}`}>Rotaciones de cultivo con datos de la NASA</p>
-      <div className={`w-full transition-opacity duration-500 motion-reduce:transition-none ${showMap ? "pointer-events-none absolute opacity-0" : globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
-        <div className="mt-4 flex h-[min(34vh,240px)] w-full max-w-[720px] justify-center sm:mt-2 sm:h-[min(65vh,680px)]"><GlobeScene location={location} active={!showMap && !globeFading} /></div>
-        <div className="relative z-20 -mt-8 flex w-full justify-center sm:-mt-12"><LocationSearch onLocationSelected={onLocationSelected} onGpsStart={() => dispatch({ type: "locating" })} onGpsLocationSelected={onGpsLocationSelected} onGpsError={(message) => dispatch({ type: "gpsError", message })} /></div>
-        {flow.status === "flying" && location && <p className="mx-auto mt-4 text-sm text-cyan-200" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
+
+  return <main id="inicio" className="min-h-screen overflow-hidden bg-void text-bone-white">
+    {!showMap ? <section className="mx-auto grid min-h-[calc(100svh-76px)] w-full max-w-[1440px] grid-cols-1 items-center px-5 pb-8 pt-2 sm:px-10 lg:min-h-[calc(100svh-88px)] lg:grid-cols-[0.88fr_1.12fr] lg:gap-3 lg:px-12 lg:py-8">
+      <div className="relative z-10 order-2 mx-auto w-full max-w-[580px] text-center lg:order-1 lg:mx-0 lg:text-left">
+        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-saffron-spark sm:text-sm">NASA · agricultura · futuro</p>
+        <h1 className="font-display text-[clamp(3.5rem,9vw,7rem)] font-normal leading-[0.92] tracking-[-0.055em]">HEIMDALL</h1>
+        <p className="mt-5 text-xl font-light leading-relaxed text-silver-mist sm:text-2xl">Decide qué sembrar con datos de la NASA.</p>
+        <p className="mx-auto mt-3 max-w-[460px] text-sm leading-7 text-ash-gray sm:text-base lg:mx-0">Marca tu finca y compara rotaciones de cultivo con evidencia, riesgos y lo que aún no sabemos.</p>
+        <div className="mt-7"><LocationSearch onLocationSelected={onLocationSelected} onGpsStart={() => dispatch({ type: "locating" })} onGpsLocationSelected={onGpsLocationSelected} onGpsError={(message) => dispatch({ type: "gpsError", message })} /></div>
       </div>
-      {showMap && location && <div className="w-full text-left"><MapScene location={mapLocation ?? location} gpsAccuracyMeters={gpsAccuracyMeters} onLocationSelected={setMapLocation} onBack={onBackToGlobe} onConfirmed={() => dispatch({ type: "confirmar" })} /></div>}
-    </section>
-    {!showMap && <footer className="relative z-10 mt-auto pt-10 text-xs text-slate-500">© Colaboradores de OpenStreetMap</footer>}
+      <div className={`order-1 mx-auto h-[min(39svh,340px)] w-full max-w-[610px] transition-opacity duration-500 motion-reduce:transition-none sm:h-[min(48svh,460px)] lg:order-2 lg:h-[min(78svh,740px)] ${globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
+        <GlobeScene location={location} active={!showMap && !globeFading} />
+      </div>
+      {flow.status === "flying" && location && <p className="order-3 text-center text-sm text-saffron-spark" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
+      <footer className="order-4 mt-2 text-center text-xs text-ash-gray lg:col-span-2">© Colaboradores de OpenStreetMap</footer>
+    </section> : <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
+      <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-saffron-spark">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
+      {location && <MapScene location={mapLocation ?? location} gpsAccuracyMeters={gpsAccuracyMeters} onLocationSelected={setMapLocation} onBack={onBackToGlobe} onConfirmed={() => dispatch({ type: "confirmar" })} />}
+    </section>}
   </main>;
 }
