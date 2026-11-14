@@ -12,6 +12,8 @@ const GLOBE_DISTANCE = 3.5;
 const T = HERO_TIMELINE;
 
 const VERTEX_SHADER = `
+  // Mantiene la precisión de uniforms y varyings igual al fragment shader en WebGL.
+  precision mediump float;
   attribute vec3 aStart;
   attribute float aSize;
   attribute float aSeed;
