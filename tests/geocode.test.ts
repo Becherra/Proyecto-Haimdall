@@ -1,18 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearGeocodeCache, geocodeLocation, parseGeocodeResponse } from "../src/lib/geocode";
 
-const validPayload = [{ lat: "4.8133", lon: "-75.6961", display_name: "Pereira, Risaralda, Colombia" }];
+const validPayload = [{ lat: "4.8133", lon: "-75.6961", display_name: "Pereira, Risaralda, Colombia", boundingbox: ["4.6646", "4.9062", "-75.9359", "-75.3754"] }];
 
 describe("geocode", () => {
   beforeEach(() => clearGeocodeCache());
 
   it("parsea una respuesta válida de Nominatim", () => {
-    expect(parseGeocodeResponse(validPayload)).toEqual({ lat: 4.8133, lon: -75.6961, label: "Pereira, Risaralda, Colombia" });
+    expect(parseGeocodeResponse(validPayload)).toEqual({ lat: 4.8133, lon: -75.6961, label: "Pereira, Risaralda, Colombia", boundingBox: [4.6646, 4.9062, -75.9359, -75.3754] });
   });
 
   it("devuelve null para una respuesta vacía y falla si está malformada", () => {
     expect(parseGeocodeResponse([])).toBeNull();
     expect(() => parseGeocodeResponse([{ lat: "sin-coordenadas" }])).toThrow("malformada");
+  });
+
+  it("rechaza un bounding box malformado", () => {
+    expect(() => parseGeocodeResponse([{ lat: "4.8", lon: "-75.7", display_name: "Lugar", boundingbox: ["4", "3", "-75", "-76"] }])).toThrow("bounding box");
   });
 
   it("reutiliza caché para consultas normalizadas", async () => {

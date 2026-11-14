@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { locationResultSchema, type LocationResult } from "../types";
+import { locationBoundingBoxSchema, locationResultSchema, type LocationResult } from "../types";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const REQUEST_TIMEOUT_MS = 8_000;
 const RATE_LIMIT_MS = 1_000;
 const DEFAULT_USER_AGENT = "Heimdall/1.0 (NASA Space Apps 2026)";
 const querySchema = z.string().trim().min(2).max(100);
-const nominatimItemSchema = z.object({ lat: z.string(), lon: z.string(), display_name: z.string().min(1) });
+const nominatimItemSchema = z.object({ lat: z.string(), lon: z.string(), display_name: z.string().min(1), boundingbox: z.array(z.string()).length(4).optional() });
 
 export class GeocodeValidationError extends Error {}
 export class GeocodeParseError extends Error {}
@@ -34,7 +34,10 @@ export function parseGeocodeResponse(payload: unknown): LocationResult | null {
   if (!parsed.success) throw new GeocodeParseError("Nominatim devolvió una respuesta malformada");
   const first = parsed.data[0];
   if (!first) return null;
-  const location = locationResultSchema.safeParse({ lat: Number(first.lat), lon: Number(first.lon), label: first.display_name });
+  const boundingBox = first.boundingbox?.map(Number);
+  const parsedBoundingBox = boundingBox === undefined ? undefined : locationBoundingBoxSchema.safeParse(boundingBox);
+  if (parsedBoundingBox && !parsedBoundingBox.success) throw new GeocodeParseError("Nominatim devolvió un bounding box inválido");
+  const location = locationResultSchema.safeParse({ lat: Number(first.lat), lon: Number(first.lon), label: first.display_name, boundingBox: parsedBoundingBox?.success ? parsedBoundingBox.data : undefined });
   if (!location.success) throw new GeocodeParseError("Nominatim devolvió coordenadas inválidas");
   return location.data;
 }
