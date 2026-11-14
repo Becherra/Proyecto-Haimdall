@@ -1,7 +1,9 @@
 import type { Crop, Indicators, Rotation, RotationResult, UserPriorities } from "../types";
 import {
-  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY,
+  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
+  MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY, MAX_TEMPERATURE_PENALTY, MAX_WATER_SCARCITY_PENALTY, WATER_AVAILABILITY_DROUGHT_FACTOR,
 } from "./config";
+import { formatTemperatureRange, frostExposure, frostUnprotected, temperatureMismatch, temperatureSuitability } from "./climateFit";
 import { commonName, familyBreakShare } from "./rotations";
 import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
 
@@ -10,7 +12,8 @@ type Criterion = { key: CriterionKey; label: string; weight: number; value: numb
 type Penalty = { label: string; value: number };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
 /** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
-type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; years: number; familyBreak: number | null };
+type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
+type WaterAvailability = NonNullable<UserPriorities["waterAvailability"]>;
 
 /**
  * Entrada del motor: todo llega como dato, sin leer archivos ni red.
@@ -71,14 +74,15 @@ function criterionValues(crops: readonly Crop[], dryness: number): Record<Criter
 /** Días por año de una cuenta que abarca toda la serie. */
 const perYear = (days: number, years: number) => days / years;
 
-function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: number, years: number): Penalty[] {
+/** `waterFactor` escala la sequía según el agua que el agricultor declara tener (`WATER_AVAILABILITY_DROUGHT_FACTOR`). */
+function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: number, years: number, waterFactor: number): Penalty[] {
   const heatPerYear = perYear(indicators.heatStressDays, years);
   const heatShare = Math.min(heatPerYear / HEAT_DAYS_REFERENCE, 1);
   const heatGap = (MAX_SCORE - average(crops, (crop) => crop.heatTolerance)) / MAX_SCORE;
   const droughtGap = (MAX_SCORE - average(crops, (crop) => crop.droughtTolerance)) / MAX_SCORE;
   return [
     { label: `calor (≈${heatPerYear.toFixed(0)} días al año sobre ${HEAT_STRESS_THRESHOLD_C} °C)`, value: heatShare * heatGap * MAX_RISK_PENALTY },
-    { label: "sequía (balance hídrico negativo)", value: dryness * droughtGap * MAX_RISK_PENALTY },
+    { label: "sequía (balance hídrico negativo)", value: dryness * droughtGap * MAX_RISK_PENALTY * waterFactor },
   ].filter((penalty) => penalty.value > 0);
 }
 
@@ -96,6 +100,21 @@ function sowingPenalties(sowing: SowingFinding[] | null): Penalty[] {
   return value > 0 ? [{ label: `siembra en meses secos (${formatMonths(dryMonths)})`, value }] : [];
 }
 
+/**
+ * Penalizaciones por clima del sitio y agua declarada: temperatura media fuera del rango de los cultivos,
+ * heladas frecuentes sin tolerancia documentada y cultivos de alto consumo cuando el agricultor tiene poca agua.
+ */
+function climatePenalties(crops: readonly Crop[], indicators: Indicators, years: number, waterAvailability: WaterAvailability | undefined): Penalty[] {
+  const temperature = indicators.meanTemperatureC ?? null;
+  const frostPerYear = perYear(indicators.frostRiskDays, years);
+  const waterUseShare = average(crops, (crop) => crop.waterUse) / MAX_SCORE;
+  return [
+    { label: `temperatura fuera del rango de los cultivos (media del sitio ${temperature?.toFixed(1)} °C)`, value: temperature === null ? 0 : temperatureMismatch(crops, temperature) * MAX_TEMPERATURE_PENALTY },
+    { label: `heladas (≈${frostPerYear.toFixed(0)} días al año bajo ${FROST_THRESHOLD_C} °C)`, value: frostExposure(crops, frostPerYear) * MAX_FROST_PENALTY },
+    { label: "poca agua disponible para cultivos de alto consumo", value: waterAvailability === "low" ? waterUseShare * MAX_WATER_SCARCITY_PENALTY : 0 },
+  ].filter((penalty) => penalty.value > 0);
+}
+
 /** Castiga repetir la misma familia botánica en relevos seguidos: completa para el monocultivo, nula si siempre se alterna o si no hay dato de familia. */
 function pestCyclePenalties(familyBreak: number | null): Penalty[] {
   if (familyBreak === null || familyBreak >= 1) return [];
@@ -110,10 +129,13 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
   const sowing = seasonality ? crops.map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
   const familyBreak = familyBreakShare(crops);
-  const penalties = [...riskPenalties(crops, indicators, dryness, years), ...sowingPenalties(sowing), ...pestCyclePenalties(familyBreak)];
+  const { waterAvailability } = priorities;
+  const waterFactor = WATER_AVAILABILITY_DROUGHT_FACTOR[waterAvailability ?? "medium"];
+  const sowingRisk = sowingPenalties(sowing).map((penalty) => ({ ...penalty, value: penalty.value * waterFactor }));
+  const penalties = [...riskPenalties(crops, indicators, dryness, years, waterFactor), ...climatePenalties(crops, indicators, years, waterAvailability), ...sowingRisk, ...pestCyclePenalties(familyBreak)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, criteria, penalties, sowing, years, familyBreak, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, criteria, penalties, sowing, years, familyBreak, waterAvailability, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -164,8 +186,18 @@ function durationEvidence(crops: readonly Crop[]): string {
   return `Duración de la secuencia: ${detail} días de cultivo (ciclos típicos del catálogo, no datos del lote).`;
 }
 
+const WATER_AVAILABILITY_LABELS: Record<WaterAvailability, string> = { low: "baja", medium: "media", high: "alta" };
+
+/** Temperatura media del sitio y rango de cada cultivo; vacío si no hay temperatura. */
+function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC }: Indicators): string[] {
+  if (meanTemperatureC === undefined || meanTemperatureC === null) return [];
+  const ranges = crops.flatMap((crop) => (crop.temperatureC ? [`${commonName(crop)} ${formatTemperatureRange(crop.temperatureC)}`] : []));
+  const detail = ranges.length > 0 ? ` Rango en que crece bien según el catálogo: ${ranges.join("; ")}.` : "";
+  return [`Temperatura media del sitio: ${meanTemperatureC.toFixed(1)} °C (NASA POWER, T2M).${detail}`];
+}
+
 function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[] {
-  const { criteria, crops, sowing, years } = evaluation;
+  const { criteria, crops, sowing, years, waterAvailability } = evaluation;
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
   return [
     ...(balance === null ? [] : [balanceEvidence(balance, indicators)]),
@@ -173,6 +205,8 @@ function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[]
     ...(rain === null ? [] : [`Lluvia diaria extrema (percentil 95): ${oneDecimal(rain)} mm/día (NASA POWER, PRECTOTCORR).`]),
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
+    ...temperatureEvidence(crops, indicators),
+    ...(waterAvailability ? [`Disponibilidad de agua declarada por el agricultor: ${WATER_AVAILABILITY_LABELS[waterAvailability]}.`] : []),
     ...sowingEvidence(sowing),
     ...familyEvidence(evaluation),
     durationEvidence(crops),
@@ -201,6 +235,25 @@ function familyRisks({ crops, familyBreak }: Evaluation): string[] {
   return ["Repite la misma familia botánica en relevos seguidos, lo que corta menos los ciclos de plagas y enfermedades."];
 }
 
+/** Un riesgo por cada cultivo cuya temperatura buena no incluye la media del sitio. */
+function temperatureRisks(crops: readonly Crop[], { meanTemperatureC }: Indicators): string[] {
+  if (meanTemperatureC === undefined || meanTemperatureC === null) return [];
+  return crops.flatMap((crop) => {
+    if (!crop.temperatureC) return [];
+    const suitability = temperatureSuitability(crop.temperatureC, meanTemperatureC);
+    if (suitability >= 1) return [];
+    const side = meanTemperatureC < crop.temperatureC.goodMin ? "por debajo" : "por encima";
+    const beyond = suitability === 0 ? "; además está fuera del límite que da su fuente, así que es poco probable que produzca" : "";
+    return [`La temperatura media del sitio (${meanTemperatureC.toFixed(1)} °C) queda ${side} del rango en que ${commonName(crop)} crece bien (${formatTemperatureRange(crop.temperatureC)})${beyond}.`];
+  });
+}
+
+function frostRisks(crops: readonly Crop[], indicators: Indicators, years: number): string[] {
+  const unprotected = frostUnprotected(crops);
+  if (indicators.frostRiskDays === 0 || unprotected.length === 0) return [];
+  return [`La serie registra ≈${perYear(indicators.frostRiskDays, years).toFixed(0)} días al año con riesgo de helada y el catálogo no documenta tolerancia a heladas para ${unprotected.map(commonName).join(", ")}.`];
+}
+
 function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   const { crops, sowing, years } = evaluation;
   const low = (pick: (crop: Crop) => number) => average(crops, pick) < LOW_ATTRIBUTE_THRESHOLD;
@@ -208,7 +261,8 @@ function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   if (low((crop) => crop.heatTolerance)) risks.push("Baja tolerancia al calor según el catálogo.");
   if (low((crop) => crop.droughtTolerance) && drynessFactor(indicators) > 0) risks.push("Baja tolerancia a sequía en un sitio donde la evaporación supera a la lluvia.");
   if (average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD && drynessFactor(indicators) > 0) risks.push("Alto uso de agua en un sitio con déficit hídrico.");
-  if (indicators.frostRiskDays > 0) risks.push(`La serie registra ≈${perYear(indicators.frostRiskDays, years).toFixed(0)} días al año con riesgo de helada y el catálogo no incluye tolerancia a heladas.`);
+  risks.push(...temperatureRisks(crops, indicators), ...frostRisks(crops, indicators, years));
+  if (evaluation.waterAvailability === "low" && average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD) risks.push("Alto consumo de agua y el agricultor declara poca agua disponible.");
   if (low((crop) => crop.marketPotential)) risks.push("Bajo potencial de mercado según el catálogo.");
   for (const { crop, assessment } of sowing ?? []) {
     if (assessment.dryMonths.length > 0) risks.push(`Parte de los meses de siembra de ${crop.name} (${formatMonths(assessment.dryMonths)}) cae en época seca del sitio.`);
@@ -230,11 +284,21 @@ function familyGap(familyBreak: number | null): string {
     : "No hay datos de plagas ni enfermedades del lote: alternar familias botánicas es una regla agronómica general, no un diagnóstico.";
 }
 
-function buildGaps(indicators: Indicators, { sowing, familyBreak }: Evaluation): string[] {
+function temperatureGaps(crops: readonly Crop[], { meanTemperatureC }: Indicators): string[] {
+  if (meanTemperatureC === undefined || meanTemperatureC === null) return ["No hay temperatura media del sitio: no se evaluó la aptitud térmica de los cultivos."];
+  const unknown = crops.filter((crop) => !crop.temperatureC).map(commonName);
+  return [
+    "La temperatura es el promedio de una celda de unos 50 km de NASA POWER: en montaña la del lote cambia con la altitud y puede diferir varios grados.",
+    ...(unknown.length > 0 ? [`El catálogo no trae rango de temperatura para ${unknown.join(", ")}: no se evaluó su aptitud térmica.`] : []),
+  ];
+}
+
+function buildGaps(indicators: Indicators, { crops, sowing, familyBreak }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
     "Los datos de NASA POWER son de malla y no miden el lote específico.",
+    ...temperatureGaps(crops, indicators),
     ...sowingGaps(sowing),
     familyGap(familyBreak),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),
@@ -260,7 +324,8 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
 
 /**
  * Puntúa cada rotación en la escala 0–5: Σ(peso de la prioridad × puntaje del criterio) − penalizaciones de riesgo
- * (calor, sequía, siembra en meses secos y repetir la misma familia botánica en relevos seguidos).
+ * (calor, sequía, temperatura media fuera del rango del cultivo, heladas, poca agua declarada, siembra en meses secos
+ * y repetir la misma familia botánica en relevos seguidos).
  * Los pesos salen de las prioridades normalizadas; los puntajes combinan atributos del catálogo con los indicadores del sitio.
  * Devuelve los resultados en el mismo orden de entrada (la línea base primero). Lanza un Error si una rotación usa un
  * cultivo fuera del catálogo o no tiene cultivos.

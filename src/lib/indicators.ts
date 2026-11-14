@@ -177,6 +177,7 @@ export function computeWetnessAnomalies(monthly: readonly MonthlyClimate[]): Mon
  * - `heatStressDays` / `frostRiskDays`: total de días de toda la serie (no promedio anual).
  * - `extremeRainThresholdMm`: percentil 95 de lluvia diaria.
  * - `meanRootZoneWetness`: promedio de los días con dato de GWETROOT.
+ * - `meanTemperatureC`: promedio de T2M de los días con dato (temperatura de la celda de NASA POWER, no del lote).
  * - `missingByParameter`: días sin dato por cada uno de los parámetros NASA.
  * Un indicador sin datos suficientes queda en null (o 0 en los conteos de días).
  */
@@ -188,6 +189,7 @@ export function computeIndicators(records: readonly ClimateRecord[], latitude?: 
     frostRiskDays: countFrostRiskDays(records).value,
     extremeRainThresholdMm: extremeRainThreshold(records).value,
     meanRootZoneWetness: mean(validValues(records, "GWETROOT").value),
+    meanTemperatureC: mean(validValues(records, "T2M").value),
     missingByParameter: Object.fromEntries(CLIMATE_PARAMETERS.map((name) => [name, validValues(records, name).missing])),
     waterBalanceMethod: latitude === undefined ? "evland" : "potential",
   };

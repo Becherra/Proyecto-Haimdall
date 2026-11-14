@@ -19,6 +19,24 @@ export const MAX_RISK_PENALTY = 0.5;
  * (las fichas FAO de papa y repollo piden rotaciones de 3 años o más), no una medición del lote.
  */
 export const MAX_PEST_CYCLE_PENALTY = 0.5;
+/**
+ * Penalización máxima (escala 0–5) cuando la temperatura media del sitio queda fuera del límite de todos los cultivos de la rotación.
+ * Es alta a propósito: un cultivo que no se da en ese clima no debe salir sugerido por sus otros atributos. Heurística de diseño.
+ */
+export const MAX_TEMPERATURE_PENALTY = 2;
+/**
+ * Grados entre el rango en que un cultivo crece bien y su límite cuando la fuente no da el límite.
+ * Es la mediana aproximada de los márgenes que sí traen las fuentes del catálogo (3 a 10 °C); heurística, no dato.
+ */
+export const DEFAULT_TEMPERATURE_MARGIN_C = 7;
+/** Días de helada POR AÑO a partir de los cuales la penalización por heladas es máxima: un mes al año. Heurística de diseño. */
+export const FROST_DAYS_REFERENCE = 30;
+/** Penalización máxima (escala 0–5) por heladas frecuentes en una rotación sin tolerancia documentada. */
+export const MAX_FROST_PENALTY = 1;
+/** Cuánto pesan la sequía y la siembra en meses secos según el agua que el agricultor dice tener (riego, nacimiento, reservorio). Heurística de diseño. */
+export const WATER_AVAILABILITY_DROUGHT_FACTOR = { low: 1.5, medium: 1, high: 0.5 } as const;
+/** Penalización máxima (escala 0–5) a un cultivo de máximo consumo de agua cuando el agricultor declara poca agua disponible. */
+export const MAX_WATER_SCARCITY_PENALTY = 0.5;
 /** Puntaje de `nitrogenFixation` (0–5) desde el cual un cultivo cuenta como fijador de nitrógeno al armar rotaciones. */
 export const NITROGEN_FIXER_THRESHOLD = 2;
 /** Puntaje de atributo de cultivo (0–5) desde el cual se considera una ventaja destacada. */

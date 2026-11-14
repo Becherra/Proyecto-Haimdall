@@ -68,6 +68,21 @@ describe("data/crops.json", () => {
     expect(new Set(crops.map((crop) => crop.family)).size).toBeGreaterThanOrEqual(5);
   });
 
+  it("trae un rango de temperatura ordenado para cada cultivo", () => {
+    for (const crop of raw.map((entry) => cropSchema.parse(entry))) {
+      const range = crop.temperatureC;
+      expect(range, crop.id).toBeDefined();
+      if (!range) continue;
+      const bounds = [range.limitMin, range.goodMin, range.goodMax, range.limitMax].filter((value): value is number => value !== undefined);
+      expect(bounds, crop.id).toEqual([...bounds].sort((a, b) => a - b));
+    }
+  });
+
+  it("solo documenta tolerancia a heladas donde la fuente da una cifra (crotalaria y repollo)", () => {
+    const tolerant = raw.map((entry) => cropSchema.parse(entry)).filter((crop) => crop.frostToleranceC !== undefined).map((crop) => crop.id);
+    expect(tolerant).toEqual(["crotalaria", "repollo"]);
+  });
+
   it("contiene todos los cultivos que usan las rotaciones del mock", () => {
     const ids = new Set(raw.map((crop) => cropSchema.parse(crop).id));
     for (const { rotation } of mockAnalysisResponse.rotations) {
