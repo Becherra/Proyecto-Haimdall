@@ -16,8 +16,28 @@ export const monthlyClimateSchema = z.object({
   year: z.number().int().min(1981), month: z.number().int().min(1).max(12),
   meanTemperatureC: z.number().nullable(), precipitationMm: z.number().nullable(), evaporationMm: z.number().nullable(),
   rootZoneWetness: z.number().min(0).max(1).nullable(), missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
+  // Opcionales para no romper consumidores previos; aggregateMonthly siempre los entrega.
+  minTemperatureC: z.number().nullable().optional(), maxTemperatureC: z.number().nullable().optional(),
 });
 export type MonthlyClimate = z.infer<typeof monthlyClimateSchema>;
+
+/** Valor de un indicador junto con cuántos datos diarios faltaron (null) y no pudieron usarse. */
+export type IndicatorValue<T> = { value: T; missing: number };
+
+/** Balance hídrico mensual: lluvia − evaporación (negativo = déficit; mismo criterio que `Indicators.waterDeficitMm`). */
+export const monthlyWaterDeficitSchema = z.object({
+  year: z.number().int().min(1981), month: z.number().int().min(1).max(12),
+  waterDeficitMm: z.number().nullable(), missing: z.number().int().nonnegative(),
+});
+export type MonthlyWaterDeficit = z.infer<typeof monthlyWaterDeficitSchema>;
+
+/** Humedad de zona radicular del mes y su anomalía (diferencia) frente al promedio histórico del mismo mes. */
+export const monthlyWetnessAnomalySchema = z.object({
+  year: z.number().int().min(1981), month: z.number().int().min(1).max(12),
+  meanWetness: z.number().min(0).max(1).nullable(), historicalMeanWetness: z.number().min(0).max(1).nullable(),
+  anomaly: z.number().nullable(), missing: z.number().int().nonnegative(),
+});
+export type MonthlyWetnessAnomaly = z.infer<typeof monthlyWetnessAnomalySchema>;
 
 export const indicatorsSchema = z.object({
   waterDeficitMm: z.number().nullable(), heatStressDays: z.number().int().nonnegative(), frostRiskDays: z.number().int().nonnegative(),
