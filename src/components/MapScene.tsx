@@ -1,0 +1,124 @@
+"use client";
+
+import L from "leaflet";
+import { useEffect, useMemo, useState } from "react";
+import { CircleMarker, LayersControl, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { buildGibsTileUrl, GIBS_LAYER_CONFIG, isGibsDateAvailable } from "../lib/ui/mapLayers";
+import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
+import type { LocationResult } from "../types";
+
+type MapSceneProps = { location: LocationResult; onLocationSelected: (location: LocationResult) => void; onBack: () => void };
+type TileState = { loading: boolean; error: string | null };
+
+const initialDate = "2026-10-16";
+const satelliteAttribution = "Tiles © Esri — Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community";
+const osmAttribution = '© OpenStreetMap contributors';
+const nasaAttribution = "NASA GIBS";
+
+const pinIcon = L.divIcon({ className: "heimdall-pin", html: '<span aria-hidden="true"></span>', iconSize: [24, 24], iconAnchor: [12, 12] });
+
+function ZoomToLocation({ location }: { location: LocationResult }) {
+  const map = useMap();
+  useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    map.setView([location.lat, location.lon], 8, { animate: false });
+    if (reducedMotion) {
+      map.setZoom(13, { animate: false });
+      return;
+    }
+    const timer = window.setTimeout(() => map.setZoom(13, { animate: true, duration: 1.8 }), 80);
+    return () => window.clearTimeout(timer);
+  }, [location, map]);
+  return null;
+}
+
+function MapPinSelector({ onSelect }: { onSelect: (location: LocationResult) => void }) {
+  useMapEvents({ click: (event) => onSelect(validateMapLocation(event.latlng.lat, event.latlng.lng)) });
+  return null;
+}
+
+function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
+  const map = useMap();
+  useEffect(() => { onZoomChange(map.getZoom()); }, [map, onZoomChange]);
+  useMapEvents({ zoomend: () => onZoomChange(map.getZoom()) });
+  return null;
+}
+
+export default function MapScene({ location, onLocationSelected, onBack }: MapSceneProps) {
+  const [draftLocation, setDraftLocation] = useState(location);
+  const [opacity, setOpacity] = useState(65);
+  const [date, setDate] = useState(initialDate);
+  const [zoom, setZoom] = useState(8);
+  const [online, setOnline] = useState(true);
+  const [tiles, setTiles] = useState<TileState>({ loading: true, error: null });
+  const trueColorUrl = useMemo(() => {
+    try { return buildGibsTileUrl("trueColor", date); } catch { return null; }
+  }, [date]);
+  const ndviUrl = useMemo(() => {
+    try { return buildGibsTileUrl("ndvi", date); } catch { return null; }
+  }, [date]);
+  const dateError = !isGibsDateAvailable("trueColor", date) && !isGibsDateAvailable("ndvi", date)
+    ? "NASA GIBS no tiene datos para esta fecha. Elige una fecha entre 2025-11-10 y 2026-10-16."
+    : null;
+  useEffect(() => {
+    const updateOnline = () => setOnline(navigator.onLine);
+    updateOnline();
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => { window.removeEventListener("online", updateOnline); window.removeEventListener("offline", updateOnline); };
+  }, []);
+
+  const onTileLoad = () => setTiles({ loading: false, error: null });
+  const onTileError = () => setTiles({ loading: false, error: "No se pudieron cargar las teselas. Revisa tu conexión o cambia la fecha." });
+
+  return <section className="relative w-full" aria-label="Mapa de ubicación de la finca">
+    {!online && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="status">Sin conexión: las teselas nuevas pueden no estar disponibles.</p>}
+    {tiles.loading && <p className="mb-3 rounded-lg border border-cyan-300/30 bg-cyan-950/50 p-3 text-sm text-cyan-100" role="status">Cargando teselas del mapa…</p>}
+    {tiles.error && <p className="mb-3 rounded-lg border border-red-300/40 bg-red-950/60 p-3 text-sm text-red-100" role="alert">{tiles.error}</p>}
+    {dateError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{dateError}</p>}
+    <div className="relative h-[min(68vh,620px)] min-h-[420px] overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-cyan-950/30">
+      <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl>
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Satélite">
+            <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={23} attribution={satelliteAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Calles">
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} attribution={osmAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />
+          </LayersControl.BaseLayer>
+          <LayersControl.Overlay checked name="Color real · NASA GIBS">
+            {trueColorUrl && <TileLayer url={trueColorUrl} maxZoom={GIBS_LAYER_CONFIG.trueColor.maxZoom} opacity={opacity / 100} attribution={nasaAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />}
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="NDVI · NASA GIBS">
+            {ndviUrl && <TileLayer url={ndviUrl} maxZoom={GIBS_LAYER_CONFIG.ndvi.maxZoom} opacity={opacity / 100} attribution={nasaAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />}
+          </LayersControl.Overlay>
+        </LayersControl>
+        <ZoomToLocation location={location} />
+        <MapZoomObserver onZoomChange={setZoom} />
+        <MapPinSelector onSelect={setDraftLocation} />
+        <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); setDraftLocation(validateMapLocation(point.lat, point.lng)); } }} title="Pin de la finca" />
+        <CircleMarker center={[draftLocation.lat, draftLocation.lon]} radius={8} pathOptions={{ color: "#fbbf24", fillColor: "#fbbf24", fillOpacity: 0.25 }} />
+      </MapContainer>
+    </div>
+    <div className="mt-4 grid gap-4 rounded-2xl border border-white/15 bg-slate-950/80 p-4 text-left sm:grid-cols-[1fr_auto]">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Finca seleccionada</p>
+        <p className="mt-2 text-base font-semibold text-white">{draftLocation.label}</p>
+        <p className="mt-1 text-sm text-slate-300">{formatCoordinates(draftLocation)}</p>
+        <p className="mt-2 text-xs text-slate-400">Haz click en el mapa o arrastra el pin para ajustar la ubicación.</p>
+      </div>
+      <div className="flex flex-col gap-2 sm:min-w-44">
+        <label htmlFor="gibs-date" className="text-xs font-semibold text-slate-300">Fecha NASA GIBS</label>
+        <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/50" />
+        <label htmlFor="gibs-opacity" className="text-xs font-semibold text-slate-300">Opacidad de capas: {opacity}%</label>
+        <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-cyan-300" />
+      </div>
+      <p className="text-xs leading-5 text-slate-400 sm:col-span-2">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
+      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:justify-end">
+        <button type="button" onClick={onBack} className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300">Volver al globo</button>
+        <button type="button" onClick={() => onLocationSelected(draftLocation)} className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Confirmar finca</button>
+      </div>
+    </div>
+    <p className="mt-3 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
+    {zoom < 12 && <p className="mt-1 text-xs text-amber-200">Acércate a zoom 12 o más para fijar el pin con mayor precisión.</p>}
+  </section>;
+}
