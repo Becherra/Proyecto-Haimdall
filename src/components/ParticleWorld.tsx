@@ -3,30 +3,58 @@
 import * as THREE from "three";
 import { useEffect, useRef, useState } from "react";
 import { generateFibonacciSphere, getParticleColor, isLandPixel, sampleWholeSurface, type ParticlePosition } from "../lib/ui/particleGeometry";
+import { HERO_TIMELINE } from "../lib/ui/heroTimeline";
 
 const TEXTURE_URL = "/textures/earth-bluemarble-2048.jpg";
+/** react-globe.gl usa fov 50 y, a altitud 2.5, la cámara queda a 3.5 radios del centro. Con esto la esfera de triángulos mide EXACTO lo mismo que tu globo. */
+const GLOBE_FOV_DEG = 50;
+const GLOBE_DISTANCE = 3.5;
+const T = HERO_TIMELINE;
+
 const VERTEX_SHADER = `
+  attribute vec3 aStart;
   attribute float aSize;
   attribute float aSeed;
   attribute vec3 aColor;
-  uniform highp float uPixelRatio;
+  uniform float uPixelRatio;
   uniform float uCameraDistance;
+  uniform float uAssemble;
+  uniform float uBurst;
+  uniform float uTime;
+  uniform vec2 uSpread;
+  uniform vec2 uOffset;
   varying vec3 vColor;
   varying float vFresnel;
   varying float vFacing;
   varying float vLight;
   varying float vSize;
-  varying float vSeed;
+  varying float vAngle;
+  varying float vEase;
+  mat2 rot(float a) { float c = cos(a); float s = sin(a); return mat2(c, -s, s, c); }
   void main() {
-    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+    // cada triángulo sale en un momento distinto y llega con ease-out
+    float delay = fract(aSeed * 13.37) * 0.45;
+    float t = clamp((uAssemble - delay) / 0.55, 0.0, 1.0);
+    float e = 1.0 - pow(1.0 - t, 3.0);
+    vec3 start = vec3(uOffset + aStart.xy * uSpread, aStart.z * 2.0);
+    vec3 p = mix(start, position, e);
+    p.xz = rot((1.0 - e) * 0.8 * (0.5 + aSeed)) * p.xz; // espiral al llegar
+    p += (1.0 - e) * 0.08 * vec3(sin(uTime * 0.9 + aSeed * 40.0), cos(uTime * 0.7 + aSeed * 25.0), sin(uTime * 0.6 + aSeed * 31.0));
+    p *= 1.0 + uBurst * (0.25 + aSeed * 0.55); // explosión suave al final
+
+    vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     vec3 normal = normalize(normalMatrix * normalize(position));
     vec3 viewDirection = normalize(-viewPosition.xyz);
-    vFacing = dot(normal, viewDirection);
-    vFresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.0);
+    float facing = dot(normal, viewDirection);
+    // volando se ven todos; ya ensamblados se oculta la cara trasera de la esfera
+    vFacing = mix(1.0, smoothstep(-0.02, 0.12, facing), smoothstep(0.55, 1.0, e));
+    vFresnel = pow(1.0 - max(facing, 0.0), 2.0);
     vLight = 0.12 + max(dot(normal, normalize(vec3(-0.35, 0.3, 1.0))), 0.0) * 0.88;
     vColor = aColor;
-    vSize = aSize * uPixelRatio * (uCameraDistance / max(0.1, -viewPosition.z));
-    vSeed = aSeed;
+    vEase = e;
+    vAngle = aSeed * 6.2831853 + (1.0 - e) * uTime * (aSeed - 0.5) * 5.0; // giran mientras vuelan
+    vSize = aSize * uPixelRatio * min(uCameraDistance / max(0.1, -viewPosition.z), 2.0)
+          * (0.7 + 0.3 * e) * (1.0 + 0.1 * e * sin(uTime * 2.0 + aSeed * 50.0));
     gl_PointSize = vSize;
     gl_Position = projectionMatrix * viewPosition;
   }
@@ -35,43 +63,52 @@ const VERTEX_SHADER = `
 const FRAGMENT_SHADER = `
   precision mediump float;
   uniform float uOpacity;
-  uniform highp float uPixelRatio;
-  uniform float uTriangle;
+  uniform float uLayerOpacity;
+  uniform float uPixelRatio;
   varying vec3 vColor;
   varying float vFresnel;
   varying float vFacing;
   varying float vLight;
   varying float vSize;
-  varying float vSeed;
+  varying float vAngle;
+  varying float vEase;
   float segmentDistance(vec2 point, vec2 start, vec2 end) {
     vec2 delta = end - start;
     float amount = clamp(dot(point - start, delta) / dot(delta, delta), 0.0, 1.0);
     return length(point - (start + amount * delta));
   }
   void main() {
-    if (vFacing < 0.0) discard;
-    float alpha = 1.0;
-    if (uTriangle > 0.5) {
-      vec2 point = (gl_PointCoord - 0.5) * vSize;
-      float angle = vSeed * 6.2831853;
-      point = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * point;
-      vec2 a = vec2(-0.42, -0.32) * vSize;
-      vec2 b = vec2(0.42, -0.32) * vSize;
-      vec2 c = vec2(0.0, 0.44) * vSize;
-      float edge = min(segmentDistance(point, a, b), min(segmentDistance(point, b, c), segmentDistance(point, c, a)));
-      alpha = 1.0 - smoothstep(1.0 * uPixelRatio, 1.9 * uPixelRatio, edge);
-      if (alpha < 0.02) discard;
-    } else if (distance(gl_PointCoord, vec2(0.5)) > 0.5) {
-      discard;
-    }
-    float rim = 0.28 + 1.25 * vFresnel;
-    float lighting = 0.16 + 0.84 * vLight;
-    gl_FragColor = vec4(vColor * lighting * (0.58 + 0.55 * vFresnel), alpha * uOpacity * rim);
+    vec2 point = (gl_PointCoord - 0.5) * vSize;
+    point = mat2(cos(vAngle), -sin(vAngle), sin(vAngle), cos(vAngle)) * point;
+    vec2 a = vec2(0.0, 0.42) * vSize;
+    vec2 b = vec2(-0.364, -0.21) * vSize;
+    vec2 c = vec2(0.364, -0.21) * vSize;
+    float edge = min(segmentDistance(point, a, b), min(segmentDistance(point, b, c), segmentDistance(point, c, a)));
+    float alpha = 1.0 - smoothstep(0.8 * uPixelRatio, 1.7 * uPixelRatio, edge);
+    if (alpha < 0.02) discard;
+    float rim = mix(1.0, 0.4 + 1.1 * vFresnel, vEase);
+    float lighting = mix(1.0, 0.16 + 0.84 * vLight, vEase);
+    float visibility = vFacing * mix(0.5, 1.0, vEase);
+    vec3 color = vColor * lighting * (0.58 + 0.55 * vFresnel) * 1.2;
+    gl_FragColor = vec4(color, alpha * uOpacity * uLayerOpacity * rim * visibility);
   }
 `;
 
 type TextureMask = { pixels: Uint8ClampedArray; width: number; height: number };
-type LayerKind = "triangle" | "point";
+type Shared = Record<string, THREE.IUniform>;
+type ParticleWorldProps = {
+  stage?: string;
+  /** performance.now() del inicio de la intro (lo escribe page.tsx cuando llama a onReady). */
+  startRef?: { current: number };
+  /** Contenedor del globo real: la esfera de triángulos se coloca y escala igual que él. */
+  anchorRef?: { current: HTMLElement | null };
+  onReady?: () => void;
+  onError?: () => void;
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const smooth = (value: number) => value * value * (3 - 2 * value);
+const fract = (value: number) => value - Math.floor(value);
 
 function loadTextureMask(): Promise<TextureMask | null> {
   return new Promise((resolve) => {
@@ -94,73 +131,69 @@ function loadTextureMask(): Promise<TextureMask | null> {
   });
 }
 
+/** Mapeo igual al de three-globe: lng 0 / lat 0 mira a la cámara (+Z), el este queda a la derecha. */
 function isLandPosition(position: ParticlePosition, mask: TextureMask | null): boolean {
   if (!mask) return true;
-  const u = (Math.atan2(position[2], position[0]) / (Math.PI * 2) + 1) % 1;
-  const v = 0.5 - Math.asin(position[1]) / Math.PI;
-  const x = Math.min(mask.width - 1, Math.floor(u * mask.width));
-  const y = Math.min(mask.height - 1, Math.floor(v * mask.height));
+  const u = Math.atan2(position[0], position[2]) / (Math.PI * 2) + 0.5;
+  const v = 0.5 - Math.asin(Math.max(-1, Math.min(1, position[1]))) / Math.PI;
+  const x = Math.min(mask.width - 1, Math.max(0, Math.floor(u * mask.width)));
+  const y = Math.min(mask.height - 1, Math.max(0, Math.floor(v * mask.height)));
   const pixel = (y * mask.width + x) * 4;
   return isLandPixel(mask.pixels[pixel], mask.pixels[pixel + 1], mask.pixels[pixel + 2]);
 }
 
-function createParticleLayer(
-  positions: ParticlePosition[],
-  kind: LayerKind,
-  pixelRatio: number,
-  opacity: number,
-): THREE.Points {
+function createLayer(positions: ParticlePosition[], options: { size: number; opacity: number; seedOffset: number }, shared: Shared): THREE.Points {
   const count = positions.length;
-  const xyz = new Float32Array(count * 3);
+  const target = new Float32Array(count * 3);
+  const start = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   const seeds = new Float32Array(count);
   const colors = new Float32Array(count * 3);
-
+  const color = new THREE.Color();
   positions.forEach((position, index) => {
-    const pointColor = new THREE.Color(getParticleColor(position));
-    xyz.set(position, index * 3);
-    sizes[index] = kind === "triangle" ? 10 + (index % 7) : 1 + (index % 2);
-    seeds[index] = fract(Math.sin((index + 1) * 78.233) * 43758.5453);
-    colors.set([pointColor.r, pointColor.g, pointColor.b], index * 3);
+    color.set(getParticleColor(position));
+    target.set(position, index * 3);
+    start[index * 3] = Math.random() * 2 - 1;
+    start[index * 3 + 1] = Math.random() * 2 - 1;
+    start[index * 3 + 2] = Math.random() * 2 - 1;
+    sizes[index] = options.size + (index % 5);
+    seeds[index] = fract(Math.sin((index + 1 + options.seedOffset) * 78.233) * 43758.5453);
+    colors[index * 3] = color.r;
+    colors[index * 3 + 1] = color.g;
+    colors[index * 3 + 2] = color.b;
   });
-
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(xyz, 3));
+  geometry.setAttribute("position", new THREE.BufferAttribute(target, 3));
+  geometry.setAttribute("aStart", new THREE.BufferAttribute(start, 3));
   geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
   geometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
   geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
   const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uPixelRatio: { value: pixelRatio },
-      uCameraDistance: { value: 3.5 },
-      uOpacity: { value: opacity },
-      uTriangle: { value: kind === "triangle" ? 1 : 0 },
-    },
+    uniforms: { ...shared, uLayerOpacity: { value: options.opacity } },
     vertexShader: VERTEX_SHADER,
     fragmentShader: FRAGMENT_SHADER,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-  return new THREE.Points(geometry, material);
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false; // las partículas viajan fuera del bounding sphere
+  return points;
 }
 
-function fract(value: number): number {
-  return value - Math.floor(value);
-}
-
-function createLandPositions(target: number, mask: TextureMask | null): ParticlePosition[] {
-  const candidates = generateFibonacciSphere(target * 6);
-  return sampleWholeSurface(candidates.filter((position) => isLandPosition(position, mask)), target);
-}
-
-export default function ParticleWorld({ stage = "settled" }: { stage?: string }) {
+export default function ParticleWorld({ stage = "settled", startRef, anchorRef, onReady, onError }: ParticleWorldProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
   const [fps, setFps] = useState(0);
   const [renderError, setRenderError] = useState(false);
-  const triangleCount = isMobile ? 1500 : 3500;
-  const pointCount = isMobile ? 4000 : 9000;
+  const isPreview = stage === "preview";
+  // Triángulos de continente (protagonistas) + triángulos tenues de océano para que se lea la esfera completa.
+  const landCount = isMobile ? 2000 : 4200;
+  const oceanCount = isMobile ? 700 : 1600;
+
+  useEffect(() => { onReadyRef.current = onReady; onErrorRef.current = onError; });
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
@@ -176,9 +209,8 @@ export default function ParticleWorld({ stage = "settled" }: { stage?: string })
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: "high-performance" });
-
     } catch {
-      queueMicrotask(() => setRenderError(true));
+      queueMicrotask(() => { setRenderError(true); onErrorRef.current?.(); });
       return;
     }
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -186,24 +218,49 @@ export default function ParticleWorld({ stage = "settled" }: { stage?: string })
     renderer.setClearColor(0x000000, 0);
     renderer.domElement.className = "absolute inset-0 h-full w-full pointer-events-none";
     renderer.domElement.setAttribute("role", "img");
-    renderer.domElement.setAttribute("aria-label", "Tierra formada por partículas triangulares y puntos de luz");
+    renderer.domElement.setAttribute("aria-label", "Tierra formada por partículas triangulares");
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-    camera.position.set(0, 0, 3.5);
+    const camera = new THREE.PerspectiveCamera(GLOBE_FOV_DEG, 1, 0.1, 100);
+    camera.position.set(0, 0, GLOBE_DISTANCE);
     const world = new THREE.Group();
     scene.add(world);
 
+    const shared: Shared = {
+      uPixelRatio: { value: pixelRatio },
+      uCameraDistance: { value: GLOBE_DISTANCE },
+      uAssemble: { value: isPreview ? 1 : 0 },
+      uBurst: { value: 0 },
+      uTime: { value: 0 },
+      uOpacity: { value: isPreview ? 1 : 0 },
+      uSpread: { value: new THREE.Vector2(3, 2) },
+      uOffset: { value: new THREE.Vector2(0, 0) },
+    };
+
+    // El overlay es fullscreen, pero la esfera se centra y escala igual que el contenedor del globo real.
     const resize = () => {
-      const { width, height } = host.getBoundingClientRect();
+      const rect = host.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
       if (!width || !height) return;
       renderer.setSize(width, height, false);
+      const anchor = anchorRef?.current?.getBoundingClientRect();
+      const hasAnchor = Boolean(anchor && anchor.width && anchor.height);
+      const cx = hasAnchor && anchor ? anchor.left + anchor.width / 2 - rect.left : width / 2;
+      const cy = hasAnchor && anchor ? anchor.top + anchor.height / 2 - rect.top : height / 2;
+      const anchorHeight = hasAnchor && anchor ? anchor.height : height;
+      const tanHalf = Math.tan(THREE.MathUtils.degToRad(GLOBE_FOV_DEG / 2)) * (height / anchorHeight);
+      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanHalf));
       camera.aspect = width / height;
-      camera.updateProjectionMatrix();
+      camera.setViewOffset(width, height, width / 2 - cx, height / 2 - cy, width, height);
+      const unitsPerPixel = (2 * GLOBE_DISTANCE * tanHalf) / height;
+      shared.uSpread.value.set((width / 2) * unitsPerPixel, (height / 2) * unitsPerPixel);
+      shared.uOffset.value.set((width / 2 - cx) * unitsPerPixel, (cy - height / 2) * unitsPerPixel);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
+    if (anchorRef?.current) observer.observe(anchorRef.current);
     resize();
 
     const layers: THREE.Points[] = [];
@@ -215,39 +272,47 @@ export default function ParticleWorld({ stage = "settled" }: { stage?: string })
 
     void loadTextureMask().then((mask) => {
       if (cancelled) return;
-      const land = createLandPositions(triangleCount, mask);
-      const ocean = generateFibonacciSphere(pointCount, 0.995);
-      const ambient = generateFibonacciSphere(16, 1.2).map((position, index) => {
-        const color = index % 3 === 0 ? "#ffb829" : index % 3 === 1 ? "#8052ff" : "#15846e";
-        const point = new THREE.Vector3(...position).multiplyScalar(1.18 + (index % 5) * 0.04);
-        return { position: [point.x, point.y, point.z] as ParticlePosition, color };
-      });
-      const triangles = createParticleLayer(land, "triangle", pixelRatio, 0.9);
-      const points = createParticleLayer(ocean, "point", pixelRatio, 0.46);
-      const floatingTriangles = createParticleLayer(ambient.map((item) => item.position), "triangle", pixelRatio, 0.34);
-      const ambientColors = floatingTriangles.geometry.getAttribute("aColor") as THREE.BufferAttribute;
-      ambient.forEach((item, index) => {
-        const color = new THREE.Color(item.color);
-        ambientColors.setXYZ(index, color.r, color.g, color.b);
-      });
-      layers.push(triangles, points, floatingTriangles);
-      world.add(triangles, points, floatingTriangles);
+      const candidates = generateFibonacciSphere(landCount * 6);
+      const land = sampleWholeSurface(candidates.filter((position) => isLandPosition(position, mask)), landCount);
+      const ocean = generateFibonacciSphere(oceanCount, 0.995);
+      const landLayer = createLayer(land, { size: 8, opacity: 1, seedOffset: 0 }, shared);
+      const oceanLayer = createLayer(ocean, { size: 6, opacity: 0.32, seedOffset: 5000 }, shared);
+      layers.push(landLayer, oceanLayer);
+      world.add(oceanLayer, landLayer);
+      resize();
+      if (!isPreview) onReadyRef.current?.();
     });
 
-    const render = (now: number) => {
+    const render = () => {
       if (cancelled) return;
       frame = window.requestAnimationFrame(render);
-      const delta = Math.min((now - previousFrame) / 1000, 0.05);
-      previousFrame = now;
-      if (!document.hidden) {
+      const nowMs = performance.now();
+      const delta = Math.min((nowMs - previousFrame) / 1000, 0.05);
+      previousFrame = nowMs;
+      if (document.hidden || layers.length === 0) return;
+
+      shared.uTime.value = nowMs / 1000;
+      if (isPreview) {
         if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) world.rotation.y += delta * 0.035;
-        renderer.render(scene, camera);
+      } else {
+        const elapsed = startRef && startRef.current ? nowMs - startRef.current : 0;
+        const assemble = clamp01((elapsed - T.scatter) / (T.gather - T.scatter));
+        const burst = smooth(clamp01((elapsed - T.hold) / (T.explode - T.hold)));
+        shared.uAssemble.value = assemble;
+        shared.uBurst.value = burst;
+        shared.uOpacity.value = smooth(clamp01(elapsed / 500)) * (1 - burst);
+        // gira al ensamblarse y termina EXACTAMENTE alineado con el globo real (lng 0, lat 0)
+        world.rotation.y = Math.pow(1 - assemble, 2) * 1.2;
       }
-      frameCount += 1;
-      if (now - lastFpsUpdate >= 1000) {
-        setFps(Math.round((frameCount * 1000) / (now - lastFpsUpdate)));
-        frameCount = 0;
-        lastFpsUpdate = now;
+      renderer.render(scene, camera);
+
+      if (isPreview) {
+        frameCount += 1;
+        if (nowMs - lastFpsUpdate >= 1000) {
+          setFps(Math.round((frameCount * 1000) / (nowMs - lastFpsUpdate)));
+          frameCount = 0;
+          lastFpsUpdate = nowMs;
+        }
       }
     };
     frame = window.requestAnimationFrame(render);
@@ -265,11 +330,13 @@ export default function ParticleWorld({ stage = "settled" }: { stage?: string })
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [isMobile, pointCount, triangleCount]);
+  }, [isMobile, landCount, oceanCount, isPreview, startRef, anchorRef]);
 
-  return <div ref={hostRef} data-intro-stage={stage} className={`particle-world pointer-events-none absolute inset-0 overflow-hidden particle-stage-${stage}`}>
-    {renderError ? <p className="absolute inset-x-4 bottom-4 text-center text-xs text-silver-mist" role="alert">No fue posible iniciar WebGL para la vista de partículas.</p> : <output className="absolute bottom-3 right-3 z-10 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 font-mono text-[10px] text-silver-mist" aria-live="off">
-      {triangleCount.toLocaleString("es-CO")} triángulos · {pointCount.toLocaleString("es-CO")} puntos · {fps || "—"} FPS
-    </output>}
+  return <div ref={hostRef} data-intro-stage={stage} className={`particle-world pointer-events-none fixed inset-0 z-20 overflow-hidden particle-stage-${stage}`}>
+    {renderError
+      ? <p className="absolute inset-x-4 bottom-4 text-center text-xs text-silver-mist" role="alert">No fue posible iniciar WebGL para la vista de partículas.</p>
+      : isPreview && <output className="fixed bottom-3 right-3 z-10 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 font-mono text-[10px] text-silver-mist" aria-live="off">
+        {landCount.toLocaleString("es-CO")} + {oceanCount.toLocaleString("es-CO")} triángulos · {fps || "—"} FPS
+      </output>}
   </div>;
 }
