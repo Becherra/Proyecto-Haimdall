@@ -47,8 +47,18 @@ export const indicatorsSchema = z.object({
   missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
   /** Con qué se calculó `waterDeficitMm`: evaporación potencial estimada ("potential") o EVLAND de NASA ("evland", la real, que subestima la aridez). */
   waterBalanceMethod: z.enum(["potential", "evland"]).optional(),
-  /** Temperatura media de toda la serie (T2M, °C); null si no hubo datos. Es la de la celda de NASA POWER, no la del lote. */
+  /** Temperatura media estimada para el sitio (°C); si se conocen las altitudes de la celda y del lote se corrige por piso térmico, si no es el promedio de T2M de la celda. */
   meanTemperatureC: z.number().nullable().optional(),
+  /** Temperatura media sin corregir de la celda de NASA POWER (T2M, °C) cuando se aplicó corrección por altitud. */
+  cellMeanTemperatureC: z.number().nullable().optional(),
+  /** Altitud media de la celda de NASA POWER (m s. n. m.). */
+  cellElevationMeters: z.number().finite().optional(),
+  /** Altitud del lote (m s. n. m., SRTM o declarada) con la que se ajustó la temperatura. */
+  siteElevationMeters: z.number().finite().optional(),
+  /** Pendiente media del lote (%, SRTM o declarada) para evaluar erosión en ladera. */
+  slopePercent: z.number().finite().min(0).max(100).optional(),
+  /** Origen de los datos de terreno del lote: muestra precargada de NASA SRTM ("srtm-sample") o declarados por el usuario ("user"). */
+  terrainSource: z.enum(["srtm-sample", "user"]).optional(),
 });
 export type Indicators = z.infer<typeof indicatorsSchema>;
 
@@ -75,8 +85,19 @@ export type Rotation = z.infer<typeof rotationSchema>;
 export const userPrioritiesSchema = z.object({
   waterSaving: score, extraIncome: score, soilImprovement: score, erosionReduction: score, lowRisk: score,
   currentCropId: z.string().min(1).optional(), waterAvailability: z.enum(["low", "medium", "high"]).optional(),
+  /** Altitud del lote declarada por el agricultor (m s. n. m.); permite corregir la temperatura de la celda de NASA POWER. */
+  elevationMeters: z.number().finite().min(-500).max(6000).optional(),
+  /** Pendiente media del lote declarada por el agricultor (%, 0–100); pondera el riesgo de erosión en ladera. */
+  slopePercent: z.number().finite().min(0).max(100).optional(),
 });
 export type UserPriorities = z.infer<typeof userPrioritiesSchema>;
+
+export const terrainSampleSchema = z.object({
+  id: z.string().min(1), name: z.string().min(1),
+  lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180), tolerance: z.number().positive(),
+  elevationMeters: z.number().finite().min(-500).max(6000), slopePercent: z.number().finite().min(0).max(100), source: z.string().min(1),
+});
+export type TerrainSample = z.infer<typeof terrainSampleSchema>;
 
 export const rotationResultSchema = z.object({
   rotation: rotationSchema, score: z.number(), whySuggested: z.string().min(1), evidence: z.array(z.string().min(1)).min(1),
@@ -89,6 +110,8 @@ export const climateResultSchema = z.object({
   records: z.array(climateRecordSchema),
   missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
   source: z.enum(["live", "cache", "sample"]),
+  /** Elevación media de la celda de NASA POWER (m s. n. m., geometry.coordinates[2]); ausente si la respuesta no la incluye. */
+  cellElevationMeters: z.number().finite().optional(),
 });
 export type ClimateResult = z.infer<typeof climateResultSchema>;
 
