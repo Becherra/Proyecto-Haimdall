@@ -5,9 +5,9 @@ import { readLocationCache, writeLocationCache } from "../lib/ui/locationCache";
 import { geolocationErrorMessage, requestCurrentLocation } from "../services/geolocation";
 import { locationResultSchema, type LocationResult } from "../types";
 
-type LocationSearchProps = { onLocationSelected: (location: LocationResult, accuracyMeters?: number) => void };
+type LocationSearchProps = { onLocationSelected: (location: LocationResult, accuracyMeters?: number) => void; onGpsStart?: () => void; onGpsLocationSelected?: (location: LocationResult, accuracyMeters: number) => void; onGpsError?: (message: string) => void };
 
-export default function LocationSearch({ onLocationSelected }: LocationSearchProps) {
+export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLocationSelected, onGpsError }: LocationSearchProps) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -36,12 +36,15 @@ export default function LocationSearch({ onLocationSelected }: LocationSearchPro
   async function useCurrentLocation() {
     setError(null);
     setLocating(true);
+    onGpsStart?.();
     try {
       const coords = await requestCurrentLocation();
       const location = locationResultSchema.parse({ lat: coords.latitude, lon: coords.longitude, label: "Tu ubicación actual" });
-      onLocationSelected(location, coords.accuracy);
+      (onGpsLocationSelected ?? onLocationSelected)(location, coords.accuracy);
     } catch (caught) {
-      setError(geolocationErrorMessage(caught));
+      const message = geolocationErrorMessage(caught);
+      setError(message);
+      onGpsError?.(message);
     } finally { setLocating(false); }
   }
 
