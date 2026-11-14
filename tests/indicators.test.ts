@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  aggregateMonthly, computeMonthlyWaterDeficit, computeWetnessAnomalies, countFrostRiskDays, countHeatStressDays, extremeRainThreshold, percentile,
+  aggregateMonthly, computeIndicators, computeMonthlyWaterDeficit, computeWetnessAnomalies, countFrostRiskDays, countHeatStressDays, extremeRainThreshold, percentile,
 } from "../src/lib/indicators";
 import { clearClimateCache, fetchDailyClimate } from "../src/lib/nasaPower";
-import type { ClimateRecord } from "../src/types";
+import { indicatorsSchema, type ClimateRecord } from "../src/types";
 
 const fixture = JSON.parse(readFileSync("tests/fixtures/power-pereira.json", "utf8")) as unknown;
 const EMPTY_DAY = { T2M: null, T2M_MIN: null, T2M_MAX: null, PRECTOTCORR: null, EVLAND: null, GWETROOT: null, ALLSKY_SFC_SW_DWN: null };
@@ -162,5 +162,39 @@ describe("computeWetnessAnomalies", () => {
 
   it("devuelve una lista vacía si no hay meses", () => {
     expect(computeWetnessAnomalies([])).toEqual([]);
+  });
+});
+
+describe("computeIndicators", () => {
+  it("arma un objeto Indicators válido con la fixture real de Pereira", () => {
+    const indicators = computeIndicators(pereira);
+    expect(indicatorsSchema.safeParse(indicators).success).toBe(true);
+    expect(indicators.waterDeficitMm).toBeCloseTo(48.6875, 4);
+    expect(indicators.heatStressDays).toBe(0);
+    expect(indicators.frostRiskDays).toBe(0);
+    expect(indicators.extremeRainThresholdMm).toBeCloseTo(17.4475, 4);
+    expect(indicators.meanRootZoneWetness).toBeCloseTo(0.798786, 5);
+    expect(indicators.missingByParameter).toEqual({ T2M: 0, T2M_MIN: 0, T2M_MAX: 0, PRECTOTCORR: 0, EVLAND: 0, GWETROOT: 0, ALLSKY_SFC_SW_DWN: 0 });
+  });
+
+  it("combina conteos, balance y faltantes con datos incompletos", () => {
+    const records = [
+      day("20200101", { T2M_MAX: 36, T2M_MIN: -1, PRECTOTCORR: 10, EVLAND: 4, GWETROOT: 0.5 }),
+      day("20200201", { T2M_MAX: null, T2M_MIN: 5, PRECTOTCORR: 2, EVLAND: 8, GWETROOT: null }),
+    ];
+    const indicators = computeIndicators(records);
+    expect(indicatorsSchema.safeParse(indicators).success).toBe(true);
+    expect(indicators).toMatchObject({ waterDeficitMm: 0, heatStressDays: 1, frostRiskDays: 1, meanRootZoneWetness: 0.5 });
+    expect(indicators.missingByParameter).toMatchObject({ T2M: 2, T2M_MAX: 1, GWETROOT: 1, PRECTOTCORR: 0 });
+  });
+
+  it("no inventa valores con una serie vacía", () => {
+    const indicators = computeIndicators([]);
+    expect(indicatorsSchema.safeParse(indicators).success).toBe(true);
+    expect(indicators).toMatchObject({ waterDeficitMm: null, heatStressDays: 0, frostRiskDays: 0, extremeRainThresholdMm: null, meanRootZoneWetness: null });
+  });
+
+  it("deja el balance en null si ningún mes tiene lluvia y evaporación", () => {
+    expect(computeIndicators([day("20200101", { PRECTOTCORR: 3 })]).waterDeficitMm).toBeNull();
   });
 });

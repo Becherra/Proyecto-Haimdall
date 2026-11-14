@@ -1,9 +1,9 @@
-import type { ClimateRecord, IndicatorValue, MonthlyClimate, MonthlyWaterDeficit, MonthlyWetnessAnomaly } from "../types";
+import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, MonthlyWaterDeficit, MonthlyWetnessAnomaly } from "../types";
 import { EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_YEARS_FOR_ANOMALY_BASELINE } from "./config";
 
-type NumericParameter = "T2M" | "T2M_MIN" | "T2M_MAX" | "PRECTOTCORR" | "EVLAND" | "GWETROOT";
+type NumericParameter = ClimateParameter;
 
-const AGGREGATED_PARAMETERS: readonly NumericParameter[] = ["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT"];
+const AGGREGATED_PARAMETERS: readonly ClimateParameter[] = ["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT"];
 
 /** Separa los valores válidos de un parámetro y cuenta los días en que faltó (null). */
 function validValues(records: readonly ClimateRecord[], parameter: NumericParameter): IndicatorValue<number[]> {
@@ -138,4 +138,25 @@ export function computeWetnessAnomalies(monthly: readonly MonthlyClimate[]): Mon
       missing: missingByParameter.GWETROOT ?? 0,
     };
   });
+}
+
+/**
+ * Arma el objeto `Indicators` completo a partir de los registros diarios.
+ * - `waterDeficitMm`: promedio de los balances mensuales (lluvia − evaporación) en mm/mes; negativo = déficit.
+ * - `heatStressDays` / `frostRiskDays`: total de días de toda la serie (no promedio anual).
+ * - `extremeRainThresholdMm`: percentil 95 de lluvia diaria.
+ * - `meanRootZoneWetness`: promedio de los días con dato de GWETROOT.
+ * - `missingByParameter`: días sin dato por cada uno de los parámetros NASA.
+ * Un indicador sin datos suficientes queda en null (o 0 en los conteos de días).
+ */
+export function computeIndicators(records: readonly ClimateRecord[]): Indicators {
+  const monthlyBalances = computeMonthlyWaterDeficit(aggregateMonthly(records)).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
+  return {
+    waterDeficitMm: mean(monthlyBalances),
+    heatStressDays: countHeatStressDays(records).value,
+    frostRiskDays: countFrostRiskDays(records).value,
+    extremeRainThresholdMm: extremeRainThreshold(records).value,
+    meanRootZoneWetness: mean(validValues(records, "GWETROOT").value),
+    missingByParameter: Object.fromEntries(CLIMATE_PARAMETERS.map((name) => [name, validValues(records, name).missing])),
+  };
 }
