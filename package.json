@@ -28,6 +28,7 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.6",
     "postcss": "^8.5.33",
@@ -40,6 +41,7 @@
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-globe.gl": "^2.38.0",
     "zod": "^4.6.7"
   }
 }
