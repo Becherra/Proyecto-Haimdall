@@ -31,8 +31,10 @@ export default function GlobeScene({ location }: GlobeSceneProps) {
 
   useEffect(() => {
     const globe = globeRef.current;
-    if (!globe || reducedMotion) return;
+    if (!globe) return;
     const controls = globe.controls();
+    controls.autoRotate = !reducedMotion;
+    if (reducedMotion) return;
     const pause = () => {
       controls.autoRotate = false;
       if (resumeTimer.current) window.clearTimeout(resumeTimer.current);
@@ -41,7 +43,6 @@ export default function GlobeScene({ location }: GlobeSceneProps) {
       if (resumeTimer.current) window.clearTimeout(resumeTimer.current);
       resumeTimer.current = window.setTimeout(() => { controls.autoRotate = true; }, 3500);
     };
-    controls.autoRotate = true;
     controls.autoRotateSpeed = 0.28;
     controls.enableDamping = true;
     controls.addEventListener("start", pause);
@@ -55,5 +56,5 @@ export default function GlobeScene({ location }: GlobeSceneProps) {
 
   if (!webglAvailable) return <div className="flex h-[320px] w-full max-w-[560px] items-center justify-center rounded-full border border-white/10 bg-slate-900/70 p-8 text-center text-sm text-slate-300" role="status">Tu navegador no puede mostrar el globo 3D. Puedes buscar una ubicación para continuar.</div>;
 
-  return <Globe ref={globeRef} width={width} height={width} globeImageUrl="/textures/earth-bluemarble-2048.png" showAtmosphere atmosphereColor="#67e8f9" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={0.6} pointColor={() => "#fbbf24"} pointLabel="label" rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { globeRef.current?.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }} aria-label="Globo terrestre interactivo" />;
+  return <Globe ref={globeRef} width={width} height={width} globeImageUrl="/textures/earth-bluemarble-2048.jpg" showAtmosphere atmosphereColor="#67e8f9" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={0.6} pointColor={() => "#fbbf24"} pointLabel="label" rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { globeRef.current?.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }} aria-label="Globo terrestre interactivo" />;
 }
