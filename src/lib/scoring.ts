@@ -1,14 +1,16 @@
 import type { Crop, Indicators, Rotation, RotationResult, UserPriorities } from "../types";
 import {
-  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_RISK_PENALTY,
+  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY,
 } from "./config";
+import { commonName, familyBreakShare } from "./rotations";
 import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
 
 type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk";
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
 type Penalty = { label: string; value: number };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
-type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; years: number };
+/** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
+type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; years: number; familyBreak: number | null };
 
 /**
  * Entrada del motor: todo llega como dato, sin leer archivos ni red.
@@ -94,6 +96,12 @@ function sowingPenalties(sowing: SowingFinding[] | null): Penalty[] {
   return value > 0 ? [{ label: `siembra en meses secos (${formatMonths(dryMonths)})`, value }] : [];
 }
 
+/** Castiga repetir la misma familia botánica en relevos seguidos: completa para el monocultivo, nula si siempre se alterna o si no hay dato de familia. */
+function pestCyclePenalties(familyBreak: number | null): Penalty[] {
+  if (familyBreak === null || familyBreak >= 1) return [];
+  return [{ label: "repetir la misma familia botánica en relevos seguidos (plagas y enfermedades)", value: (1 - familyBreak) * MAX_PEST_CYCLE_PENALTY }];
+}
+
 function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, priorities, seasonality, years }: Context): Evaluation {
   const crops = resolveCrops(rotation, catalog);
   const dryness = drynessFactor(indicators);
@@ -101,10 +109,11 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const values = criterionValues(crops, dryness);
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
   const sowing = seasonality ? crops.map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
-  const penalties = [...riskPenalties(crops, indicators, dryness, years), ...sowingPenalties(sowing)];
+  const familyBreak = familyBreakShare(crops);
+  const penalties = [...riskPenalties(crops, indicators, dryness, years), ...sowingPenalties(sowing), ...pestCyclePenalties(familyBreak)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, criteria, penalties, sowing, years, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, criteria, penalties, sowing, years, familyBreak, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -141,7 +150,22 @@ function daysPerYearText(days: number, years: number): string {
   return `${days} en ${years} ${years === 1 ? "año" : "años"} (≈${perYear(days, years).toFixed(0)} al año)`;
 }
 
-function buildEvidence({ criteria, crops, sowing, years }: Evaluation, indicators: Indicators): string[] {
+/** Familias de la secuencia y cuántos relevos cambian de familia; vacío si el catálogo no trae las familias. */
+function familyEvidence({ crops, familyBreak }: Evaluation): string[] {
+  if (familyBreak === null) return [];
+  const relays = crops.length;
+  const changes = Math.round(familyBreak * relays);
+  return [`Familias botánicas de la secuencia: ${crops.map((crop) => crop.family).join(" → ")}; cambia de familia en ${changes} de ${relays} ${relays === 1 ? "relevo" : "relevos"}, contando la vuelta al primer cultivo (catálogo).`];
+}
+
+function durationEvidence(crops: readonly Crop[]): string {
+  const total = crops.reduce((sum, crop) => sum + crop.cycleDays, 0);
+  const detail = crops.length === 1 ? `${total}` : `${crops.map((crop) => crop.cycleDays).join(" + ")} = ${total}`;
+  return `Duración de la secuencia: ${detail} días de cultivo (ciclos típicos del catálogo, no datos del lote).`;
+}
+
+function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[] {
+  const { criteria, crops, sowing, years } = evaluation;
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
   return [
     ...(balance === null ? [] : [balanceEvidence(balance, indicators)]),
@@ -150,6 +174,8 @@ function buildEvidence({ criteria, crops, sowing, years }: Evaluation, indicator
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
     ...sowingEvidence(sowing),
+    ...familyEvidence(evaluation),
+    durationEvidence(crops),
     ...crops.map((crop) => `Atributos de ${crop.name}: ${crop.source}.`),
   ];
 }
@@ -163,12 +189,20 @@ const BENEFITS: { pick: (crop: Crop) => number; text: string }[] = [
   { pick: (crop) => crop.droughtTolerance, text: "Tolera periodos secos." },
 ];
 
-function buildBenefits({ crops }: Evaluation): string[] {
-  const found = BENEFITS.filter(({ pick }) => average(crops, pick) >= HIGH_ATTRIBUTE_THRESHOLD).map(({ text }) => text);
+function buildBenefits({ crops, familyBreak }: Evaluation): string[] {
+  const alternates = familyBreak === 1 ? ["Alterna familias botánicas en todos los relevos, lo que ayuda a cortar ciclos de plagas y enfermedades."] : [];
+  const found = [...alternates, ...BENEFITS.filter(({ pick }) => average(crops, pick) >= HIGH_ATTRIBUTE_THRESHOLD).map(({ text }) => text)];
   return found.length > 0 ? found : ["Ninguna ventaja destaca en los atributos del catálogo; su valor es de referencia."];
 }
 
-function buildRisks({ crops, sowing, years }: Evaluation, indicators: Indicators): string[] {
+function familyRisks({ crops, familyBreak }: Evaluation): string[] {
+  if (familyBreak === null || familyBreak >= 1) return [];
+  if (crops.length === 1) return [`Es un monocultivo de ${commonName(crops[0])}: repetir siempre la misma familia (${crops[0].family}) favorece que se acumulen plagas y enfermedades del suelo.`];
+  return ["Repite la misma familia botánica en relevos seguidos, lo que corta menos los ciclos de plagas y enfermedades."];
+}
+
+function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
+  const { crops, sowing, years } = evaluation;
   const low = (pick: (crop: Crop) => number) => average(crops, pick) < LOW_ATTRIBUTE_THRESHOLD;
   const risks: string[] = [];
   if (low((crop) => crop.heatTolerance)) risks.push("Baja tolerancia al calor según el catálogo.");
@@ -179,6 +213,7 @@ function buildRisks({ crops, sowing, years }: Evaluation, indicators: Indicators
   for (const { crop, assessment } of sowing ?? []) {
     if (assessment.dryMonths.length > 0) risks.push(`Parte de los meses de siembra de ${crop.name} (${formatMonths(assessment.dryMonths)}) cae en época seca del sitio.`);
   }
+  risks.push(...familyRisks(evaluation));
   return [...risks, "El puntaje es una simplificación por reglas: no captura plagas, precios, costos ni manejo real."];
 }
 
@@ -189,12 +224,19 @@ function sowingGaps(sowing: SowingFinding[] | null): string[] {
   return ["Los meses de siembra salen del catálogo (preliminares) y se cruzaron con promedios mensuales de lluvia: no distinguen años secos o lluviosos (El Niño/La Niña) ni un calendario real por cultivo y municipio.", ...unknown];
 }
 
-function buildGaps(indicators: Indicators, sowing: SowingFinding[] | null): string[] {
+function familyGap(familyBreak: number | null): string {
+  return familyBreak === null
+    ? "El catálogo no trae la familia botánica de todos los cultivos: no se evaluó si la rotación alterna familias."
+    : "No hay datos de plagas ni enfermedades del lote: alternar familias botánicas es una regla agronómica general, no un diagnóstico.";
+}
+
+function buildGaps(indicators: Indicators, { sowing, familyBreak }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
     "Los datos de NASA POWER son de malla y no miden el lote específico.",
     ...sowingGaps(sowing),
+    familyGap(familyBreak),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),
     ...missing,
   ];
@@ -207,7 +249,7 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
     whySuggested: explainWhy(evaluation),
     evidence: buildEvidence(evaluation, indicators),
     benefits: buildBenefits(evaluation),
-    informationGaps: buildGaps(indicators, evaluation.sowing),
+    informationGaps: buildGaps(indicators, evaluation),
     risks: buildRisks(evaluation, indicators),
     validateWithLocalExpert: [
       `Variedades y fechas de siembra locales de ${evaluation.crops.map((crop) => crop.name).join(", ")}.`,
@@ -217,7 +259,8 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
 }
 
 /**
- * Puntúa cada rotación en la escala 0–5: Σ(peso de la prioridad × puntaje del criterio) − penalizaciones de riesgo.
+ * Puntúa cada rotación en la escala 0–5: Σ(peso de la prioridad × puntaje del criterio) − penalizaciones de riesgo
+ * (calor, sequía, siembra en meses secos y repetir la misma familia botánica en relevos seguidos).
  * Los pesos salen de las prioridades normalizadas; los puntajes combinan atributos del catálogo con los indicadores del sitio.
  * Devuelve los resultados en el mismo orden de entrada (la línea base primero). Lanza un Error si una rotación usa un
  * cultivo fuera del catálogo o no tiene cultivos.

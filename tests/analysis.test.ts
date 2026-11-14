@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AnalysisInputError, buildAnalysis, buildRotations, isInSowingCalendarRegion } from "../src/lib/analysis";
+import { AnalysisInputError, buildAnalysis, isInSowingCalendarRegion } from "../src/lib/analysis";
 import { CROPS } from "../src/lib/catalog";
 import { aggregateMonthly, computeIndicators } from "../src/lib/indicators";
 import { DEFAULT_CURRENT_CROP_ID } from "../src/lib/config";
@@ -22,19 +22,31 @@ function climateWith(overrides: Partial<ClimateRecord> = {}, monthCount = 2): Cl
   };
 }
 
-describe("buildRotations", () => {
+describe("buildAnalysis: rotaciones comparadas", () => {
   it("devuelve la línea base primero y dos alternativas, con el cultivo actual por defecto", () => {
-    const rotations = buildRotations(CROPS, undefined);
-    expect(rotations.map((rotation) => rotation.id)).toEqual(["baseline", "legume", "cover-drought"]);
-    expect(rotations[0].cropIds).toEqual([DEFAULT_CURRENT_CROP_ID]);
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities, location: PEREIRA });
+    expect(response.rotations.map((result) => result.rotation.id)).toEqual(["baseline", "legume", "cover-drought"]);
+    expect(response.rotations[0].rotation.cropIds).toEqual([DEFAULT_CURRENT_CROP_ID]);
   });
 
-  it("usa el cultivo actual declarado por el agricultor como línea base", () => {
-    expect(buildRotations(CROPS, "yuca")[0].cropIds).toEqual(["yuca"]);
+  it("usa el cultivo actual declarado por el agricultor como línea base y dentro de cada alternativa", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: { ...priorities, currentCropId: "yuca" }, location: PEREIRA });
+    expect(response.rotations[0].rotation.cropIds).toEqual(["yuca"]);
+    for (const result of response.rotations) expect(result.rotation.cropIds).toContain("yuca");
   });
 
-  it("lanza AnalysisInputError si el cultivo actual no está en el catálogo", () => {
-    expect(() => buildRotations(CROPS, "cafe")).toThrow(AnalysisInputError);
+  it("no deja que el monocultivo le gane a la rotación que lo combina con otra familia", () => {
+    // Antes, con fríjol como cultivo actual, el fríjol solo superaba a "maíz → fríjol".
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: { waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3, currentCropId: "frijol" }, location: PEREIRA });
+    const [baseline, legume] = response.rotations;
+    expect(legume.score).toBeGreaterThan(baseline.score);
+    expect(baseline.risks.join(" ")).toContain("monocultivo");
+  });
+
+  it("elige alternativas distintas según las prioridades del agricultor", () => {
+    const only = (key: "extraIncome" | "soilImprovement"): UserPriorities => ({ waterSaving: 0, extraIncome: 0, soilImprovement: 0, erosionReduction: 0, lowRisk: 0, [key]: 5 });
+    const analyze = (chosen: UserPriorities) => buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: chosen, location: PEREIRA }).rotations[1].rotation.cropIds;
+    expect(analyze(only("extraIncome"))).not.toEqual(analyze(only("soilImprovement")));
   });
 });
 

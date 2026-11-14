@@ -2,6 +2,7 @@
   {
     "id": "maiz",
     "name": "Maíz (Zea mays)",
+    "family": "Gramíneas",
     "waterUse": 3,
     "nitrogenFixation": 0,
     "erosionReduction": 2,
@@ -22,6 +23,7 @@
   {
     "id": "frijol",
     "name": "Fríjol (Phaseolus vulgaris)",
+    "family": "Leguminosas",
     "waterUse": 2,
     "nitrogenFixation": 2,
     "erosionReduction": 2,
@@ -42,6 +44,7 @@
   {
     "id": "soya",
     "name": "Soya (Glycine max)",
+    "family": "Leguminosas",
     "waterUse": 3,
     "nitrogenFixation": 4,
     "erosionReduction": 3,
@@ -62,6 +65,7 @@
   {
     "id": "arveja",
     "name": "Arveja (Pisum sativum)",
+    "family": "Leguminosas",
     "waterUse": 2,
     "nitrogenFixation": 2,
     "erosionReduction": 1,
@@ -82,6 +86,7 @@
   {
     "id": "mucuna",
     "name": "Mucuna (Mucuna pruriens)",
+    "family": "Leguminosas",
     "waterUse": 3,
     "nitrogenFixation": 4,
     "erosionReduction": 5,
@@ -102,6 +107,7 @@
   {
     "id": "crotalaria",
     "name": "Crotalaria (Crotalaria juncea)",
+    "family": "Leguminosas",
     "waterUse": 2,
     "nitrogenFixation": 5,
     "erosionReduction": 4,
@@ -122,6 +128,7 @@
   {
     "id": "yuca",
     "name": "Yuca (Manihot esculenta)",
+    "family": "Euforbiáceas",
     "waterUse": 2,
     "nitrogenFixation": 0,
     "erosionReduction": 2,
@@ -142,6 +149,7 @@
   {
     "id": "papa",
     "name": "Papa (Solanum tuberosum)",
+    "family": "Solanáceas",
     "waterUse": 3,
     "nitrogenFixation": 0,
     "erosionReduction": 1,
@@ -162,6 +170,7 @@
   {
     "id": "avena",
     "name": "Avena forrajera (Avena sativa)",
+    "family": "Gramíneas",
     "waterUse": 2,
     "nitrogenFixation": 0,
     "erosionReduction": 4,
@@ -182,6 +191,7 @@
   {
     "id": "repollo",
     "name": "Repollo (Brassica oleracea var. capitata)",
+    "family": "Crucíferas",
     "waterUse": 2,
     "nitrogenFixation": 0,
     "erosionReduction": 1,

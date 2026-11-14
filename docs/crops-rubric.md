@@ -16,6 +16,7 @@
 | `marketPotential` | Mercado amplio y conocido | Solo juicio, **sin datos de mercado**. Pendiente: precios y área sembrada locales (UPRA, Agronet, FENALCE). |
 | `heatTolerance` | Tolera mucho calor | Rangos de temperatura EcoCrop y FAO (maíz, soya, yuca, arveja, papa, repollo); avena por Feedipedia; fríjol por literatura. |
 | `droughtTolerance` | Tolera mucha sequía | Literatura cualitativa (yuca, crotalaria); mucuna tiene fuentes en conflicto. |
+| `family` | (no es puntaje) Familia botánica en español | Taxonomía estándar: maíz y avena son gramíneas; fríjol, soya, arveja, mucuna y crotalaria, leguminosas; yuca, euforbiácea; papa, solanácea; repollo, crucífera. El motor la usa para penalizar relevos seguidos de la misma familia. |
 | `cycleDays` | Días de siembra a cosecha o corte | Cenicafé (maíz 145, fríjol 90), EcoCrop, FAO y estudios de biomasa. Es una cifra típica, no un dato local. |
 | `sowingMonths` | Meses aptos | Marzo–abril y septiembre–octubre, de una fuente secundaria que **no** es Cenicafé ni FENALCE. Cenicafé señala febrero–marzo y julio–agosto como los periodos menos lluviosos y desaconseja sembrar fríjol o maíz en esos meses durante El Niño. |
 
@@ -45,5 +46,5 @@ Las de los 7 cultivos iniciales las consulté por **búsqueda web y solo vi res�
 - Calendario de siembra único para los 10 cultivos; falta un calendario real por cultivo y municipio. Para papa, avena y repollo no se encontró ninguna fuente de fechas de siembra en el Eje Cafetero: el boletín agroclimático de Agronet para Caldas trae un calendario de siembra y cosecha, pero el PDF no se pudo abrir.
 - Papa, avena y repollo son de clima frío: sus fuentes hablan de zonas altas (la avena, sobre 2000 m) y no se verificó que se den a la altitud de Pereira (~1400 m). Sirven para fincas altas de la región, no para la zona cafetera media.
 - Tolerancia a heladas: solo la ficha de repollo da una cifra (−6 °C por poco tiempo); las de papa y avena no dicen nada.
-- Familia botánica de cada cultivo: aún no está en el esquema, así que el catálogo no permite medir si una rotación rompe ciclos de plagas.
+- La familia botánica (`family`) solo permite una regla general: alternar familias corta ciclos de plagas. No hay datos de plagas ni enfermedades locales, y la regla no distingue plagas que atacan a varias familias.
 - Fríjol: sin ficha EcoCrop consultada.

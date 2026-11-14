@@ -13,6 +13,14 @@ export const DRYNESS_REFERENCE_MM = 100;
 export const HEAT_DAYS_REFERENCE = 90;
 /** Penalización máxima (en la escala 0–5) por cada riesgo climático: calor y sequía. */
 export const MAX_RISK_PENALTY = 0.5;
+/**
+ * Penalización máxima (escala 0–5) por repetir la misma familia botánica en relevos seguidos; el monocultivo la recibe completa.
+ * Heurística de diseño: refleja la recomendación general de rotar familias contra plagas y enfermedades del suelo
+ * (las fichas FAO de papa y repollo piden rotaciones de 3 años o más), no una medición del lote.
+ */
+export const MAX_PEST_CYCLE_PENALTY = 0.5;
+/** Puntaje de `nitrogenFixation` (0–5) desde el cual un cultivo cuenta como fijador de nitrógeno al armar rotaciones. */
+export const NITROGEN_FIXER_THRESHOLD = 2;
 /** Puntaje de atributo de cultivo (0–5) desde el cual se considera una ventaja destacada. */
 export const HIGH_ATTRIBUTE_THRESHOLD = 3.5;
 /** Puntaje de atributo de cultivo (0–5) por debajo del cual se considera una debilidad. */

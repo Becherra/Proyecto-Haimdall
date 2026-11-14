@@ -58,6 +58,16 @@ describe("data/crops.json", () => {
     expect(crops.find((crop) => crop.id === "avena")?.forageValue).toBe(best);
   });
 
+  it("trae la familia botánica de cada cultivo, con al menos cinco familias distintas", () => {
+    const crops = raw.map((crop) => cropSchema.parse(crop));
+    for (const crop of crops) expect(crop.family, crop.id).toBeTruthy();
+    const family = (id: string) => crops.find((crop) => crop.id === id)?.family;
+    expect(family("maiz")).toBe(family("avena"));
+    expect(new Set(["frijol", "soya", "arveja", "mucuna", "crotalaria"].map(family)).size).toBe(1);
+    expect(family("papa")).not.toBe(family("repollo"));
+    expect(new Set(crops.map((crop) => crop.family)).size).toBeGreaterThanOrEqual(5);
+  });
+
   it("contiene todos los cultivos que usan las rotaciones del mock", () => {
     const ids = new Set(raw.map((crop) => cropSchema.parse(crop).id));
     for (const { rotation } of mockAnalysisResponse.rotations) {
