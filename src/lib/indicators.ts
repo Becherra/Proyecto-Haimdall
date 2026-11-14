@@ -1,4 +1,4 @@
-import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, MonthlyWaterDeficit, MonthlyWetnessAnomaly } from "../types";
+import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, type MonthlyWaterDeficit, type MonthlyWetnessAnomaly } from "../types";
 import { EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_YEARS_FOR_ANOMALY_BASELINE } from "./config";
 
 type NumericParameter = ClimateParameter;
