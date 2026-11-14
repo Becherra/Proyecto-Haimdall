@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { computeIndicators } from "../src/lib/indicators";
 import { clearClimateCache, fetchDailyClimate } from "../src/lib/nasaPower";
+import { HEAT_DAYS_REFERENCE } from "../src/lib/config";
 import { drynessFactor, scoreRotations } from "../src/lib/scoring";
 import { cropSchema, rotationResultSchema, type Crop, type Indicators, type Rotation, type UserPriorities } from "../src/types";
 
@@ -57,13 +58,13 @@ describe("scoreRotations: puntaje", () => {
   });
 
   it("descuenta la penalización por calor según la tolerancia del cultivo", () => {
-    const hot = { ...WET, heatStressDays: 30 };
+    const hot = { ...WET, heatStressDays: HEAT_DAYS_REFERENCE };
     expect(scoreOf([rotation("a", "thirsty")], hot, only("extraIncome"))[0]).toBeCloseTo(4.6, 5);
     expect(scoreOf([rotation("a", "thirsty")], WET, only("extraIncome"))[0]).toBe(5);
   });
 
   it("nunca baja de 0 aunque las penalizaciones superen el puntaje", () => {
-    expect(scoreOf([rotation("a", "thirsty")], { ...DRY, heatStressDays: 30 }, only("waterSaving"))[0]).toBe(0);
+    expect(scoreOf([rotation("a", "thirsty")], { ...DRY, heatStressDays: HEAT_DAYS_REFERENCE }, only("waterSaving"))[0]).toBe(0);
   });
 
   it("conserva el orden de entrada y devuelve vacío sin rotaciones", () => {

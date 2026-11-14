@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const { priorities, ...location } = parsed.data;
   try {
     const climate = await fetchDailyClimate(location);
-    return NextResponse.json(buildAnalysis({ climate, crops: CROPS, priorities }));
+    return NextResponse.json(buildAnalysis({ climate, crops: CROPS, priorities, location: { lat: location.lat, lon: location.lon } }));
   } catch (error) {
     if (error instanceof AnalysisInputError || error instanceof InvalidClimateRequestError) return NextResponse.json({ error: error.message }, { status: 400 });
     const message = error instanceof Error ? error.message : "No fue posible completar el análisis";

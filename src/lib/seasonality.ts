@@ -1,5 +1,6 @@
 import type { MonthlyClimate } from "../types";
 import { SEASON_DRY_RAIN_RATIO } from "./config";
+import { monthlyWaterBalance } from "./indicators";
 
 /** Clima típico de un mes calendario (enero a diciembre) promediado sobre todos los años de la serie. */
 export type MonthSeason = { month: number; meanRainMm: number | null; meanBalanceMm: number | null; dry: boolean };
@@ -19,14 +20,12 @@ function valuesForMonth(monthly: readonly MonthlyClimate[], month: number, pick:
 }
 
 function meanBalance(monthly: readonly MonthlyClimate[], month: number): number | null {
-  const balances = monthly.filter((entry) => entry.month === month && entry.precipitationMm !== null && entry.evaporationMm !== null)
-    .map((entry) => (entry.precipitationMm ?? 0) - (entry.evaporationMm ?? 0));
-  return mean(balances);
+  return mean(monthly.filter((entry) => entry.month === month).flatMap((entry) => monthlyWaterBalance(entry) ?? []));
 }
 
 /**
- * Promedia lluvia y balance (lluvia − evaporación) de cada mes calendario sobre todos los años y marca los meses secos.
- * Un mes es seco si la evaporación supera a la lluvia (balance negativo) o si llueve menos de `SEASON_DRY_RAIN_RATIO`
+ * Promedia lluvia y balance hídrico (lluvia − demanda de agua, ver `monthlyWaterBalance`) de cada mes calendario sobre todos los años y marca los meses secos.
+ * Un mes es seco si la demanda de agua supera a la lluvia (balance negativo) o si llueve menos de `SEASON_DRY_RAIN_RATIO`
  * veces el promedio mensual del sitio; la segunda regla detecta épocas secas también en zonas húmedas como Pereira.
  * Un mes sin ningún dato de lluvia queda con `meanRainMm` null y no se marca seco (se trata como desconocido).
  */

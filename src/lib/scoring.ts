@@ -8,13 +8,15 @@ type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosion
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
 type Penalty = { label: string; value: number };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
-type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null };
+type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; years: number };
 
 /**
  * Entrada del motor: todo llega como dato, sin leer archivos ni red.
  * `seasonality` (opcional) permite cruzar los meses de siembra con las épocas secas del sitio.
+ * `yearsAnalyzed` (opcional, por defecto 1) son los años que cubren los conteos de días de `indicators`, para pasarlos a días por año.
  */
-export type ScoringInput = { rotations: readonly Rotation[]; crops: readonly Crop[]; indicators: Indicators; priorities: UserPriorities; seasonality?: readonly MonthSeason[] };
+export type ScoringInput = { rotations: readonly Rotation[]; crops: readonly Crop[]; indicators: Indicators; priorities: UserPriorities; seasonality?: readonly MonthSeason[]; yearsAnalyzed?: number };
+type Context = Omit<ScoringInput, "rotations" | "yearsAnalyzed"> & { years: number };
 
 const LABELS: Record<CriterionKey, string> = {
   waterSaving: "Ahorro de agua", extraIncome: "Ingresos extra", soilImprovement: "Mejora del suelo", erosionReduction: "Reducción de erosión", lowRisk: "Bajo riesgo",
@@ -64,12 +66,16 @@ function criterionValues(crops: readonly Crop[], dryness: number): Record<Criter
   };
 }
 
-function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: number): Penalty[] {
-  const heatShare = Math.min(indicators.heatStressDays / HEAT_DAYS_REFERENCE, 1);
+/** Días por año de una cuenta que abarca toda la serie. */
+const perYear = (days: number, years: number) => days / years;
+
+function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: number, years: number): Penalty[] {
+  const heatPerYear = perYear(indicators.heatStressDays, years);
+  const heatShare = Math.min(heatPerYear / HEAT_DAYS_REFERENCE, 1);
   const heatGap = (MAX_SCORE - average(crops, (crop) => crop.heatTolerance)) / MAX_SCORE;
   const droughtGap = (MAX_SCORE - average(crops, (crop) => crop.droughtTolerance)) / MAX_SCORE;
   return [
-    { label: `calor (${indicators.heatStressDays} días sobre ${HEAT_STRESS_THRESHOLD_C} °C)`, value: heatShare * heatGap * MAX_RISK_PENALTY },
+    { label: `calor (≈${heatPerYear.toFixed(0)} días al año sobre ${HEAT_STRESS_THRESHOLD_C} °C)`, value: heatShare * heatGap * MAX_RISK_PENALTY },
     { label: "sequía (balance hídrico negativo)", value: dryness * droughtGap * MAX_RISK_PENALTY },
   ].filter((penalty) => penalty.value > 0);
 }
@@ -88,17 +94,17 @@ function sowingPenalties(sowing: SowingFinding[] | null): Penalty[] {
   return value > 0 ? [{ label: `siembra en meses secos (${formatMonths(dryMonths)})`, value }] : [];
 }
 
-function evaluateRotation(rotation: Rotation, catalog: readonly Crop[], indicators: Indicators, priorities: UserPriorities, seasonality: readonly MonthSeason[] | undefined): Evaluation {
+function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, priorities, seasonality, years }: Context): Evaluation {
   const crops = resolveCrops(rotation, catalog);
   const dryness = drynessFactor(indicators);
   const weights = normalizedWeights(priorities);
   const values = criterionValues(crops, dryness);
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
   const sowing = seasonality ? crops.map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
-  const penalties = [...riskPenalties(crops, indicators, dryness), ...sowingPenalties(sowing)];
+  const penalties = [...riskPenalties(crops, indicators, dryness, years), ...sowingPenalties(sowing)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, criteria, penalties, sowing, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, criteria, penalties, sowing, years, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -119,11 +125,27 @@ function sowingEvidence(sowing: SowingFinding[] | null): string[] {
   return lines.length > 0 ? [...lines, rule] : [];
 }
 
-function buildEvidence({ criteria, crops, sowing }: Evaluation, indicators: Indicators): string[] {
+const WATER_BALANCE_SOURCE = {
+  potential: "NASA POWER, PRECTOTCORR; evaporación potencial estimada con Hargreaves–Samani a partir de T2M, T2M_MIN, T2M_MAX y la latitud",
+  evland: "NASA POWER, PRECTOTCORR y EVLAND",
+} as const;
+
+function balanceEvidence(balance: number, { waterBalanceMethod }: Indicators): string {
+  const potential = waterBalanceMethod === "potential";
+  const demand = potential ? "evaporación potencial estimada" : "evaporación";
+  return `Balance hídrico medio (lluvia − ${demand}): ${oneDecimal(balance)} mm/mes (${WATER_BALANCE_SOURCE[potential ? "potential" : "evland"]}).`;
+}
+
+/** "1907 en 10 años (≈191 al año)": el total de la serie y su promedio anual. */
+function daysPerYearText(days: number, years: number): string {
+  return `${days} en ${years} ${years === 1 ? "año" : "años"} (≈${perYear(days, years).toFixed(0)} al año)`;
+}
+
+function buildEvidence({ criteria, crops, sowing, years }: Evaluation, indicators: Indicators): string[] {
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
   return [
-    ...(balance === null ? [] : [`Balance hídrico medio (lluvia − evaporación): ${oneDecimal(balance)} mm/mes (NASA POWER, PRECTOTCORR y EVLAND).`]),
-    `Días con T2M_MAX > ${HEAT_STRESS_THRESHOLD_C} °C: ${heatStressDays}; días con T2M_MIN < ${FROST_THRESHOLD_C} °C: ${frostRiskDays} (NASA POWER).`,
+    ...(balance === null ? [] : [balanceEvidence(balance, indicators)]),
+    `Días con T2M_MAX > ${HEAT_STRESS_THRESHOLD_C} °C: ${daysPerYearText(heatStressDays, years)}; días con T2M_MIN < ${FROST_THRESHOLD_C} °C: ${daysPerYearText(frostRiskDays, years)} (NASA POWER).`,
     ...(rain === null ? [] : [`Lluvia diaria extrema (percentil 95): ${oneDecimal(rain)} mm/día (NASA POWER, PRECTOTCORR).`]),
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
@@ -146,13 +168,13 @@ function buildBenefits({ crops }: Evaluation): string[] {
   return found.length > 0 ? found : ["Ninguna ventaja destaca en los atributos del catálogo; su valor es de referencia."];
 }
 
-function buildRisks({ crops, sowing }: Evaluation, indicators: Indicators): string[] {
+function buildRisks({ crops, sowing, years }: Evaluation, indicators: Indicators): string[] {
   const low = (pick: (crop: Crop) => number) => average(crops, pick) < LOW_ATTRIBUTE_THRESHOLD;
   const risks: string[] = [];
   if (low((crop) => crop.heatTolerance)) risks.push("Baja tolerancia al calor según el catálogo.");
   if (low((crop) => crop.droughtTolerance) && drynessFactor(indicators) > 0) risks.push("Baja tolerancia a sequía en un sitio donde la evaporación supera a la lluvia.");
   if (average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD && drynessFactor(indicators) > 0) risks.push("Alto uso de agua en un sitio con déficit hídrico.");
-  if (indicators.frostRiskDays > 0) risks.push(`La serie registra ${indicators.frostRiskDays} días con riesgo de helada y el catálogo no incluye tolerancia a heladas.`);
+  if (indicators.frostRiskDays > 0) risks.push(`La serie registra ≈${perYear(indicators.frostRiskDays, years).toFixed(0)} días al año con riesgo de helada y el catálogo no incluye tolerancia a heladas.`);
   if (low((crop) => crop.marketPotential)) risks.push("Bajo potencial de mercado según el catálogo.");
   for (const { crop, assessment } of sowing ?? []) {
     if (assessment.dryMonths.length > 0) risks.push(`Parte de los meses de siembra de ${crop.name} (${formatMonths(assessment.dryMonths)}) cae en época seca del sitio.`);
@@ -161,7 +183,7 @@ function buildRisks({ crops, sowing }: Evaluation, indicators: Indicators): stri
 }
 
 function sowingGaps(sowing: SowingFinding[] | null): string[] {
-  if (!sowing) return ["El calendario de siembra de cada cultivo no se cruzó con la estacionalidad de lluvia."];
+  if (!sowing) return ["El calendario de siembra de cada cultivo no se cruzó con la estacionalidad de lluvia: el calendario del catálogo solo es válido para el Eje Cafetero (Colombia)."];
   const unknown = sowing.filter(({ assessment }) => assessment.unknownMonths.length > 0)
     .map(({ crop, assessment }) => `Hay meses de siembra de ${crop.name} (${formatMonths(assessment.unknownMonths)}) sin dato de lluvia; no se pudo evaluar si caen en época seca.`);
   return ["Los meses de siembra salen del catálogo (preliminares) y se cruzaron con promedios mensuales de lluvia: no distinguen años secos o lluviosos (El Niño/La Niña) ni un calendario real por cultivo y municipio.", ...unknown];
@@ -200,6 +222,7 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
  * Devuelve los resultados en el mismo orden de entrada (la línea base primero). Lanza un Error si una rotación usa un
  * cultivo fuera del catálogo o no tiene cultivos.
  */
-export function scoreRotations({ rotations, crops, indicators, priorities, seasonality }: ScoringInput): RotationResult[] {
-  return rotations.map((rotation) => buildResult(evaluateRotation(rotation, crops, indicators, priorities, seasonality), indicators));
+export function scoreRotations({ rotations, yearsAnalyzed = 1, ...context }: ScoringInput): RotationResult[] {
+  const years = Math.max(yearsAnalyzed, 1);
+  return rotations.map((rotation) => buildResult(evaluateRotation(rotation, { ...context, years }), context.indicators));
 }
