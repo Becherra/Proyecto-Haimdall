@@ -6,9 +6,11 @@ import { calculateGlobeView } from "../lib/ui/globeView";
 import type { LocationResult } from "../types";
 
 type GlobeSceneProps = { location: LocationResult | null; active?: boolean };
-const TWO_K_TEXTURE = "/textures/earth-bluemarble-2048.jpg";
+// globe.gl clears material.color when it applies a texture, so a uniform material tint cannot color land and sea separately.
+const TWO_K_TEXTURE = "/textures/earth-bluemarble-2048-heimdall.webp";
 // NASA SVS Blue Marble January source: https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/january/world.topo.200401.3x5400x2700.jpg
-const FOUR_K_TEXTURE = "/textures/earth-bluemarble-4k.jpg";
+// Imagen: NASA Blue Marble, con tratamiento de color propio.
+const FOUR_K_TEXTURE = "/textures/earth-bluemarble-4k-heimdall.webp";
 
 function supportsWebGL(): boolean {
   try {
@@ -87,7 +89,7 @@ export default function GlobeScene({ location, active = true }: GlobeSceneProps)
     return () => window.clearInterval(interval);
   }, [location, reducedMotion]);
 
-  const fallback = <div className="flex h-full w-full items-center justify-center rounded-full border border-white/10 bg-slate-900/70 p-8 text-center text-sm text-slate-300" role="status">Tu navegador no puede mostrar el globo 3D. Puedes buscar una ubicación para continuar.</div>;
+  const fallback = <div className="flex h-full w-full items-center justify-center rounded-full border border-white/10 bg-black p-8 text-center text-sm text-slate-300" role="status">Tu navegador no puede mostrar el globo 3D. Puedes buscar una ubicación para continuar.</div>;
 
-  return <div ref={containerRef} className="flex h-full w-full items-center justify-center" aria-label="Globo terrestre interactivo">{!webglAvailable ? fallback : size.width > 0 && size.height > 0 ? <Globe ref={globeRef} width={size.width} height={size.height} globeImageUrl={globeImageUrl} showAtmosphere atmosphereColor="#67e8f9" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={reducedMotion ? 0.6 : markerPulse ? 0.75 : 0.6} pointColor={() => "#fbbf24"} pointLabel="label" rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { globeRef.current?.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }} /> : <div className="text-sm text-slate-500" role="status">Preparando globo…</div>}</div>;
+  return <div ref={containerRef} className="flex h-full w-full items-center justify-center" aria-label="Globo terrestre interactivo">{!webglAvailable ? fallback : size.width > 0 && size.height > 0 ? <Globe ref={globeRef} width={size.width} height={size.height} globeImageUrl={globeImageUrl} showAtmosphere atmosphereColor="#8052ff" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={reducedMotion ? 0.6 : markerPulse ? 0.75 : 0.6} pointColor={() => "#ffb829"} pointLabel="label" rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { globeRef.current?.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }} /> : <div className="text-sm text-slate-500" role="status">Preparando globo…</div>}</div>;
 }

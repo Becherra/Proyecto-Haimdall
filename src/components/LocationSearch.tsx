@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { readLocationCache, writeLocationCache } from "../lib/ui/locationCache";
-import { geolocationErrorMessage, requestCurrentLocation } from "../services/geolocation";
+import { geolocationErrorMessage, isGeolocationFailure, requestCurrentLocation } from "../services/geolocation";
 import { locationResultSchema, type LocationResult } from "../types";
 
-type LocationSearchProps = { onLocationSelected: (location: LocationResult, accuracyMeters?: number) => void };
+type LocationSearchProps = { onLocationSelected: (location: LocationResult, accuracyMeters?: number) => void; onGpsStart?: () => void; onGpsLocationSelected?: (location: LocationResult, accuracyMeters: number) => void; onGpsError?: (message: string) => void };
 
-export default function LocationSearch({ onLocationSelected }: LocationSearchProps) {
+export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLocationSelected, onGpsError }: LocationSearchProps) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -36,30 +36,33 @@ export default function LocationSearch({ onLocationSelected }: LocationSearchPro
   async function useCurrentLocation() {
     setError(null);
     setLocating(true);
+    onGpsStart?.();
     try {
       const coords = await requestCurrentLocation();
       const location = locationResultSchema.parse({ lat: coords.latitude, lon: coords.longitude, label: "Tu ubicación actual" });
-      onLocationSelected(location, coords.accuracy);
+      (onGpsLocationSelected ?? onLocationSelected)(location, coords.accuracy);
     } catch (caught) {
-      setError(geolocationErrorMessage(caught));
+      const message = geolocationErrorMessage(caught && typeof caught === "object" && "reason" in caught && isGeolocationFailure(caught.reason) ? caught.reason : "unavailable");
+      setError(message);
+      onGpsError?.(message);
     } finally { setLocating(false); }
   }
 
   return <div className="w-full max-w-xl">
     <form onSubmit={submitSearch} noValidate>
-    <label htmlFor="location-query" className="mb-2 block text-sm font-medium text-slate-200">Busca tu finca o municipio</label>
+    <label htmlFor="location-query" className="mb-2 block text-left text-sm font-medium text-silver-mist">Encuentra tu finca o municipio</label>
     <div className="flex flex-col gap-3 sm:flex-row">
       <div className="relative flex-1">
-        <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-cyan-200" aria-hidden="true">⌕</span>
-        <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busca tu finca, ciudad o región..." className="min-h-14 w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/60" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
+        <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-saffron-spark" aria-hidden="true">⌕</span>
+        <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busca tu finca, ciudad o región..." className="min-h-14 w-full rounded-full border border-white/25 bg-transparent py-3 pl-11 pr-4 text-base text-white outline-none placeholder:text-ash-gray focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
       </div>
-      <button type="submit" disabled={loading} className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-7 font-semibold text-slate-950 transition hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60"><span aria-hidden="true">⌕</span>{loading ? "Buscando…" : "Buscar"}</button>
+      <button type="submit" disabled={loading} className="flex min-h-14 items-center justify-center gap-2 rounded-full border border-white/30 px-7 font-semibold text-white transition hover:border-saffron-spark hover:text-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark focus:ring-offset-2 focus:ring-offset-black disabled:cursor-wait disabled:opacity-60"><span aria-hidden="true">⌕</span>{loading ? "Buscando…" : "Buscar"}</button>
     </div>
-    {loading && <p className="mt-3 text-sm text-cyan-200" role="status" aria-live="polite">Consultando OpenStreetMap…</p>}
+    {loading && <p className="mt-3 text-sm text-saffron-spark" role="status" aria-live="polite">Consultando OpenStreetMap…</p>}
     </form>
-    <div className="mt-3 rounded-xl border border-cyan-200/20 bg-cyan-950/30 p-3 text-left">
-      <p className="text-xs text-cyan-100">Usaremos tu ubicación para mostrarte tu zona. No la guardamos.</p>
-      <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="mt-3 flex min-h-14 w-full items-center justify-center rounded-xl border border-cyan-200/60 bg-cyan-100 px-5 py-3 text-base font-bold text-slate-950 shadow-lg shadow-cyan-950/30 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
+    <div className="mt-3 text-left">
+      <p className="text-xs text-ash-gray">Usaremos tu ubicación para mostrarte tu zona. No la guardamos.</p>
+      <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="mt-3 flex min-h-14 w-full items-center justify-center rounded-full bg-electric-iris px-5 py-3 text-base font-semibold text-white transition hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark focus:ring-offset-2 focus:ring-offset-black disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
     </div>
     {error && <p id="location-error" className="mt-3 text-left text-sm text-rose-300" role="alert">{error}</p>}
   </div>;

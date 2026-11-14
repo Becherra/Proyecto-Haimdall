@@ -8,7 +8,7 @@ import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
 import { calculateMapView } from "../lib/ui/mapView";
 import type { LocationResult } from "../types";
 
-type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void };
+type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void; onConfirmed?: () => void };
 type TileState = { loading: boolean; error: string | null };
 
 const initialDate = "2026-10-16";
@@ -47,7 +47,7 @@ function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => voi
   return null;
 }
 
-export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack }: MapSceneProps) {
+export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack, onConfirmed }: MapSceneProps) {
   const [draftLocation, setDraftLocation] = useState(location);
   const [opacity, setOpacity] = useState(65);
   const [date, setDate] = useState(initialDate);
@@ -83,7 +83,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
     {dateError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{dateError}</p>}
     {trueColorError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{trueColorError}</p>}
     {ndviError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{ndviError}</p>}
-    <div className="relative h-[min(38vh,280px)] min-h-[235px] overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-cyan-950/30 sm:h-[min(58vh,520px)] sm:min-h-[360px]">
+    <div className="relative h-[min(38vh,280px)] min-h-[235px] overflow-hidden rounded-xl border border-white/15 sm:h-[min(58vh,520px)] sm:min-h-[360px]">
       <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl>
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Satélite">
@@ -107,23 +107,23 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
         {gpsAccuracyMeters !== undefined && <Circle center={[draftLocation.lat, draftLocation.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
       </MapContainer>
     </div>
-    <div className="sticky bottom-0 z-20 mt-3 grid grid-cols-[1fr_auto] gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-3 text-left backdrop-blur sm:mt-4 sm:grid-cols-[1fr_auto] sm:p-4">
+    <div className="sticky bottom-0 z-20 mt-3 grid grid-cols-[1fr_auto] gap-3 rounded-2xl border-t border-white/15 bg-black/95 p-3 text-left backdrop-blur sm:mt-4 sm:grid-cols-[1fr_auto] sm:p-4">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Finca seleccionada</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-saffron-spark">Finca seleccionada</p>
         <p className="mt-2 text-base font-semibold text-white">{draftLocation.label}</p>
         <p className="mt-1 text-sm text-slate-300">{formatCoordinates(draftLocation)}</p>
         <p className="mt-2 text-xs text-slate-400">Haz click en el mapa o arrastra el pin para ajustar la ubicación.</p>
       </div>
       <div className="flex min-w-32 flex-col gap-2 sm:min-w-44">
         <label htmlFor="gibs-date" className="text-xs font-semibold text-slate-300">Fecha NASA GIBS</label>
-        <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/50" />
+        <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-black px-3 py-2 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" />
         <label htmlFor="gibs-opacity" className="text-xs font-semibold text-slate-300">Opacidad de capas: {opacity}%</label>
-        <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-cyan-300" />
+        <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-[#8052ff]" />
       </div>
       <p className="col-span-2 text-xs leading-5 text-slate-400">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
       <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" onClick={onBack} className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300">Volver al globo</button>
-        <button type="button" onClick={() => onLocationSelected(draftLocation)} className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Confirmar finca</button>
+        <button type="button" onClick={onBack} className="rounded-full border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark">Volver al globo</button>
+        <button type="button" onClick={() => { onLocationSelected(draftLocation); onConfirmed?.(); }} className="rounded-full bg-electric-iris px-4 py-3 text-sm font-semibold text-white hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark">Confirmar finca</button>
       </div>
     </div>
     <p className="mt-3 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
