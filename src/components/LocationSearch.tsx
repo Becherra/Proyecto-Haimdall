@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { readLocationCache, writeLocationCache } from "../lib/ui/locationCache";
-import { geolocationErrorMessage, requestCurrentLocation } from "../services/geolocation";
+import { geolocationErrorMessage, isGeolocationFailure, requestCurrentLocation } from "../services/geolocation";
 import { locationResultSchema, type LocationResult } from "../types";
 
 type LocationSearchProps = { onLocationSelected: (location: LocationResult, accuracyMeters?: number) => void; onGpsStart?: () => void; onGpsLocationSelected?: (location: LocationResult, accuracyMeters: number) => void; onGpsError?: (message: string) => void };
@@ -42,7 +42,7 @@ export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLo
       const location = locationResultSchema.parse({ lat: coords.latitude, lon: coords.longitude, label: "Tu ubicación actual" });
       (onGpsLocationSelected ?? onLocationSelected)(location, coords.accuracy);
     } catch (caught) {
-      const message = geolocationErrorMessage(caught);
+      const message = geolocationErrorMessage(caught && typeof caught === "object" && "reason" in caught && isGeolocationFailure(caught.reason) ? caught.reason : "unavailable");
       setError(message);
       onGpsError?.(message);
     } finally { setLocating(false); }
