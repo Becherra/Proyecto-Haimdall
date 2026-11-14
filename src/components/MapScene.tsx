@@ -2,12 +2,13 @@
 
 import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
-import { CircleMarker, LayersControl, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { Circle, CircleMarker, LayersControl, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { buildGibsTileUrl, GIBS_LAYER_CONFIG, isGibsDateAvailable } from "../lib/ui/mapLayers";
 import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
+import { calculateMapView } from "../lib/ui/mapView";
 import type { LocationResult } from "../types";
 
-type MapSceneProps = { location: LocationResult; onLocationSelected: (location: LocationResult) => void; onBack: () => void };
+type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void };
 type TileState = { loading: boolean; error: string | null };
 
 const initialDate = "2026-10-16";
@@ -17,18 +18,20 @@ const nasaAttribution = "NASA GIBS";
 
 const pinIcon = L.divIcon({ className: "heimdall-pin", html: '<span aria-hidden="true"></span>', iconSize: [24, 24], iconAnchor: [12, 12] });
 
-function ZoomToLocation({ location }: { location: LocationResult }) {
+function ZoomToLocation({ location, gpsAccuracyMeters }: Pick<MapSceneProps, "location" | "gpsAccuracyMeters">) {
   const map = useMap();
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    map.setView([location.lat, location.lon], 8, { animate: false });
-    if (reducedMotion) {
-      map.setZoom(13, { animate: false });
+    const view = calculateMapView(location, gpsAccuracyMeters);
+    if (view.bounds) {
+      map.fitBounds(view.bounds, { animate: !reducedMotion, duration: 1.2, maxZoom: view.targetZoom });
+      if (map.getZoom() < 12) map.setZoom(12, { animate: !reducedMotion });
       return;
     }
-    const timer = window.setTimeout(() => map.setZoom(13, { animate: true, duration: 1.8 }), 80);
+    map.setView([location.lat, location.lon], 8, { animate: false });
+    const timer = window.setTimeout(() => map.setZoom(view.targetZoom, { animate: !reducedMotion, duration: 1.8 }), 80);
     return () => window.clearTimeout(timer);
-  }, [location, map]);
+  }, [gpsAccuracyMeters, location, map]);
   return null;
 }
 
@@ -44,7 +47,7 @@ function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => voi
   return null;
 }
 
-export default function MapScene({ location, onLocationSelected, onBack }: MapSceneProps) {
+export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack }: MapSceneProps) {
   const [draftLocation, setDraftLocation] = useState(location);
   const [opacity, setOpacity] = useState(65);
   const [date, setDate] = useState(initialDate);
@@ -60,6 +63,8 @@ export default function MapScene({ location, onLocationSelected, onBack }: MapSc
   const dateError = !isGibsDateAvailable("trueColor", date) && !isGibsDateAvailable("ndvi", date)
     ? "NASA GIBS no tiene datos para esta fecha. Elige una fecha entre 2025-11-10 y 2026-10-16."
     : null;
+  const trueColorError = !trueColorUrl && !dateError ? "Color real NASA GIBS no tiene datos para esta fecha." : null;
+  const ndviError = !ndviUrl && !dateError ? "NDVI NASA GIBS no tiene datos para esta fecha; las demás capas siguen disponibles." : null;
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
     updateOnline();
@@ -76,7 +81,9 @@ export default function MapScene({ location, onLocationSelected, onBack }: MapSc
     {tiles.loading && <p className="mb-3 rounded-lg border border-cyan-300/30 bg-cyan-950/50 p-3 text-sm text-cyan-100" role="status">Cargando teselas del mapa…</p>}
     {tiles.error && <p className="mb-3 rounded-lg border border-red-300/40 bg-red-950/60 p-3 text-sm text-red-100" role="alert">{tiles.error}</p>}
     {dateError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{dateError}</p>}
-    <div className="relative h-[min(68vh,620px)] min-h-[420px] overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-cyan-950/30">
+    {trueColorError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{trueColorError}</p>}
+    {ndviError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{ndviError}</p>}
+    <div className="relative h-[min(38vh,280px)] min-h-[235px] overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-cyan-950/30 sm:h-[min(58vh,520px)] sm:min-h-[360px]">
       <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl>
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Satélite">
@@ -92,33 +99,35 @@ export default function MapScene({ location, onLocationSelected, onBack }: MapSc
             {ndviUrl && <TileLayer url={ndviUrl} maxZoom={GIBS_LAYER_CONFIG.ndvi.maxZoom} opacity={opacity / 100} attribution={nasaAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />}
           </LayersControl.Overlay>
         </LayersControl>
-        <ZoomToLocation location={location} />
+        <ZoomToLocation location={location} gpsAccuracyMeters={gpsAccuracyMeters} />
         <MapZoomObserver onZoomChange={setZoom} />
         <MapPinSelector onSelect={setDraftLocation} />
         <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); setDraftLocation(validateMapLocation(point.lat, point.lng)); } }} title="Pin de la finca" />
         <CircleMarker center={[draftLocation.lat, draftLocation.lon]} radius={8} pathOptions={{ color: "#fbbf24", fillColor: "#fbbf24", fillOpacity: 0.25 }} />
+        {gpsAccuracyMeters !== undefined && <Circle center={[draftLocation.lat, draftLocation.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
       </MapContainer>
     </div>
-    <div className="mt-4 grid gap-4 rounded-2xl border border-white/15 bg-slate-950/80 p-4 text-left sm:grid-cols-[1fr_auto]">
+    <div className="sticky bottom-0 z-20 mt-3 grid grid-cols-[1fr_auto] gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-3 text-left backdrop-blur sm:mt-4 sm:grid-cols-[1fr_auto] sm:p-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Finca seleccionada</p>
         <p className="mt-2 text-base font-semibold text-white">{draftLocation.label}</p>
         <p className="mt-1 text-sm text-slate-300">{formatCoordinates(draftLocation)}</p>
         <p className="mt-2 text-xs text-slate-400">Haz click en el mapa o arrastra el pin para ajustar la ubicación.</p>
       </div>
-      <div className="flex flex-col gap-2 sm:min-w-44">
+      <div className="flex min-w-32 flex-col gap-2 sm:min-w-44">
         <label htmlFor="gibs-date" className="text-xs font-semibold text-slate-300">Fecha NASA GIBS</label>
         <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/50" />
         <label htmlFor="gibs-opacity" className="text-xs font-semibold text-slate-300">Opacidad de capas: {opacity}%</label>
         <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-cyan-300" />
       </div>
-      <p className="text-xs leading-5 text-slate-400 sm:col-span-2">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
-      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:justify-end">
+      <p className="col-span-2 text-xs leading-5 text-slate-400">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
+      <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onBack} className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300">Volver al globo</button>
         <button type="button" onClick={() => onLocationSelected(draftLocation)} className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Confirmar finca</button>
       </div>
     </div>
     <p className="mt-3 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
-    {zoom < 12 && <p className="mt-1 text-xs text-amber-200">Acércate a zoom 12 o más para fijar el pin con mayor precisión.</p>}
+    {gpsAccuracyMeters !== undefined && gpsAccuracyMeters > 1000 && <p className="mt-1 text-xs text-amber-200">La precisión del GPS es aproximada ({Math.round(gpsAccuracyMeters)} m); ajusta el pin manualmente.</p>}
+    {zoom < 14 && <p className="mt-1 text-xs text-amber-200">Toca el mapa donde queda tu finca.</p>}
   </section>;
 }
