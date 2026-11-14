@@ -1,0 +1,6 @@
+[
+  { "id": "thirsty", "name": "Cultivo exigente (prueba)", "waterUse": 5, "nitrogenFixation": 0, "erosionReduction": 1, "organicMatter": 1, "forageValue": 1, "marketPotential": 5, "heatTolerance": 1, "droughtTolerance": 1, "cycleDays": 120, "sowingMonths": [3, 9], "source": "Datos sintéticos de prueba, no agronómicos" },
+  { "id": "tolerant", "name": "Cultivo tolerante (prueba)", "waterUse": 1, "nitrogenFixation": 1, "erosionReduction": 3, "organicMatter": 3, "forageValue": 2, "marketPotential": 3, "heatTolerance": 4, "droughtTolerance": 5, "cycleDays": 150, "sowingMonths": [3, 9], "source": "Datos sintéticos de prueba, no agronómicos" },
+  { "id": "legume", "name": "Leguminosa (prueba)", "waterUse": 3, "nitrogenFixation": 5, "erosionReduction": 3, "organicMatter": 4, "forageValue": 3, "marketPotential": 3, "heatTolerance": 3, "droughtTolerance": 3, "cycleDays": 90, "sowingMonths": [3, 9], "source": "Datos sintéticos de prueba, no agronómicos" },
+  { "id": "cover", "name": "Cobertura (prueba)", "waterUse": 2, "nitrogenFixation": 4, "erosionReduction": 5, "organicMatter": 5, "forageValue": 3, "marketPotential": 1, "heatTolerance": 4, "droughtTolerance": 4, "cycleDays": 100, "sowingMonths": [3, 9], "source": "Datos sintéticos de prueba, no agronómicos" }
+]
