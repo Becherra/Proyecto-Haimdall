@@ -37,6 +37,20 @@ describe("fetchDailyClimate", () => {
     await expect(fetchDailyClimate(request)).rejects.toThrow("respuesta malformada");
     clearClimateCache();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
-    await expect(fetchDailyClimate(request)).rejects.toThrow("HTTP 503");
+    await expect(fetchDailyClimate({ ...request, lat: 0, lon: 0 })).rejects.toThrow("HTTP 503");
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("usa la muestra de Pereira cuando se agotan los reintentos", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const result = await fetchDailyClimate(request);
+    expect(result.source).toBe("sample");
+    expect(result.records.length).toBeGreaterThan(1000);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("rechaza años fuera del periodo disponible y rangos mayores a 15 años", () => {
+    expect(() => fetchDailyClimate({ ...request, startYear: 1980 })).toThrow("1981");
+    expect(() => fetchDailyClimate({ ...request, startYear: 1981, endYear: 1996 })).toThrow("15 años");
   });
 });

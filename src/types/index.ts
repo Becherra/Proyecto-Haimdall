@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const climateParameters = ["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT", "ALLSKY_SFC_SW_DWN"] as const;
+export const CLIMATE_PARAMETERS = ["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT", "ALLSKY_SFC_SW_DWN"] as const;
 const score = z.number().min(0).max(5);
 
 export const climateRecordSchema = z.object({
@@ -10,7 +10,7 @@ export const climateRecordSchema = z.object({
   ALLSKY_SFC_SW_DWN: z.number().nullable(),
 });
 export type ClimateRecord = z.infer<typeof climateRecordSchema>;
-export type ClimateParameter = (typeof climateParameters)[number];
+export type ClimateParameter = (typeof CLIMATE_PARAMETERS)[number];
 
 export const monthlyClimateSchema = z.object({
   year: z.number().int().min(1981), month: z.number().int().min(1).max(12),
@@ -55,6 +55,12 @@ export const climateResultSchema = z.object({
   source: z.enum(["live", "cache", "sample"]),
 });
 export type ClimateResult = z.infer<typeof climateResultSchema>;
+
+export const climateRequestSchema = z.object({
+  lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
+  startYear: z.number().int().min(1981), endYear: z.number().int().min(1981),
+});
+export type ClimateRequest = z.infer<typeof climateRequestSchema>;
 
 export const analysisRequestSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
