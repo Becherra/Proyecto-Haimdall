@@ -1,4 +1,4 @@
-import { locationResultSchema, type LocationResult } from "../types";
+import { locationResultSchema, type LocationResult } from "../../types";
 
 const STORAGE_KEY = "heimdall.geocode.cache.v1";
 

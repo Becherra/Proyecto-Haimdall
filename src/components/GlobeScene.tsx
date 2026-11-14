@@ -2,7 +2,7 @@
 
 import Globe, { type GlobeMethods } from "react-globe.gl";
 import { useEffect, useRef, useState } from "react";
-import { calculateGlobeView } from "../lib/globeView";
+import { calculateGlobeView } from "../lib/ui/globeView";
 import type { LocationResult } from "../types";
 
 type GlobeSceneProps = { location: LocationResult | null };
