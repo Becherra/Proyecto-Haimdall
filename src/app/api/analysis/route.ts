@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AnalysisInputError, buildAnalysis } from "../../../lib/analysis";
 import { CROPS } from "../../../lib/catalog";
-import { fetchDailyClimate } from "../../../lib/nasaPower";
+import { fetchDailyClimate, InvalidClimateRequestError } from "../../../lib/nasaPower";
 import { analysisRequestSchema } from "../../../types";
 
 export async function POST(request: Request) {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const climate = await fetchDailyClimate(location);
     return NextResponse.json(buildAnalysis({ climate, crops: CROPS, priorities }));
   } catch (error) {
-    if (error instanceof AnalysisInputError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof AnalysisInputError || error instanceof InvalidClimateRequestError) return NextResponse.json({ error: error.message }, { status: 400 });
     const message = error instanceof Error ? error.message : "No fue posible completar el análisis";
     return NextResponse.json({ error: message }, { status: 502 });
   }

@@ -16,6 +16,8 @@ const requestSchema = z.object({
 }).refine((value) => value.startYear <= value.endYear, "startYear debe ser menor o igual que endYear")
   .refine((value) => value.endYear - value.startYear + 1 <= MAX_RANGE_YEARS, `El rango máximo es de ${MAX_RANGE_YEARS} años`);
 
+/** La solicitud climática es inválida (años fuera de rango, etc.): lo corrige quien llama, no es una falla de NASA POWER. */
+export class InvalidClimateRequestError extends Error {}
 class RetryableClimateError extends Error {}
 class ClimateServerError extends RetryableClimateError {}
 
@@ -86,7 +88,7 @@ function sampleFor(input: ClimateRequest): ClimateResult | null {
 /** Obtiene clima diario con timeout, reintentos y respaldo precargado por zona. */
 export function fetchDailyClimate(input: ClimateRequest): Promise<ClimateResult> {
   const parsed = requestSchema.safeParse(input);
-  if (!parsed.success) throw new Error(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
+  if (!parsed.success) throw new InvalidClimateRequestError(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
   const normalizedInput = parsed.data;
   const url = buildUrl(normalizedInput);
   const cached = cache.get(url);

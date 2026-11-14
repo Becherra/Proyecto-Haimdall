@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearClimateCache, fetchDailyClimate } from "../src/lib/nasaPower";
+import { clearClimateCache, fetchDailyClimate, InvalidClimateRequestError } from "../src/lib/nasaPower";
 
 const fixture = JSON.parse(readFileSync("tests/fixtures/power-pereira.json", "utf8")) as unknown;
 const request = { lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022 };
@@ -52,5 +52,13 @@ describe("fetchDailyClimate", () => {
   it("rechaza años fuera del periodo disponible y rangos mayores a 15 años", () => {
     expect(() => fetchDailyClimate({ ...request, startYear: 1980 })).toThrow("1981");
     expect(() => fetchDailyClimate({ ...request, startYear: 1981, endYear: 1996 })).toThrow("15 años");
+  });
+
+  it("marca las solicitudes inválidas con InvalidClimateRequestError y no las fallas del servicio", async () => {
+    expect(() => fetchDailyClimate({ ...request, startYear: 1981, endYear: 1996 })).toThrow(InvalidClimateRequestError);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+    const failure = await fetchDailyClimate(request).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(InvalidClimateRequestError);
   });
 });

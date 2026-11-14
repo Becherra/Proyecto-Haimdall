@@ -39,6 +39,17 @@ describe("POST /api/analysis", () => {
     expect(await withoutPriorities.json()).toEqual({ error: "Parámetros inválidos" });
   });
 
+  it("devuelve 400 con el motivo si el rango supera los 15 años o incluye el año en curso", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const tooLong = await POST(post({ ...pereira, startYear: 1981, endYear: 1996 }));
+    const currentYear = await POST(post({ ...pereira, startYear: 2020, endYear: new Date().getFullYear() }));
+    expect(tooLong.status).toBe(400);
+    expect((await tooLong.json()).error).toContain("15 años");
+    expect(currentYear.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("devuelve 400 si el cultivo actual no está en el catálogo", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(fixture, { status: 200 })));
     const response = await POST(post({ ...pereira, priorities: { ...priorities, currentCropId: "cafe" } }));
