@@ -1,0 +1,142 @@
+[
+  {
+    "id": "maiz",
+    "name": "Maíz (Zea mays)",
+    "waterUse": 3,
+    "nitrogenFixation": 0,
+    "erosionReduction": 2,
+    "organicMatter": 2,
+    "forageValue": 3,
+    "marketPotential": 4,
+    "heatTolerance": 4,
+    "droughtTolerance": 2,
+    "cycleDays": 145,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "FAO EcoCrop ficha id=238663 (óptimo 18–33 °C, 600–1200 mm/año); ciclo de 145 días: Cenicafé (maíz intercalado con café). Forraje, mercado y erosión: juicio sin fuente cuantitativa. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "frijol",
+    "name": "Fríjol (Phaseolus vulgaris)",
+    "waterUse": 2,
+    "nitrogenFixation": 2,
+    "erosionReduction": 2,
+    "organicMatter": 2,
+    "forageValue": 1,
+    "marketPotential": 4,
+    "heatTolerance": 2,
+    "droughtTolerance": 2,
+    "cycleDays": 90,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "Ciclo de 90 días: Cenicafé (fríjol intercalado con café). Fijación de N baja (3–57 kg N/ha en revisión; %Ndfa medio 38 %, Peoples et al. 2021, Plant and Soil). Sensible al calor en floración (literatura vista solo como resumen de búsqueda). Mercado y erosión: juicio. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "soya",
+    "name": "Soya (Glycine max)",
+    "waterUse": 3,
+    "nitrogenFixation": 4,
+    "erosionReduction": 3,
+    "organicMatter": 3,
+    "forageValue": 2,
+    "marketPotential": 3,
+    "heatTolerance": 3,
+    "droughtTolerance": 2,
+    "cycleDays": 120,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "FAO EcoCrop ficha id=1150 (óptimo 20–33 °C, 600–1500 mm/año, ciclo 75–180 días según variedad). Fijación de N alta (49–450 kg N/ha, %Ndfa 44–78 %, Peoples et al.). Mercado local: juicio sin dato. Idoneidad a la altitud de Pereira sin verificar. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "arveja",
+    "name": "Arveja (Pisum sativum)",
+    "waterUse": 2,
+    "nitrogenFixation": 2,
+    "erosionReduction": 1,
+    "organicMatter": 2,
+    "forageValue": 2,
+    "marketPotential": 4,
+    "heatTolerance": 1,
+    "droughtTolerance": 2,
+    "cycleDays": 95,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "FAO Land & Water, ficha de arveja (cultivo de clima frío: óptimo 17 °C medios, máx. 23 °C; estrés por calor 30.5–33 °C reduce rendimiento). Ciclo de 95 días: suma de etapas FAO de arveja fresca (65–95 días). Fijación de N: un solo valor de 46 kg N/ha en una revisión. Mercado: juicio. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "mucuna",
+    "name": "Mucuna (Mucuna pruriens)",
+    "waterUse": 3,
+    "nitrogenFixation": 4,
+    "erosionReduction": 5,
+    "organicMatter": 5,
+    "forageValue": 2,
+    "marketPotential": 1,
+    "heatTolerance": 4,
+    "droughtTolerance": 3,
+    "cycleDays": 180,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "Fijación de N de menos de 20 a más de 200 kg N/ha (Carsky et al. 1998, vía revisión); biomasa de 7–11 t MS/ha en ~6 meses; reduce escorrentía y erosión (ensayos en Benín). Tolerancia a sequía con fuentes en conflicto (algunas la llaman resistente, una guía sudafricana la describe sensible por raíz superficial). Sin mercado propio: abono verde. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "crotalaria",
+    "name": "Crotalaria (Crotalaria juncea)",
+    "waterUse": 2,
+    "nitrogenFixation": 5,
+    "erosionReduction": 4,
+    "organicMatter": 4,
+    "forageValue": 1,
+    "marketPotential": 1,
+    "heatTolerance": 4,
+    "droughtTolerance": 4,
+    "cycleDays": 135,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "UF/IFAS (ficha de sunn hemp): ~7 t de biomasa fresca y ~359 kg N/ha en subtrópico de Florida (conversión propia de 320 lb N/acre). Biomasa máxima a los 135 días tras emergencia (estudio brasileño, Pesq. Agropec. Trop. 2020). Descrita como tolerante a sequía (Tropical Forages). Sin mercado propio: abono verde. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "yuca",
+    "name": "Yuca (Manihot esculenta)",
+    "waterUse": 2,
+    "nitrogenFixation": 0,
+    "erosionReduction": 2,
+    "organicMatter": 2,
+    "forageValue": 2,
+    "marketPotential": 3,
+    "heatTolerance": 4,
+    "droughtTolerance": 5,
+    "cycleDays": 270,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "FAO EcoCrop ficha id=1420 (ciclo 180–365 días, óptimo 20–29 °C y 1000–1500 mm/año, límite absoluto 10–35 °C). Muy tolerante a sequía y habitual con menos de 800 mm/año (El-Sharkawy y Cock 2012). Erosión y mercado: juicio. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  }
+]
