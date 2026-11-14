@@ -72,3 +72,10 @@ export const analysisResponseSchema = z.object({
   climate: climateResultSchema, monthlyClimate: z.array(monthlyClimateSchema), indicators: indicatorsSchema, rotations: z.array(rotationResultSchema).min(3),
 });
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
+
+export const locationResultSchema = z.object({
+  lat: z.number().finite().gte(-90).lte(90),
+  lon: z.number().finite().gte(-180).lte(180),
+  label: z.string().min(1),
+});
+export type LocationResult = z.infer<typeof locationResultSchema>;
