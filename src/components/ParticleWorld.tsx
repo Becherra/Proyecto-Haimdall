@@ -154,7 +154,7 @@ function createLandPositions(target: number, mask: TextureMask | null): Particle
   return sampleWholeSurface(candidates.filter((position) => isLandPosition(position, mask)), target);
 }
 
-export default function ParticleWorld() {
+export default function ParticleWorld({ stage = "settled" }: { stage?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
   const [fps, setFps] = useState(0);
@@ -267,7 +267,7 @@ export default function ParticleWorld() {
     };
   }, [isMobile, pointCount, triangleCount]);
 
-  return <div ref={hostRef} className="pointer-events-none absolute inset-0 overflow-hidden">
+  return <div ref={hostRef} data-intro-stage={stage} className={`particle-world pointer-events-none absolute inset-0 overflow-hidden particle-stage-${stage}`}>
     {renderError ? <p className="absolute inset-x-4 bottom-4 text-center text-xs text-silver-mist" role="alert">No fue posible iniciar WebGL para la vista de partículas.</p> : <output className="absolute bottom-3 right-3 z-10 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 font-mono text-[10px] text-silver-mist" aria-live="off">
       {triangleCount.toLocaleString("es-CO")} triángulos · {pointCount.toLocaleString("es-CO")} puntos · {fps || "—"} FPS
     </output>}
