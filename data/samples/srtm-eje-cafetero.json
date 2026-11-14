@@ -1,0 +1,52 @@
+[
+  {
+    "id": "pereira-cafetera",
+    "name": "Pereira · Zona cafetera media (Risaralda)",
+    "lat": 4.8133,
+    "lon": -75.6961,
+    "tolerance": 0.08,
+    "elevationMeters": 1411,
+    "slopePercent": 18,
+    "source": "NASA SRTMGL1 v003 (30 m) e IGAC: altitud media urbana/periurbana de Pereira ~1411 m s. n. m. y pendiente media de ladera cafetera (~18 %)."
+  },
+  {
+    "id": "cerritos-valle",
+    "name": "Cerritos / La Virginia · Valle cálido (Risaralda)",
+    "lat": 4.805,
+    "lon": -75.84,
+    "tolerance": 0.08,
+    "elevationMeters": 1150,
+    "slopePercent": 6,
+    "source": "NASA SRTMGL1 v003 (30 m): terraza baja entre Cerritos y el valle del río Cauca (~1150 m s. n. m., relieve suavemente ondulado ~6 %)."
+  },
+  {
+    "id": "santa-rosa-alta",
+    "name": "Santa Rosa de Cabal / La Florida · Ladera fría (Risaralda)",
+    "lat": 4.868,
+    "lon": -75.605,
+    "tolerance": 0.06,
+    "elevationMeters": 1950,
+    "slopePercent": 28,
+    "source": "NASA SRTMGL1 v003 (30 m): vertiente occidental de la Cordillera Central (~1950 m s. n. m., ladera pronunciada ~28 %)."
+  },
+  {
+    "id": "manizales-ladera",
+    "name": "Manizales · Zona cafetera alta y ladera (Caldas)",
+    "lat": 5.0689,
+    "lon": -75.5174,
+    "tolerance": 0.08,
+    "elevationMeters": 2150,
+    "slopePercent": 32,
+    "source": "NASA SRTMGL1 v003 (30 m): altitud media de Manizales (~2150 m s. n. m.) en relieve quebrado de alta pendiente (~32 %)."
+  },
+  {
+    "id": "armenia-quindio",
+    "name": "Armenia · Abanico del Quindío (Quindío)",
+    "lat": 4.5339,
+    "lon": -75.6811,
+    "tolerance": 0.08,
+    "elevationMeters": 1480,
+    "slopePercent": 12,
+    "source": "NASA SRTMGL1 v003 (30 m): abanico fluviovolcánico del Quindío (~1480 m s. n. m., pendiente moderada ~12 %)."
+  }
+]

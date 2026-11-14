@@ -4,6 +4,7 @@ import { aggregateMonthly, computeIndicators, countYears } from "./indicators";
 import { baselineRotation, candidateRotations, pickBest } from "./rotations";
 import { scoreRotations } from "./scoring";
 import { computeSeasonality } from "./seasonality";
+import { resolveTerrain } from "./terrain";
 
 /** Error causado por datos de entrada inválidos (el cliente puede corregirlos), a diferencia de un fallo interno. */
 export class AnalysisInputError extends Error {}
@@ -41,7 +42,11 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
 export function buildAnalysis({ climate, crops, priorities, location }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   const current = resolveCurrentCrop(crops, priorities.currentCropId);
-  const indicators = computeIndicators(climate.records, location.lat);
+  const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined);
+  const terrainInput = terrain || climate.cellElevationMeters !== undefined
+    ? { cellElevationMeters: climate.cellElevationMeters, siteElevationMeters: terrain?.elevationMeters, slopePercent: terrain?.slopePercent, terrainSource: terrain?.source }
+    : undefined;
+  const indicators = computeIndicators(climate.records, location.lat, terrainInput);
   const monthlyClimate = aggregateMonthly(climate.records, location.lat);
   const seasonality = isInSowingCalendarRegion(location.lat, location.lon) ? computeSeasonality(monthlyClimate) : undefined;
   const yearsAnalyzed = countYears(climate.records);

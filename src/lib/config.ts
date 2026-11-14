@@ -52,3 +52,13 @@ export const SEASON_DRY_RAIN_RATIO = 0.75;
 export const SOWING_CALENDAR_REGION = { minLat: 3.8, maxLat: 6.0, minLon: -76.4, maxLon: -74.8 } as const;
 /** Cultivo de la línea base cuando el agricultor no declara uno (decisión pendiente en CONTEXT.md §13). */
 export const DEFAULT_CURRENT_CROP_ID = "maiz";
+/** Gradiente térmico vertical andino (°C por metro de altitud): ~0,6 °C menos por cada 100 m que se sube (IDEAM / Cenicafé). */
+export const TEMPERATURE_LAPSE_RATE_C_PER_METER = 0.006;
+/** Pendiente del terreno (%) desde la cual el lote se considera en ladera con riesgo relevante de escorrentía y erosión. */
+export const SLOPE_CAUTION_THRESHOLD_PERCENT = 15;
+/** Pendiente de referencia (%) a partir de la cual la exposición a erosión en ladera alcanza el máximo (1). Heurística de diseño. */
+export const STEEP_SLOPE_REFERENCE_PERCENT = 30;
+/** Lluvia diaria extrema (percentil 95, mm/día) de referencia para escalar la fuerza erosiva de los aguaceros en ladera. */
+export const EROSIVE_RAIN_REFERENCE_MM = 25;
+/** Penalización máxima (escala 0–5) para una rotación sin cobertura en una ladera empinada con aguaceros fuertes. */
+export const MAX_SLOPE_EROSION_PENALTY = 0.75;

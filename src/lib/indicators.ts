@@ -1,6 +1,14 @@
 import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, type MonthlyWaterDeficit, type MonthlyWetnessAnomaly } from "../types";
 import { dayOfYear, extraterrestrialRadiation, hargreavesDailyPet } from "./evapotranspiration";
 import { EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_YEARS_FOR_ANOMALY_BASELINE } from "./config";
+import { adjustTemperatureForElevation } from "./terrain";
+
+export type TerrainIndicatorsInput = {
+  cellElevationMeters?: number;
+  siteElevationMeters?: number;
+  slopePercent?: number;
+  terrainSource?: "srtm-sample" | "user";
+};
 
 type NumericParameter = ClimateParameter;
 
@@ -181,15 +189,23 @@ export function computeWetnessAnomalies(monthly: readonly MonthlyClimate[]): Mon
  * - `missingByParameter`: días sin dato por cada uno de los parámetros NASA.
  * Un indicador sin datos suficientes queda en null (o 0 en los conteos de días).
  */
-export function computeIndicators(records: readonly ClimateRecord[], latitude?: number): Indicators {
+export function computeIndicators(records: readonly ClimateRecord[], latitude?: number, terrain?: TerrainIndicatorsInput): Indicators {
   const monthlyBalances = computeMonthlyWaterDeficit(aggregateMonthly(records, latitude)).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
+  const cellMeanC = mean(validValues(records, "T2M").value);
+  const canAdjust = cellMeanC !== null && terrain?.cellElevationMeters !== undefined && terrain?.siteElevationMeters !== undefined;
+  const meanTemperatureC = canAdjust ? adjustTemperatureForElevation(cellMeanC, terrain.cellElevationMeters!, terrain.siteElevationMeters!) : cellMeanC;
   return {
     waterDeficitMm: mean(monthlyBalances),
     heatStressDays: countHeatStressDays(records).value,
     frostRiskDays: countFrostRiskDays(records).value,
     extremeRainThresholdMm: extremeRainThreshold(records).value,
     meanRootZoneWetness: mean(validValues(records, "GWETROOT").value),
-    meanTemperatureC: mean(validValues(records, "T2M").value),
+    meanTemperatureC,
+    ...(canAdjust ? { cellMeanTemperatureC: cellMeanC } : {}),
+    ...(terrain?.cellElevationMeters === undefined ? {} : { cellElevationMeters: terrain.cellElevationMeters }),
+    ...(terrain?.siteElevationMeters === undefined ? {} : { siteElevationMeters: terrain.siteElevationMeters }),
+    ...(terrain?.slopePercent === undefined ? {} : { slopePercent: terrain.slopePercent }),
+    ...(terrain?.terrainSource === undefined ? {} : { terrainSource: terrain.terrainSource }),
     missingByParameter: Object.fromEntries(CLIMATE_PARAMETERS.map((name) => [name, validValues(records, name).missing])),
     waterBalanceMethod: latitude === undefined ? "evland" : "potential",
   };

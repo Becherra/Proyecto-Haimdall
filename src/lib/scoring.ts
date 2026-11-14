@@ -1,11 +1,12 @@
 import type { Crop, Indicators, Rotation, RotationResult, UserPriorities } from "../types";
 import {
   SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
-  MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY, MAX_TEMPERATURE_PENALTY, MAX_WATER_SCARCITY_PENALTY, WATER_AVAILABILITY_DROUGHT_FACTOR,
+  MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY, MAX_SLOPE_EROSION_PENALTY, MAX_TEMPERATURE_PENALTY, MAX_WATER_SCARCITY_PENALTY, SLOPE_CAUTION_THRESHOLD_PERCENT, WATER_AVAILABILITY_DROUGHT_FACTOR,
 } from "./config";
 import { formatTemperatureRange, frostExposure, frostUnprotected, temperatureMismatch, temperatureSuitability } from "./climateFit";
 import { commonName, familyBreakShare } from "./rotations";
 import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
+import { slopeErosionExposure } from "./terrain";
 
 type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk";
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
@@ -108,10 +109,12 @@ function climatePenalties(crops: readonly Crop[], indicators: Indicators, years:
   const temperature = indicators.meanTemperatureC ?? null;
   const frostPerYear = perYear(indicators.frostRiskDays, years);
   const waterUseShare = average(crops, (crop) => crop.waterUse) / MAX_SCORE;
+  const slopeRisk = slopeErosionExposure(crops, indicators.slopePercent, indicators.extremeRainThresholdMm) * MAX_SLOPE_EROSION_PENALTY;
   return [
     { label: `temperatura fuera del rango de los cultivos (media del sitio ${temperature?.toFixed(1)} °C)`, value: temperature === null ? 0 : temperatureMismatch(crops, temperature) * MAX_TEMPERATURE_PENALTY },
     { label: `heladas (≈${frostPerYear.toFixed(0)} días al año bajo ${FROST_THRESHOLD_C} °C)`, value: frostExposure(crops, frostPerYear) * MAX_FROST_PENALTY },
     { label: "poca agua disponible para cultivos de alto consumo", value: waterAvailability === "low" ? waterUseShare * MAX_WATER_SCARCITY_PENALTY : 0 },
+    { label: `ladera (${indicators.slopePercent?.toFixed(0)} % de pendiente) con baja cobertura frente a lluvias fuertes`, value: slopeRisk },
   ].filter((penalty) => penalty.value > 0);
 }
 
@@ -147,10 +150,11 @@ function explainWhy({ score, criteria, penalties }: Evaluation): string {
   return `Obtiene ${oneDecimal(score)}/5 según tus prioridades; lo que más suma es ${top}.${penalty} Es un apoyo a la decisión, no una certeza.`;
 }
 
-function sowingEvidence(sowing: SowingFinding[] | null): string[] {
+function sowingEvidence(sowing: SowingFinding[] | null, { waterBalanceMethod }: Indicators): string[] {
+  const source = WATER_BALANCE_SOURCE[waterBalanceMethod === "potential" ? "potential" : "evland"];
   const lines = (sowing ?? []).filter(({ assessment }) => assessment.dryMonths.length + assessment.wetMonths.length > 0).map(({ crop, assessment }) => {
     const verdict = assessment.dryMonths.length === 0 ? "ningún mes cae en época seca del sitio" : `en época seca del sitio: ${formatMonths(assessment.dryMonths)}`;
-    return `Siembra de ${crop.name} (${formatMonths(crop.sowingMonths)}): ${verdict} (NASA POWER, PRECTOTCORR y EVLAND; meses de siembra del catálogo).`;
+    return `Siembra de ${crop.name} (${formatMonths(crop.sowingMonths)}): ${verdict} (${source}; meses de siembra del catálogo).`;
   });
   const rule = `Mes seco: lluvia media del mes menor al ${(SEASON_DRY_RAIN_RATIO * 100).toFixed(0)} % del promedio mensual del sitio, o evaporación mayor que la lluvia (regla de diseño, no dato NASA).`;
   return lines.length > 0 ? [...lines, rule] : [];
@@ -188,12 +192,23 @@ function durationEvidence(crops: readonly Crop[]): string {
 
 const WATER_AVAILABILITY_LABELS: Record<WaterAvailability, string> = { low: "baja", medium: "media", high: "alta" };
 
-/** Temperatura media del sitio y rango de cada cultivo; vacío si no hay temperatura. */
-function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC }: Indicators): string[] {
+/** Temperatura media del sitio y rango de cada cultivo; incluye el ajuste por altitud SRTM/declarada cuando se aplicó. */
+function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMeanTemperatureC, cellElevationMeters, siteElevationMeters, terrainSource }: Indicators): string[] {
   if (meanTemperatureC === undefined || meanTemperatureC === null) return [];
   const ranges = crops.flatMap((crop) => (crop.temperatureC ? [`${commonName(crop)} ${formatTemperatureRange(crop.temperatureC)}`] : []));
   const detail = ranges.length > 0 ? ` Rango en que crece bien según el catálogo: ${ranges.join("; ")}.` : "";
-  return [`Temperatura media del sitio: ${meanTemperatureC.toFixed(1)} °C (NASA POWER, T2M).${detail}`];
+  const adjusted = cellMeanTemperatureC !== undefined && cellMeanTemperatureC !== null && cellElevationMeters !== undefined && siteElevationMeters !== undefined;
+  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "NASA SRTM";
+  const sourceNote = adjusted
+    ? `(NASA POWER, T2M de ${cellMeanTemperatureC.toFixed(1)} °C en celda a ${cellElevationMeters.toFixed(0)} m, ajustada a ${siteElevationMeters.toFixed(0)} m con ${origin})`
+    : "(NASA POWER, T2M)";
+  return [`Temperatura media del sitio: ${meanTemperatureC.toFixed(1)} °C ${sourceNote}.${detail}`];
+}
+
+function terrainEvidence({ slopePercent, terrainSource }: Indicators): string[] {
+  if (slopePercent === undefined) return [];
+  const origin = terrainSource === "user" ? "declarada por el agricultor" : "NASA SRTM";
+  return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (${origin}).`];
 }
 
 function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[] {
@@ -206,8 +221,9 @@ function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[]
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
     ...temperatureEvidence(crops, indicators),
+    ...terrainEvidence(indicators),
     ...(waterAvailability ? [`Disponibilidad de agua declarada por el agricultor: ${WATER_AVAILABILITY_LABELS[waterAvailability]}.`] : []),
-    ...sowingEvidence(sowing),
+    ...sowingEvidence(sowing, indicators),
     ...familyEvidence(evaluation),
     durationEvidence(crops),
     ...crops.map((crop) => `Atributos de ${crop.name}: ${crop.source}.`),
@@ -262,6 +278,9 @@ function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   if (low((crop) => crop.droughtTolerance) && drynessFactor(indicators) > 0) risks.push("Baja tolerancia a sequía en un sitio donde la evaporación supera a la lluvia.");
   if (average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD && drynessFactor(indicators) > 0) risks.push("Alto uso de agua en un sitio con déficit hídrico.");
   risks.push(...temperatureRisks(crops, indicators), ...frostRisks(crops, indicators, years));
+  if (indicators.slopePercent !== undefined && indicators.slopePercent > SLOPE_CAUTION_THRESHOLD_PERCENT && average(crops, (crop) => crop.erosionReduction) < HIGH_ATTRIBUTE_THRESHOLD) {
+    risks.push(`Lote en ladera (${indicators.slopePercent.toFixed(0)} % de pendiente) con cobertura insuficiente frente a aguaceros fuertes.`);
+  }
   if (evaluation.waterAvailability === "low" && average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD) risks.push("Alto consumo de agua y el agricultor declara poca agua disponible.");
   if (low((crop) => crop.marketPotential)) risks.push("Bajo potencial de mercado según el catálogo.");
   for (const { crop, assessment } of sowing ?? []) {

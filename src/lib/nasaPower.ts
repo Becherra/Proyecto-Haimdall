@@ -9,7 +9,10 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [100, 250] as const;
 const PEREIRA = { lat: 4.8133, lon: -75.6961, tolerance: 0.1 } as const;
-const responseSchema = z.object({ properties: z.object({ parameter: z.record(z.string(), z.record(z.string(), z.number())) }) });
+const responseSchema = z.object({
+  geometry: z.object({ coordinates: z.array(z.number()) }).optional(),
+  properties: z.object({ parameter: z.record(z.string(), z.record(z.string(), z.number())) }),
+});
 const requestSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
   startYear: z.number().int().gte(MIN_YEAR).lte(new Date().getFullYear() - 1), endYear: z.number().int().gte(MIN_YEAR).lte(new Date().getFullYear() - 1),
@@ -47,7 +50,9 @@ function parseResponse(payload: unknown, source: ClimateResult["source"], input?
     }
     return record;
   });
-  return climateResultSchema.parse({ records, missingByParameter, source });
+  const rawElevation = parsed.data.geometry?.coordinates[2];
+  const cellElevationMeters = rawElevation !== undefined && Number.isFinite(rawElevation) && rawElevation !== -999 ? rawElevation : undefined;
+  return climateResultSchema.parse({ records, missingByParameter, source, ...(cellElevationMeters === undefined ? {} : { cellElevationMeters }) });
 }
 
 function wait(milliseconds: number): Promise<void> {
