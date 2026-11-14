@@ -47,6 +47,8 @@ export const indicatorsSchema = z.object({
   missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
   /** Con qué se calculó `waterDeficitMm`: evaporación potencial estimada ("potential") o EVLAND de NASA ("evland", la real, que subestima la aridez). */
   waterBalanceMethod: z.enum(["potential", "evland"]).optional(),
+  /** Temperatura media de toda la serie (T2M, °C); null si no hubo datos. Es la de la celda de NASA POWER, no la del lote. */
+  meanTemperatureC: z.number().nullable().optional(),
 });
 export type Indicators = z.infer<typeof indicatorsSchema>;
 
@@ -56,8 +58,16 @@ export const cropSchema = z.object({
   cycleDays: z.number().int().positive(), sowingMonths: z.array(z.number().int().min(1).max(12)), source: z.string().min(1),
   /** Familia botánica en español (p. ej. "Leguminosas"). Opcional para no romper catálogos previos; sin ella no se evalúa si la rotación alterna familias. */
   family: z.string().min(1).optional(),
+  /**
+   * Temperatura media diaria (°C) según la fuente del cultivo: entre `goodMin` y `goodMax` crece bien; fuera de `limitMin`–`limitMax` no produce.
+   * Solo `goodMin` es obligatorio: un extremo ausente significa que la fuente no lo da. Sin este campo no se evalúa la aptitud térmica.
+   */
+  temperatureC: z.object({ goodMin: z.number(), goodMax: z.number().optional(), limitMin: z.number().optional(), limitMax: z.number().optional() }).optional(),
+  /** Helada corta más fría (°C) que el cultivo soporta según su fuente. Ausente = sin tolerancia documentada. */
+  frostToleranceC: z.number().optional(),
 });
 export type Crop = z.infer<typeof cropSchema>;
+export type CropTemperatureRange = NonNullable<Crop["temperatureC"]>;
 
 export const rotationSchema = z.object({ id: z.string().min(1), name: z.string().min(1), cropIds: z.array(z.string().min(1)).min(1), description: z.string().min(1) });
 export type Rotation = z.infer<typeof rotationSchema>;
