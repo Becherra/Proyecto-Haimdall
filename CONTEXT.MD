@@ -2,7 +2,7 @@
 
 ## 1. Datos del equipo
 
-- **Equipo:** Heimdall (1 integrante: Steven)
+- **Equipo:** Heimdall (2 integrantes: Steven,Guerra)
 - **Evento local:** Medellín (participación virtual)
 - **Reto:** Desplazamiento de campo: Adaptando granjas con datos de la NASA
 - **Perfil del dev:** Estudiante de Ingeniería de Sistemas (UTP, Pereira). Fuerte en C y Python, experiencia con Next.js/TypeScript/Tailwind, HTML/JS. Habla español, estilo directo.
@@ -29,7 +29,7 @@ Prioridad: **demo funcional con datos reales + buen video**, no código enorme.
 
 | Capa                   | Herramienta                                                       | Nota                                     |
 | ---------------------- | ----------------------------------------------------------------- | ---------------------------------------- |
-| Frontend               | Next.js + TypeScript + Tailwind                                   | Ya lo domina (proyecto Lunes)            |
+| Frontend               | Next.js + TypeScript + Tailwind                                   |                                          |
 | Mapa                   | Leaflet + OpenStreetMap                                           | Sin API key                              |
 | Gráficas               | Recharts                                                          | Series de lluvia/temperatura             |
 | Datos clima            | **NASA POWER API**                                                | Gratis, sin autenticación                |
