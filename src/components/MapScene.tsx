@@ -8,7 +8,7 @@ import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
 import { calculateMapView } from "../lib/ui/mapView";
 import type { LocationResult } from "../types";
 
-type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void };
+type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void; onConfirmed?: () => void };
 type TileState = { loading: boolean; error: string | null };
 
 const initialDate = "2026-10-16";
@@ -47,7 +47,7 @@ function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => voi
   return null;
 }
 
-export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack }: MapSceneProps) {
+export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack, onConfirmed }: MapSceneProps) {
   const [draftLocation, setDraftLocation] = useState(location);
   const [opacity, setOpacity] = useState(65);
   const [date, setDate] = useState(initialDate);
@@ -123,7 +123,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
       <p className="col-span-2 text-xs leading-5 text-slate-400">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
       <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onBack} className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300">Volver al globo</button>
-        <button type="button" onClick={() => onLocationSelected(draftLocation)} className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Confirmar finca</button>
+        <button type="button" onClick={() => { onLocationSelected(draftLocation); onConfirmed?.(); }} className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Confirmar finca</button>
       </div>
     </div>
     <p className="mt-3 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
