@@ -34,8 +34,11 @@ export default function LocationSearch({ onLocationSelected }: LocationSearchPro
   return <form onSubmit={submitSearch} className="w-full max-w-xl" noValidate>
     <label htmlFor="location-query" className="mb-2 block text-sm font-medium text-slate-200">Busca tu finca o municipio</label>
     <div className="flex flex-col gap-3 sm:flex-row">
-      <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pereira, Colombia" className="min-h-12 flex-1 rounded-xl border border-white/15 bg-white/10 px-4 text-base text-white outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/60" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
-      <button type="submit" disabled={loading} className="min-h-12 rounded-xl bg-cyan-300 px-6 font-semibold text-slate-950 transition hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60">{loading ? "Buscando…" : "Buscar"}</button>
+      <div className="relative flex-1">
+        <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-cyan-200" aria-hidden="true">⌕</span>
+        <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busca tu finca, ciudad o región..." className="min-h-14 w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-400 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/60" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
+      </div>
+      <button type="submit" disabled={loading} className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-7 font-semibold text-slate-950 transition hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-60"><span aria-hidden="true">⌕</span>{loading ? "Buscando…" : "Buscar"}</button>
     </div>
     {loading && <p className="mt-3 text-sm text-cyan-200" role="status" aria-live="polite">Consultando OpenStreetMap…</p>}
     {error && <p id="location-error" className="mt-3 text-sm text-rose-300" role="alert">{error}</p>}

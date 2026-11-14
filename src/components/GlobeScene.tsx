@@ -2,9 +2,13 @@
 
 import Globe, { type GlobeMethods } from "react-globe.gl";
 import { useEffect, useRef, useState } from "react";
+import { calculateGlobeView } from "../lib/globeView";
 import type { LocationResult } from "../types";
 
 type GlobeSceneProps = { location: LocationResult | null };
+const TWO_K_TEXTURE = "/textures/earth-bluemarble-2048.jpg";
+// NASA SVS Blue Marble January source: https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/january/world.topo.200401.3x5400x2700.jpg
+const FOUR_K_TEXTURE = "/textures/earth-bluemarble-4k.jpg";
 
 function supportsWebGL(): boolean {
   try {
@@ -13,20 +17,39 @@ function supportsWebGL(): boolean {
   } catch { return false; }
 }
 
+function canUseHighResolutionTexture(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const connection = (navigator as Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }).connection;
+  const slowNetwork = connection?.saveData || ["slow-2g", "2g", "3g"].includes(connection?.effectiveType ?? "");
+  return !window.matchMedia("(max-width: 767px)").matches && !slowNetwork;
+}
+
 export default function GlobeScene({ location }: GlobeSceneProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const resumeTimer = useRef<number | undefined>(undefined);
   const [webglAvailable] = useState(() => typeof window === "undefined" || supportsWebGL());
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const [width, setWidth] = useState(() => typeof window === "undefined" ? 320 : Math.min(560, Math.max(280, window.innerWidth - 32)));
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [markerPulse, setMarkerPulse] = useState(false);
+  const globeImageUrl = location && canUseHighResolutionTexture() ? FOUR_K_TEXTURE : TWO_K_TEXTURE;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const updateMotion = () => setReducedMotion(mediaQuery.matches);
     mediaQuery.addEventListener("change", updateMotion);
-    const updateWidth = () => setWidth(Math.min(560, Math.max(280, window.innerWidth - 32)));
-    window.addEventListener("resize", updateWidth);
-    return () => { mediaQuery.removeEventListener("change", updateMotion); window.removeEventListener("resize", updateWidth); };
+    return () => mediaQuery.removeEventListener("change", updateMotion);
+  }, []);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setSize({ width: Math.floor(width), height: Math.floor(height) });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -51,10 +74,19 @@ export default function GlobeScene({ location }: GlobeSceneProps) {
   }, [reducedMotion, webglAvailable]);
 
   useEffect(() => {
-    if (location && globeRef.current) globeRef.current.pointOfView({ lat: location.lat, lng: location.lon, altitude: 1.5 }, 1800);
-  }, [location]);
+    if (location && globeRef.current && size.width > 0) {
+      const view = calculateGlobeView(true, size.width);
+      globeRef.current.pointOfView({ lat: location.lat, lng: location.lon, altitude: view.altitude }, view.transitionMs);
+    }
+  }, [location, size.width]);
 
-  if (!webglAvailable) return <div className="flex h-[320px] w-full max-w-[560px] items-center justify-center rounded-full border border-white/10 bg-slate-900/70 p-8 text-center text-sm text-slate-300" role="status">Tu navegador no puede mostrar el globo 3D. Puedes buscar una ubicación para continuar.</div>;
+  useEffect(() => {
+    if (!location || reducedMotion) return;
+    const interval = window.setInterval(() => setMarkerPulse((active) => !active), 1400);
+    return () => window.clearInterval(interval);
+  }, [location, reducedMotion]);
 
-  return <Globe ref={globeRef} width={width} height={width} globeImageUrl="/textures/earth-bluemarble-2048.jpg" showAtmosphere atmosphereColor="#67e8f9" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={0.6} pointColor={() => "#fbbf24"} pointLabel="label" rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { globeRef.current?.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }} aria-label="Globo terrestre interactivo" />;
+  const fallback = <div className="flex h-full w-full items-center justify-center rounded-full border border-white/10 bg-slate-900/70 p-8 text-center text-sm text-slate-300" role="status">Tu navegador no puede mostrar el globo 3D. Puedes buscar una ubicación para continuar.</div>;
+
+  return <div ref={containerRef} className="flex h-full w-full items-center justify-center" aria-label="Globo terrestre interactivo">{!webglAvailable ? fallback : size.width > 0 && size.height > 0 ? <Globe ref={globeRef} width={size.width} height={size.height} globeImageUrl={globeImageUrl} showAtmosphere atmosphereColor="#67e8f9" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={reducedMotion ? 0.6 : markerPulse ? 0.75 : 0.6} pointColor={() => "#fbbf24"} pointLabel="label" rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { globeRef.current?.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }} /> : <div className="text-sm text-slate-500" role="status">Preparando globo…</div>}</div>;
 }
