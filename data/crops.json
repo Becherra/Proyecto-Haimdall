@@ -138,5 +138,65 @@
       10
     ],
     "source": "FAO EcoCrop ficha id=1420 (ciclo 180–365 días, óptimo 20–29 °C y 1000–1500 mm/año, límite absoluto 10–35 °C). Muy tolerante a sequía y habitual con menos de 800 mm/año (El-Sharkawy y Cock 2012). Erosión y mercado: juicio. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "papa",
+    "name": "Papa (Solanum tuberosum)",
+    "waterUse": 3,
+    "nitrogenFixation": 0,
+    "erosionReduction": 1,
+    "organicMatter": 1,
+    "forageValue": 1,
+    "marketPotential": 4,
+    "heatTolerance": 1,
+    "droughtTolerance": 1,
+    "cycleDays": 135,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "FAO Land & Water, ficha de papa (copia archivada 2024): óptimo 18–20 °C de media diaria, el tubérculo crece mal por debajo de 10 °C y por encima de 30 °C; variedades de 90–180 días (medias 120–150; se toma 135); requiere 500–700 mm para 120–150 días; raíz superficial y relativamente sensible al déficit de agua; se recomienda rotación de 3 años o más con maíz, fríjol o alfalfa. La ficha no habla de heladas. Erosión, materia orgánica, forraje y mercado: juicio sin fuente cuantitativa. Meses de siembra: calendario general del catálogo, sin fuente propia para papa en el Eje Cafetero. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "avena",
+    "name": "Avena forrajera (Avena sativa)",
+    "waterUse": 2,
+    "nitrogenFixation": 0,
+    "erosionReduction": 4,
+    "organicMatter": 3,
+    "forageValue": 5,
+    "marketPotential": 2,
+    "heatTolerance": 1,
+    "droughtTolerance": 2,
+    "cycleDays": 140,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "Feedipedia, ficha de avena forrajera: crece entre 5 y 26 °C con más de 500 mm de lluvia; en el trópico se cultiva sobre 1600 m y rinde mejor sobre 2000 m; 4–15 t MS/ha; sirve de cobertura contra la erosión y de cultivo de rotación; proteína cruda 10,5 % de la MS. Ciclo: 111–165 días a cosecha de forraje verde en la variedad Altoandina, ensayos entre 2543 y 3184 m (Campuzano-Duque et al. 2020, Agronomía Mesoamericana 31(3), AGROSAVIA; se toma 140). Ninguna de las dos fuentes da tolerancia a heladas ni a sequía: la sequía es juicio. Mercado: juicio (forraje para uso propio o lechería). Meses de siembra: calendario general del catálogo, sin fuente propia para avena en el Eje Cafetero. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "repollo",
+    "name": "Repollo (Brassica oleracea var. capitata)",
+    "waterUse": 2,
+    "nitrogenFixation": 0,
+    "erosionReduction": 1,
+    "organicMatter": 1,
+    "forageValue": 1,
+    "marketPotential": 3,
+    "heatTolerance": 1,
+    "droughtTolerance": 1,
+    "cycleDays": 130,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "source": "FAO Land & Water, ficha de repollo (copia archivada 2024): clima fresco y húmedo, óptimo cerca de 17 °C de media diaria (máxima media 24 °C, mínima 10 °C); la mayoría de variedades soporta heladas cortas de −6 °C; ciclo de 90–200 días, 120–140 para buena producción (se toma 130); requiere 380–500 mm; raíz superficial (0,4–0,5 m); se recomienda rotación de al menos 3 años contra enfermedades del suelo. Erosión, materia orgánica, forraje, mercado y sequía: juicio sin fuente cuantitativa. Meses de siembra: calendario general del catálogo, sin fuente propia para repollo en el Eje Cafetero. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
   }
 ]

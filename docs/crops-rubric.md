@@ -1,10 +1,10 @@
 # Rúbrica de `data/crops.json` (BORRADOR)
 
-> **Estado:** borrador preliminar para la demo. Los puntajes 0–5 son **calificaciones ordinales relativas entre estos 7 cultivos**, no mediciones. Ningún valor está validado por un agrónomo local. Antes de presentarlos como evidencia, hay que revisarlos.
+> **Estado:** borrador preliminar para la demo. Los puntajes 0–5 son **calificaciones ordinales relativas entre estos 10 cultivos**, no mediciones. Ningún valor está validado por un agrónomo local. Antes de presentarlos como evidencia, hay que revisarlos.
 
 ## Cómo leer la escala
 
-0 = nulo o mínimo, 5 = máximo dentro de este catálogo. Es relativa: un 5 en `droughtTolerance` significa "el más tolerante de los 7", no un umbral agronómico absoluto.
+0 = nulo o mínimo, 5 = máximo dentro de este catálogo. Es relativa: un 5 en `droughtTolerance` significa "el más tolerante de los 10", no un umbral agronómico absoluto.
 
 | Atributo | 5 significa | Qué la respalda |
 | --- | --- | --- |
@@ -14,14 +14,14 @@
 | `organicMatter` | Mucha biomasa que aporta al suelo | Biomasa t MS/ha de mucuna y crotalaria; el resto es juicio. |
 | `forageValue` | Excelente como forraje | Solo juicio, sin fuente cuantitativa. |
 | `marketPotential` | Mercado amplio y conocido | Solo juicio, **sin datos de mercado**. Pendiente: precios y área sembrada locales (UPRA, Agronet, FENALCE). |
-| `heatTolerance` | Tolera mucho calor | Rangos de temperatura EcoCrop y FAO (maíz, soya, yuca, arveja); fríjol por literatura. |
+| `heatTolerance` | Tolera mucho calor | Rangos de temperatura EcoCrop y FAO (maíz, soya, yuca, arveja, papa, repollo); avena por Feedipedia; fríjol por literatura. |
 | `droughtTolerance` | Tolera mucha sequía | Literatura cualitativa (yuca, crotalaria); mucuna tiene fuentes en conflicto. |
 | `cycleDays` | Días de siembra a cosecha o corte | Cenicafé (maíz 145, fríjol 90), EcoCrop, FAO y estudios de biomasa. Es una cifra típica, no un dato local. |
 | `sowingMonths` | Meses aptos | Marzo–abril y septiembre–octubre, de una fuente secundaria que **no** es Cenicafé ni FENALCE. Cenicafé señala febrero–marzo y julio–agosto como los periodos menos lluviosos y desaconseja sembrar fríjol o maíz en esos meses durante El Niño. |
 
 ## Fuentes consultadas y su estado
 
-Las consulté por **búsqueda web y solo vi resúmenes**, no abrí las fichas completas. Hay que verificar cada cifra contra la fuente antes de citarla.
+Las de los 7 cultivos iniciales las consulté por **búsqueda web y solo vi resúmenes**, no abrí las fichas completas. Hay que verificar cada cifra contra la fuente antes de citarla. Las tres de la primera ampliación (papa, avena, repollo) sí se leyeron en texto completo; su estado lo dice la tabla.
 
 | Fuente | Respalda | Estado |
 | --- | --- | --- |
@@ -33,11 +33,17 @@ Las consulté por **búsqueda web y solo vi resúmenes**, no abrí las fichas co
 | Estudio brasileño, *Pesq. Agropec. Trop.* 2020 | Biomasa máxima de crotalaria a los 135 días | Resumen de búsqueda. |
 | El-Sharkawy y Cock 2012 | Tolerancia a sequía de la yuca | Resumen de búsqueda. |
 | Cenicafé, publicaciones técnicas | Ciclo de maíz y fríjol intercalados con café; periodos menos lluviosos | Referencia puntual por confirmar. |
+| FAO Land & Water, fichas de papa y repollo | Temperatura óptima, ciclo, agua requerida, profundidad de raíz, rotación recomendada, heladas (solo repollo) | **Leídas completas** en la copia de web.archive.org (capturas de 2024): FAO retiró las páginas y hoy dan error 404. |
+| Feedipedia, ficha de avena forrajera (nodo 500) | Rango de temperatura y lluvia, altitud en el trópico, biomasa, uso como cobertura, valor nutritivo | **Leída** hasta la tabla de ensilaje; el final de la página no se revisó. |
+| Campuzano-Duque et al. 2020, *Agronomía Mesoamericana* 31(3):581–595, AGROSAVIA | Días a cosecha de forraje verde de la avena Altoandina y altitud de los ensayos | **Leído** el texto; los cuadros son imágenes y no se leyeron. |
 
 ## Vacíos conocidos
 
 - Sin datos de mercado: `marketPotential` es solo juicio.
 - Sin tolerancia a heladas en el esquema (`Crop` no la tiene).
 - No se verificó la idoneidad de cada cultivo a la altitud de Pereira (~1400 m); la soya y la arveja son las más dudosas.
-- Calendario de siembra único para los 7 cultivos; falta un calendario real por cultivo y municipio.
+- Calendario de siembra único para los 10 cultivos; falta un calendario real por cultivo y municipio. Para papa, avena y repollo no se encontró ninguna fuente de fechas de siembra en el Eje Cafetero: el boletín agroclimático de Agronet para Caldas trae un calendario de siembra y cosecha, pero el PDF no se pudo abrir.
+- Papa, avena y repollo son de clima frío: sus fuentes hablan de zonas altas (la avena, sobre 2000 m) y no se verificó que se den a la altitud de Pereira (~1400 m). Sirven para fincas altas de la región, no para la zona cafetera media.
+- Tolerancia a heladas: solo la ficha de repollo da una cifra (−6 °C por poco tiempo); las de papa y avena no dicen nada.
+- Familia botánica de cada cultivo: aún no está en el esquema, así que el catálogo no permite medir si una rotación rompe ciclos de plagas.
 - Fríjol: sin ficha EcoCrop consultada.

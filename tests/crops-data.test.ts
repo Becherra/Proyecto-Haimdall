@@ -28,6 +28,36 @@ describe("data/crops.json", () => {
     }
   });
 
+  it("incluye los cultivos anuales de clima frío de la primera ampliación", () => {
+    const byId = new Map(raw.map((crop) => cropSchema.parse(crop)).map((crop) => [crop.id, crop]));
+    for (const id of ["papa", "avena", "repollo"]) expect(byId.has(id)).toBe(true);
+    // Ninguno es leguminosa: no fijan nitrógeno.
+    for (const id of ["papa", "avena", "repollo"]) expect(byId.get(id)?.nitrogenFixation).toBe(0);
+  });
+
+  it("mantiene el ciclo de los cultivos nuevos dentro del rango que da su fuente", () => {
+    const byId = new Map(raw.map((crop) => cropSchema.parse(crop)).map((crop) => [crop.id, crop]));
+    // FAO Land & Water: papa 90–180 días según variedad; repollo 90–200 días según clima y variedad.
+    expect(byId.get("papa")?.cycleDays).toBeGreaterThanOrEqual(90);
+    expect(byId.get("papa")?.cycleDays).toBeLessThanOrEqual(180);
+    expect(byId.get("repollo")?.cycleDays).toBeGreaterThanOrEqual(90);
+    expect(byId.get("repollo")?.cycleDays).toBeLessThanOrEqual(200);
+    // Campuzano-Duque et al. 2020 (AGROSAVIA): avena Altoandina, 111–165 días a cosecha de forraje verde.
+    expect(byId.get("avena")?.cycleDays).toBeGreaterThanOrEqual(111);
+    expect(byId.get("avena")?.cycleDays).toBeLessThanOrEqual(165);
+  });
+
+  it("tiene al menos cuatro cultivos poco tolerantes al calor para poder armar tres rotaciones en zona fría", () => {
+    const coolCrops = raw.map((crop) => cropSchema.parse(crop)).filter((crop) => crop.heatTolerance <= 1);
+    expect(coolCrops.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("deja a la avena forrajera como el cultivo de mayor valor forrajero", () => {
+    const crops = raw.map((crop) => cropSchema.parse(crop));
+    const best = Math.max(...crops.map((crop) => crop.forageValue));
+    expect(crops.find((crop) => crop.id === "avena")?.forageValue).toBe(best);
+  });
+
   it("contiene todos los cultivos que usan las rotaciones del mock", () => {
     const ids = new Set(raw.map((crop) => cropSchema.parse(crop).id));
     for (const { rotation } of mockAnalysisResponse.rotations) {
