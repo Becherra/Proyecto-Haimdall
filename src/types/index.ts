@@ -73,9 +73,18 @@ export const analysisResponseSchema = z.object({
 });
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
 
+export const locationBoundingBoxSchema = z.tuple([
+  z.number().finite().gte(-90).lte(90),
+  z.number().finite().gte(-90).lte(90),
+  z.number().finite().gte(-180).lte(180),
+  z.number().finite().gte(-180).lte(180),
+]).refine(([south, north, west, east]) => south <= north && west <= east, "El bounding box debe estar ordenado");
+export type LocationBoundingBox = z.infer<typeof locationBoundingBoxSchema>;
+
 export const locationResultSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90),
   lon: z.number().finite().gte(-180).lte(180),
   label: z.string().min(1),
+  boundingBox: locationBoundingBoxSchema.optional(),
 });
 export type LocationResult = z.infer<typeof locationResultSchema>;
