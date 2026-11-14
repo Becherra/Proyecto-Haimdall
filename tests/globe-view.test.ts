@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateGlobeView } from "../src/lib/globeView";
+import { calculateGlobeView } from "../src/lib/ui/globeView";
 
 describe("calculateGlobeView", () => {
   it("mantiene una vista amplia antes de seleccionar ubicación", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { readLocationCache, writeLocationCache } from "../lib/locationCache";
+import { readLocationCache, writeLocationCache } from "../lib/ui/locationCache";
 import { locationResultSchema, type LocationResult } from "../types";
 
 type LocationSearchProps = { onLocationSelected: (location: LocationResult) => void };
