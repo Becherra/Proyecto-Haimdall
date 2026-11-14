@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readLocationCache, writeLocationCache, type LocationStorage } from "../src/lib/locationCache";
+import { readLocationCache, writeLocationCache, type LocationStorage } from "../src/lib/ui/locationCache";
 
 function fakeStorage(initial?: string): LocationStorage {
   let value = initial ?? null;
