@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { calculateGlobeView } from "../lib/ui/globeView";
 import type { LocationResult } from "../types";
 
-type GlobeSceneProps = { location: LocationResult | null };
+type GlobeSceneProps = { location: LocationResult | null; active?: boolean };
 const TWO_K_TEXTURE = "/textures/earth-bluemarble-2048.jpg";
 // NASA SVS Blue Marble January source: https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/january/world.topo.200401.3x5400x2700.jpg
 const FOUR_K_TEXTURE = "/textures/earth-bluemarble-4k.jpg";
@@ -24,7 +24,7 @@ function canUseHighResolutionTexture(): boolean {
   return !window.matchMedia("(max-width: 767px)").matches && !slowNetwork;
 }
 
-export default function GlobeScene({ location }: GlobeSceneProps) {
+export default function GlobeScene({ location, active = true }: GlobeSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const resumeTimer = useRef<number | undefined>(undefined);
@@ -56,7 +56,8 @@ export default function GlobeScene({ location }: GlobeSceneProps) {
     const globe = globeRef.current;
     if (!globe) return;
     const controls = globe.controls();
-    controls.autoRotate = !reducedMotion;
+    controls.enabled = active;
+    controls.autoRotate = active && !reducedMotion;
     if (reducedMotion) return;
     const pause = () => {
       controls.autoRotate = false;
@@ -71,7 +72,7 @@ export default function GlobeScene({ location }: GlobeSceneProps) {
     controls.addEventListener("start", pause);
     controls.addEventListener("end", resume);
     return () => { controls.removeEventListener("start", pause); controls.removeEventListener("end", resume); if (resumeTimer.current) window.clearTimeout(resumeTimer.current); };
-  }, [reducedMotion, webglAvailable]);
+  }, [active, reducedMotion, webglAvailable]);
 
   useEffect(() => {
     if (location && globeRef.current && size.width > 0) {
