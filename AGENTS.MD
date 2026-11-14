@@ -41,6 +41,14 @@ chore: configure vitest and eslint
 
 ## 3. Calidad de código
 
+## Trabajo en equipo
+
+- A partir de la siguiente tarea, trabajar en una rama por tarea con formato `nombre/tarea`.
+- Hacer `git pull --rebase` antes de empezar.
+- Trabajar solo en las carpetas asignadas al dueño de la tarea y coordinar cualquier cruce antes de editar.
+- Nunca hacer push directo a `main`, excepto la Tarea 2 de cimientos, ya realizada.
+- Los cambios en `src/types/` deben ir en un commit separado.
+
 - **TypeScript estricto** (`"strict": true`). Prohibido `any` salvo justificación en comentario.
 - **Funciones puras** para toda la lógica de negocio (indicadores, scoring). Sin efectos secundarios, sin `fetch` dentro de ellas. Reciben datos, devuelven datos.
 - **Capas separadas:**
