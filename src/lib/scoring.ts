@@ -1,15 +1,20 @@
 import type { Crop, Indicators, Rotation, RotationResult, UserPriorities } from "../types";
 import {
-  DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_RISK_PENALTY,
+  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_RISK_PENALTY,
 } from "./config";
+import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
 
 type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk";
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
 type Penalty = { label: string; value: number };
-type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[] };
+type SowingFinding = { crop: Crop; assessment: SowingAssessment };
+type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null };
 
-/** Entrada del motor: todo llega como dato, sin leer archivos ni red. */
-export type ScoringInput = { rotations: readonly Rotation[]; crops: readonly Crop[]; indicators: Indicators; priorities: UserPriorities };
+/**
+ * Entrada del motor: todo llega como dato, sin leer archivos ni red.
+ * `seasonality` (opcional) permite cruzar los meses de siembra con las épocas secas del sitio.
+ */
+export type ScoringInput = { rotations: readonly Rotation[]; crops: readonly Crop[]; indicators: Indicators; priorities: UserPriorities; seasonality?: readonly MonthSeason[] };
 
 const LABELS: Record<CriterionKey, string> = {
   waterSaving: "Ahorro de agua", extraIncome: "Ingresos extra", soilImprovement: "Mejora del suelo", erosionReduction: "Reducción de erosión", lowRisk: "Bajo riesgo",
@@ -69,16 +74,31 @@ function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: 
   ].filter((penalty) => penalty.value > 0);
 }
 
-function evaluateRotation(rotation: Rotation, catalog: readonly Crop[], indicators: Indicators, priorities: UserPriorities): Evaluation {
+function dryShare({ dryMonths, wetMonths }: SowingAssessment): number {
+  const known = dryMonths.length + wetMonths.length;
+  return known === 0 ? 0 : dryMonths.length / known;
+}
+
+/** Castiga sembrar en meses secos solo a los cultivos que toleran poco la sequía; promedia entre los cultivos de la rotación. */
+function sowingPenalties(sowing: SowingFinding[] | null): Penalty[] {
+  if (!sowing) return [];
+  const gap = ({ crop }: SowingFinding) => (MAX_SCORE - crop.droughtTolerance) / MAX_SCORE;
+  const value = sowing.reduce((total, finding) => total + dryShare(finding.assessment) * gap(finding) * MAX_RISK_PENALTY, 0) / sowing.length;
+  const dryMonths = [...new Set(sowing.flatMap(({ assessment }) => assessment.dryMonths))];
+  return value > 0 ? [{ label: `siembra en meses secos (${formatMonths(dryMonths)})`, value }] : [];
+}
+
+function evaluateRotation(rotation: Rotation, catalog: readonly Crop[], indicators: Indicators, priorities: UserPriorities, seasonality: readonly MonthSeason[] | undefined): Evaluation {
   const crops = resolveCrops(rotation, catalog);
   const dryness = drynessFactor(indicators);
   const weights = normalizedWeights(priorities);
   const values = criterionValues(crops, dryness);
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
-  const penalties = riskPenalties(crops, indicators, dryness);
+  const sowing = seasonality ? crops.map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
+  const penalties = [...riskPenalties(crops, indicators, dryness), ...sowingPenalties(sowing)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, criteria, penalties, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, criteria, penalties, sowing, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -90,7 +110,16 @@ function explainWhy({ score, criteria, penalties }: Evaluation): string {
   return `Obtiene ${oneDecimal(score)}/5 según tus prioridades; lo que más suma es ${top}.${penalty} Es un apoyo a la decisión, no una certeza.`;
 }
 
-function buildEvidence({ criteria, crops }: Evaluation, indicators: Indicators): string[] {
+function sowingEvidence(sowing: SowingFinding[] | null): string[] {
+  const lines = (sowing ?? []).filter(({ assessment }) => assessment.dryMonths.length + assessment.wetMonths.length > 0).map(({ crop, assessment }) => {
+    const verdict = assessment.dryMonths.length === 0 ? "ningún mes cae en época seca del sitio" : `en época seca del sitio: ${formatMonths(assessment.dryMonths)}`;
+    return `Siembra de ${crop.name} (${formatMonths(crop.sowingMonths)}): ${verdict} (NASA POWER, PRECTOTCORR y EVLAND; meses de siembra del catálogo).`;
+  });
+  const rule = `Mes seco: lluvia media del mes menor al ${(SEASON_DRY_RAIN_RATIO * 100).toFixed(0)} % del promedio mensual del sitio, o evaporación mayor que la lluvia (regla de diseño, no dato NASA).`;
+  return lines.length > 0 ? [...lines, rule] : [];
+}
+
+function buildEvidence({ criteria, crops, sowing }: Evaluation, indicators: Indicators): string[] {
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
   return [
     ...(balance === null ? [] : [`Balance hídrico medio (lluvia − evaporación): ${oneDecimal(balance)} mm/mes (NASA POWER, PRECTOTCORR y EVLAND).`]),
@@ -98,6 +127,7 @@ function buildEvidence({ criteria, crops }: Evaluation, indicators: Indicators):
     ...(rain === null ? [] : [`Lluvia diaria extrema (percentil 95): ${oneDecimal(rain)} mm/día (NASA POWER, PRECTOTCORR).`]),
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
+    ...sowingEvidence(sowing),
     ...crops.map((crop) => `Atributos de ${crop.name}: ${crop.source}.`),
   ];
 }
@@ -116,7 +146,7 @@ function buildBenefits({ crops }: Evaluation): string[] {
   return found.length > 0 ? found : ["Ninguna ventaja destaca en los atributos del catálogo; su valor es de referencia."];
 }
 
-function buildRisks({ crops }: Evaluation, indicators: Indicators): string[] {
+function buildRisks({ crops, sowing }: Evaluation, indicators: Indicators): string[] {
   const low = (pick: (crop: Crop) => number) => average(crops, pick) < LOW_ATTRIBUTE_THRESHOLD;
   const risks: string[] = [];
   if (low((crop) => crop.heatTolerance)) risks.push("Baja tolerancia al calor según el catálogo.");
@@ -124,15 +154,25 @@ function buildRisks({ crops }: Evaluation, indicators: Indicators): string[] {
   if (average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD && drynessFactor(indicators) > 0) risks.push("Alto uso de agua en un sitio con déficit hídrico.");
   if (indicators.frostRiskDays > 0) risks.push(`La serie registra ${indicators.frostRiskDays} días con riesgo de helada y el catálogo no incluye tolerancia a heladas.`);
   if (low((crop) => crop.marketPotential)) risks.push("Bajo potencial de mercado según el catálogo.");
+  for (const { crop, assessment } of sowing ?? []) {
+    if (assessment.dryMonths.length > 0) risks.push(`Parte de los meses de siembra de ${crop.name} (${formatMonths(assessment.dryMonths)}) cae en época seca del sitio.`);
+  }
   return [...risks, "El puntaje es una simplificación por reglas: no captura plagas, precios, costos ni manejo real."];
 }
 
-function buildGaps(indicators: Indicators): string[] {
+function sowingGaps(sowing: SowingFinding[] | null): string[] {
+  if (!sowing) return ["El calendario de siembra de cada cultivo no se cruzó con la estacionalidad de lluvia."];
+  const unknown = sowing.filter(({ assessment }) => assessment.unknownMonths.length > 0)
+    .map(({ crop, assessment }) => `Hay meses de siembra de ${crop.name} (${formatMonths(assessment.unknownMonths)}) sin dato de lluvia; no se pudo evaluar si caen en época seca.`);
+  return ["Los meses de siembra salen del catálogo (preliminares) y se cruzaron con promedios mensuales de lluvia: no distinguen años secos o lluviosos (El Niño/La Niña) ni un calendario real por cultivo y municipio.", ...unknown];
+}
+
+function buildGaps(indicators: Indicators, sowing: SowingFinding[] | null): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
     "Los datos de NASA POWER son de malla y no miden el lote específico.",
-    "El calendario de siembra de cada cultivo no se cruzó con la estacionalidad de lluvia.",
+    ...sowingGaps(sowing),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),
     ...missing,
   ];
@@ -145,7 +185,7 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
     whySuggested: explainWhy(evaluation),
     evidence: buildEvidence(evaluation, indicators),
     benefits: buildBenefits(evaluation),
-    informationGaps: buildGaps(indicators),
+    informationGaps: buildGaps(indicators, evaluation.sowing),
     risks: buildRisks(evaluation, indicators),
     validateWithLocalExpert: [
       `Variedades y fechas de siembra locales de ${evaluation.crops.map((crop) => crop.name).join(", ")}.`,
@@ -160,6 +200,6 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
  * Devuelve los resultados en el mismo orden de entrada (la línea base primero). Lanza un Error si una rotación usa un
  * cultivo fuera del catálogo o no tiene cultivos.
  */
-export function scoreRotations({ rotations, crops, indicators, priorities }: ScoringInput): RotationResult[] {
-  return rotations.map((rotation) => buildResult(evaluateRotation(rotation, crops, indicators, priorities), indicators));
+export function scoreRotations({ rotations, crops, indicators, priorities, seasonality }: ScoringInput): RotationResult[] {
+  return rotations.map((rotation) => buildResult(evaluateRotation(rotation, crops, indicators, priorities, seasonality), indicators));
 }

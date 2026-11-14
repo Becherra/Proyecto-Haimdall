@@ -2,6 +2,7 @@ import type { AnalysisResponse, ClimateResult, Crop, Rotation, UserPriorities } 
 import { DEFAULT_CURRENT_CROP_ID } from "./config";
 import { aggregateMonthly, computeIndicators } from "./indicators";
 import { scoreRotations } from "./scoring";
+import { computeSeasonality } from "./seasonality";
 
 /** Error causado por datos de entrada inválidos (el cliente puede corregirlos), a diferencia de un fallo interno. */
 export class AnalysisInputError extends Error {}
@@ -34,10 +35,7 @@ export function buildAnalysis({ climate, crops, priorities }: AnalysisInput): An
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   const rotations = buildRotations(crops, priorities.currentCropId);
   const indicators = computeIndicators(climate.records);
-  return {
-    climate,
-    monthlyClimate: aggregateMonthly(climate.records),
-    indicators,
-    rotations: scoreRotations({ rotations, crops, indicators, priorities }),
-  };
+  const monthlyClimate = aggregateMonthly(climate.records);
+  const seasonality = computeSeasonality(monthlyClimate);
+  return { climate, monthlyClimate, indicators, rotations: scoreRotations({ rotations, crops, indicators, priorities, seasonality }) };
 }

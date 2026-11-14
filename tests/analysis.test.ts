@@ -11,8 +11,8 @@ function record(date: string, overrides: Partial<ClimateRecord> = {}): ClimateRe
   return { date, T2M: 20, T2M_MIN: 14, T2M_MAX: 27, PRECTOTCORR: 5, EVLAND: 3, GWETROOT: 0.8, ALLSKY_SFC_SW_DWN: 15, ...overrides };
 }
 
-function climateWith(overrides: Partial<ClimateRecord> = {}): ClimateResult {
-  const records = [1, 2].flatMap((month) => Array.from({ length: 28 }, (_, day) => record(`2021${String(month).padStart(2, "0")}${String(day + 1).padStart(2, "0")}`, overrides)));
+function climateWith(overrides: Partial<ClimateRecord> = {}, monthCount = 2): ClimateResult {
+  const records = Array.from({ length: monthCount }, (_, index) => index + 1).flatMap((month) => Array.from({ length: 28 }, (_, day) => record(`2021${String(month).padStart(2, "0")}${String(day + 1).padStart(2, "0")}`, overrides)));
   const missing = (name: keyof ClimateRecord) => (overrides[name] === null ? records.length : 0);
   return {
     records, source: "live",
@@ -51,6 +51,19 @@ describe("buildAnalysis", () => {
     expect(response.indicators).toEqual(computeIndicators(climate.records));
     expect(response.monthlyClimate).toEqual(aggregateMonthly(climate.records));
     expect(response.monthlyClimate).toHaveLength(2);
+  });
+
+  it("cruza el calendario de siembra con la lluvia mensual en cada rotación cuando hay un año completo", () => {
+    const response = buildAnalysis({ climate: climateWith({}, 12), crops: CROPS, priorities });
+    for (const result of response.rotations) {
+      expect(result.evidence.join(" ")).toContain("Siembra de");
+      expect(result.informationGaps.join(" ")).not.toContain("no se cruzó");
+    }
+  });
+
+  it("reporta como vacío los meses de siembra sin dato de lluvia cuando la serie no los cubre", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities });
+    for (const result of response.rotations) expect(result.informationGaps.join(" ")).toContain("sin dato de lluvia");
   });
 
   it("puntúa la línea base con el cultivo actual declarado", () => {
