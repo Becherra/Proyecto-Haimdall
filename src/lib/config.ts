@@ -17,3 +17,5 @@ export const MAX_RISK_PENALTY = 0.5;
 export const HIGH_ATTRIBUTE_THRESHOLD = 3.5;
 /** Puntaje de atributo de cultivo (0–5) por debajo del cual se considera una debilidad. */
 export const LOW_ATTRIBUTE_THRESHOLD = 2;
+/** Cultivo de la línea base cuando el agricultor no declara uno (decisión pendiente en CONTEXT.md §13). */
+export const DEFAULT_CURRENT_CROP_ID = "maiz";

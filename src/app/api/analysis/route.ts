@@ -1,0 +1,22 @@
+import { NextResponse } from "next/server";
+import { AnalysisInputError, buildAnalysis } from "../../../lib/analysis";
+import { CROPS } from "../../../lib/catalog";
+import { fetchDailyClimate } from "../../../lib/nasaPower";
+import { analysisRequestSchema } from "../../../types";
+
+export async function POST(request: Request) {
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ error: "El cuerpo debe ser JSON válido" }, { status: 400 }); }
+  const parsed = analysisRequestSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Parámetros inválidos" }, { status: 400 });
+  const { priorities, ...location } = parsed.data;
+  try {
+    const climate = await fetchDailyClimate(location);
+    return NextResponse.json(buildAnalysis({ climate, crops: CROPS, priorities }));
+  } catch (error) {
+    if (error instanceof AnalysisInputError) return NextResponse.json({ error: error.message }, { status: 400 });
+    const message = error instanceof Error ? error.message : "No fue posible completar el análisis";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
+}
