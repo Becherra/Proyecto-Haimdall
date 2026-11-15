@@ -23,6 +23,13 @@ describe("TERRAIN_SAMPLES y findTerrainSample", () => {
     for (const sample of TERRAIN_SAMPLES) expect(terrainSampleSchema.safeParse(sample).success).toBe(true);
   });
 
+  it("declara en cada muestra que sus cifras son estimaciones sin verificar contra el ráster de NASA SRTM", () => {
+    for (const sample of TERRAIN_SAMPLES) {
+      expect(sample.source, sample.id).toContain("Estimación de referencia");
+      expect(sample.source, sample.id).toContain("sin verificar");
+    }
+  });
+
   it("encuentra la muestra SRTM de Pereira, Cerritos y Manizales y devuelve null fuera de la zona", () => {
     expect(findTerrainSample(4.8133, -75.6961)?.id).toBe("pereira-cafetera");
     expect(findTerrainSample(4.805, -75.84)?.id).toBe("cerritos-valle");
@@ -103,7 +110,19 @@ describe("integración NASA POWER + SRTM en Pereira", () => {
     expect(analysis.indicators.slopePercent).toBe(18);
     expect(analysis.indicators.cellMeanTemperatureC).toBeCloseTo(16.27, 2);
     expect(analysis.indicators.meanTemperatureC).toBeCloseTo(20.64, 2);
-    expect(analysis.rotations[0].evidence.join(" ")).toContain("SRTM");
     expect(analysis.rotations[0].evidence.join(" ")).toContain("1411 m");
+    // La altitud y la pendiente de la muestra no se leyeron del ráster: se muestran como estimación y como vacío de información.
+    for (const result of analysis.rotations) {
+      expect(result.evidence.join(" ")).toContain("estimación de referencia");
+      expect(result.evidence.join(" ")).not.toContain("con NASA SRTM)");
+      expect(result.informationGaps.join(" ")).toContain("no son mediciones del lote");
+    }
+  });
+
+  it("no agrega el vacío de terreno estimado cuando el agricultor declara altitud y pendiente", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(powerFixture, { status: 200 })));
+    const climate = await fetchDailyClimate({ lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022 });
+    const analysis = buildAnalysis({ climate, crops: CROPS, priorities: { ...EQUAL, elevationMeters: 1500, slopePercent: 10 }, location: { lat: 4.8133, lon: -75.6961 } });
+    for (const result of analysis.rotations) expect(result.informationGaps.join(" ")).not.toContain("no son mediciones del lote");
   });
 });

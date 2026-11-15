@@ -5,7 +5,10 @@ import { EROSIVE_RAIN_REFERENCE_MM, SLOPE_CAUTION_THRESHOLD_PERCENT, STEEP_SLOPE
 
 const MAX_SCORE = 5;
 
-/** Muestras precargadas de elevación y pendiente de NASA SRTM (30 m) para la zona piloto, validadas al importar. */
+/**
+ * Muestras precargadas de altitud y pendiente para la zona piloto, validadas al importar.
+ * Son estimaciones de referencia: todavía no se leyeron del ráster de NASA SRTM (ver el campo `source` de cada una).
+ */
 export const TERRAIN_SAMPLES: readonly TerrainSample[] = z.array(terrainSampleSchema).parse(srtmSamplesData);
 
 export type ResolvedTerrain = {
@@ -18,7 +21,7 @@ function distanceSquared(lat1: number, lon1: number, lat2: number, lon2: number)
   return (lat1 - lat2) ** 2 + (lon1 - lon2) ** 2;
 }
 
-/** Busca la muestra precargada de NASA SRTM más cercana que cubra las coordenadas dadas. */
+/** Busca la muestra de terreno precargada más cercana que cubra las coordenadas dadas. */
 export function findTerrainSample(lat: number, lon: number, samples: readonly TerrainSample[] = TERRAIN_SAMPLES): TerrainSample | null {
   const matches = samples.filter((sample) => Math.abs(lat - sample.lat) <= sample.tolerance && Math.abs(lon - sample.lon) <= sample.tolerance);
   if (matches.length === 0) return null;
@@ -29,7 +32,7 @@ export function findTerrainSample(lat: number, lon: number, samples: readonly Te
 
 /**
  * Resuelve la altitud y pendiente del lote: prioriza lo que declara el agricultor y, cuando `useSampleFallback` es verdadero,
- * completa con la muestra precargada de NASA SRTM de la zona piloto.
+ * completa con la muestra de terreno precargada de la zona piloto.
  */
 export function resolveTerrain(
   location: { lat: number; lon: number },
