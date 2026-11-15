@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, SCENARIO_PRESETS, activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, describeNasaSupport, describeSimpleSources, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, SCENARIO_PRESETS, activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, describeNasaSupport, describeSimpleSources, rainCalendar, scenarioPresets, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
 import type { CurrentSeason, Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
@@ -237,5 +237,87 @@ describe("activeScenarioPreset y describeNasaSupport: simulador simple y respald
     expect(sources.map((item) => item.id)).toEqual(["terrainUser", "otra-fuente"]);
     expect(sources[1]).toMatchObject({ title: "Fuente nueva", body: "Uso nuevo" });
     expect(describeSimpleSources()).toEqual([]);
+  });
+});
+
+describe("escenarios con años reales", () => {
+  const extreme = (year: number, rainFactor: number, tempDeltaC: number, rainChangePercent: number) => ({ year, rainFactor, tempDeltaC, rainChangePercent });
+  const real = { driest: extreme(2021, 0.6, 0.2, -40), wettest: extreme(2013, 1.32, -0.2, 32), warmest: extreme(2016, 0.9, 0.8, -10), yearsCompared: 15 };
+
+  it("sin años reales conserva los cuatro botones de siempre, rotulados como supuestos", () => {
+    expect(scenarioPresets(undefined)).toEqual(SCENARIO_PRESETS);
+    expect(SCENARIO_PRESETS.map((preset) => preset.id)).toEqual(["normal", "drought", "wet", "heat"]);
+  });
+
+  it("con años reales, sequía, mucha lluvia y calor usan el año más seco, el más lluvioso y el más cálido del sitio", () => {
+    const presets = scenarioPresets(real);
+    expect(presets.map((preset) => preset.id)).toEqual(["normal", "drought", "wet", "heat"]);
+    expect(presets.find((preset) => preset.id === "drought")?.scenario).toEqual({ tempDeltaC: 0.2, rainFactor: 0.6 });
+    expect(presets.find((preset) => preset.id === "wet")?.scenario).toEqual({ tempDeltaC: -0.2, rainFactor: 1.32 });
+    expect(presets.find((preset) => preset.id === "heat")?.scenario).toEqual({ tempDeltaC: 0.8, rainFactor: 0.9 });
+    expect(presets.find((preset) => preset.id === "normal")?.scenario).toEqual({ tempDeltaC: 0, rainFactor: 1 });
+  });
+
+  it("dice el año real y cuánto cambió la lluvia, y avisa de que es el año más extremo de los que se miraron", () => {
+    const drought = scenarioPresets(real).find((preset) => preset.id === "drought")!;
+    expect(drought.subtitle).toContain("2021");
+    expect(drought.notice).toContain("2021");
+    expect(drought.notice).toContain("40 %");
+    expect(drought.notice).toContain("15 años");
+    expect(scenarioPresets(real).find((preset) => preset.id === "wet")?.notice).toContain("32 %");
+  });
+
+  it("el botón activo se reconoce con los números del año real", () => {
+    const presets = scenarioPresets(real);
+    expect(activeScenarioPreset({ tempDeltaC: 0.2, rainFactor: 0.6 }, presets).id).toBe("drought");
+    expect(activeScenarioPreset({ tempDeltaC: 0.8, rainFactor: 0.9 }, presets).id).toBe("heat");
+    expect(activeScenarioPreset(undefined, presets).id).toBe("normal");
+    expect(activeScenarioPreset({ tempDeltaC: 1, rainFactor: 0.7 }).id).toBe("drought");
+  });
+});
+
+describe("textos de la temporada y del respaldo con datos reales", () => {
+  const season: CurrentSeason = { windowDays: 87, firstDate: "20260818", lastDate: "20261112", daysWithData: 87, rainMm: 563, normalRainMm: 507, rainPercentOfNormal: 111, status: "wetter", temperatureAnomalyC: 0.1, currentDryStreakDays: 0, baselineYears: 15, baselineYearsDrier: 11, rainPercentile: 11 / 15 };
+
+  it("la temporada dice en cuántos años de la serie llovió menos que hoy", () => {
+    expect(describeCurrentSeason(season).details).toContain("Para esta época ha llovido más que en 11 de los 15 años que miramos.");
+  });
+
+  it("dice con claridad cuando es la más seca o la más lluviosa de toda la serie", () => {
+    expect(describeCurrentSeason({ ...season, baselineYearsDrier: 0 }).details).toContain("Es la época más seca de los 15 años que miramos.");
+    expect(describeCurrentSeason({ ...season, baselineYearsDrier: 15 }).details).toContain("Es la época más lluviosa de los 15 años que miramos.");
+  });
+
+  it("sin el dato de años (respuestas antiguas) no inventa la frase", () => {
+    const { baselineYearsDrier: _drop, rainPercentile: _also, ...old } = season;
+    expect(describeCurrentSeason(old).details.join(" ")).not.toContain("años que miramos");
+  });
+
+  it("el respaldo dice cuántos años y cuáles, y que es un modelo de la NASA, no 'satélites que anotan'", () => {
+    const history = describeNasaSupport({ indicators, climate: { firstDate: "20110101", lastDate: "20251231" } }).find((item) => item.id === "history")!;
+    expect(history.body).toContain("15 años");
+    expect(history.body).toContain("2011");
+    expect(history.body).toContain("2025");
+    expect(history.body).toContain("modelo de la NASA");
+    expect(history.body).not.toMatch(/anotan/);
+  });
+
+  it("sin los datos de la serie conserva la frase general", () => {
+    expect(describeNasaSupport({ indicators }).find((item) => item.id === "history")?.body).toContain("muchos años");
+  });
+
+  it("la racha seca muestra los días reales, también cuando no hay motivo de alarma", () => {
+    const body = (days: number) => describeNasaSupport({ indicators: { ...indicators, longestDrySpellDays: days } }).find((item) => item.id === "drought")?.body;
+    expect(body(22)).toContain("22 días");
+    expect(body(22)).toContain("varias semanas seguidas sin un buen aguacero");
+    expect(body(8)).toContain("8 días");
+    expect(body(8)).toContain("no suelen pasar demasiados días");
+  });
+
+  it("las tarjetas de fuentes no dicen que los satélites 'anotan todos los días'", () => {
+    const source = (id: string) => ({ id, name: id, provider: "NASA POWER", use: "x" });
+    const text = describeSimpleSources(["power-t2m", "power-prectotcorr", "power-gwetroot", "power-recent"].map(source)).map((card) => card.body).join(" ");
+    expect(text).not.toMatch(/anotan/);
+    expect(text).toContain("modelo de la NASA");
   });
 });

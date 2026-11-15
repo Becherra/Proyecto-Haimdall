@@ -1,4 +1,4 @@
-import type { AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, Indicators, MonthlyClimate, RotationResult } from "../../types";
+import type { AnalysisClimate, AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, ExtremeYear, ExtremeYears, Indicators, MonthlyClimate, RotationResult } from "../../types";
 import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C } from "../config";
 import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
 
@@ -191,6 +191,14 @@ const SEASON_ADVICE: Record<CurrentSeasonTone, string> = {
   wet: "En tu lote: cuidado con los hongos en las hojas, los charcos y que el agua no te lave la tierra ni el abono.",
 };
 
+/** En cuántos de los años de la serie llovió menos que hoy en esta misma época; vacío si la respuesta no trae el dato (respuestas antiguas). */
+function rankSentence({ baselineYears: years, baselineYearsDrier: drier }: Pick<CurrentSeason, "baselineYears" | "baselineYearsDrier">): string[] {
+  if (drier === undefined) return [];
+  if (drier === 0) return [`Es la época más seca de los ${years} años que miramos.`];
+  if (drier === years) return [`Es la época más lluviosa de los ${years} años que miramos.`];
+  return [`Para esta época ha llovido más que en ${drier} de los ${years} años que miramos.`];
+}
+
 /** "20261112" → "12 de noviembre". */
 const dayAndMonth = (date: string) => `${Number(date.slice(6, 8))} de ${MONTH_NAMES[Number(date.slice(4, 6)) - 1]}`;
 
@@ -213,6 +221,7 @@ export function describeCurrentSeason(season: CurrentSeason): CurrentSeasonCard 
     ...CURRENT_SEASON_EXPLANATION, explanationAudioId: CURRENT_SEASON_EXPLANATION.audioId,
     statusLabel: status.label, tone: status.tone, headline: status.headline,
     details: [
+      ...rankSentence(season),
       ...temperatureSentence(season.temperatureAnomalyC),
       ...(season.currentDryStreakDays >= CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS ? ["Llevas varios días seguidos sin que caiga un buen aguacero."] : []),
       SEASON_ADVICE[status.tone],
@@ -247,16 +256,34 @@ export type ScenarioPreset = {
 /** Botones simples para que el agricultor pruebe qué pasa con sus cultivos si cambia el tiempo, sin usar porcentajes ni grados. */
 export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   { id: "normal", label: "Clima normal", subtitle: "Como suele ser aquí", scenario: { tempDeltaC: 0, rainFactor: 1 }, notice: "Estás viendo tus cultivos con el clima habitual de tu zona." },
-  { id: "drought", label: "Si viene sequía", subtitle: "Poca agua y más sol", scenario: { tempDeltaC: 1, rainFactor: 0.7 }, notice: "Estás probando qué pasaría en un año seco. Mira cómo cambian las estrellas de cada camino." },
-  { id: "wet", label: "Si llueve mucho", subtitle: "Temporada de mucha agua", scenario: { tempDeltaC: 0, rainFactor: 1.35 }, notice: "Estás probando qué pasaría en un año de mucha agua. Mira qué cultivos aguantan mejor." },
-  { id: "heat", label: "Si hace más calor", subtitle: "Días más bochornosos", scenario: { tempDeltaC: 2, rainFactor: 1 }, notice: "Estás probando qué pasaría si los días se ponen más calientes que de costumbre." },
+  { id: "drought", label: "Si viene sequía", subtitle: "Supuesto: poca agua y más sol", scenario: { tempDeltaC: 1, rainFactor: 0.7 }, notice: "Estás probando qué pasaría en un año seco. Mira cómo cambian las estrellas de cada camino." },
+  { id: "wet", label: "Si llueve mucho", subtitle: "Supuesto: mucha agua", scenario: { tempDeltaC: 0, rainFactor: 1.35 }, notice: "Estás probando qué pasaría en un año de mucha agua. Mira qué cultivos aguantan mejor." },
+  { id: "heat", label: "Si hace más calor", subtitle: "Supuesto: 2 °C más", scenario: { tempDeltaC: 2, rainFactor: 1 }, notice: "Estás probando qué pasaría si los días se ponen más calientes que de costumbre." },
 ] as const;
 
+const rainChangeWords = (percent: number) => `${Math.abs(Math.round(percent))} % ${percent < 0 ? "menos" : "más"} lluvia que el promedio`;
+
+/**
+ * Los cuatro botones de clima. Con los años reales del sitio (`extremeYears`), sequía, mucha lluvia y calor son "como el año X": el más seco, el más
+ * lluvioso y el más cálido de la serie de NASA, con su lluvia y temperatura reales. Sin ellos se usan los botones fijos de `SCENARIO_PRESETS`.
+ */
+export function scenarioPresets(extremeYears?: ExtremeYears): readonly ScenarioPreset[] {
+  if (!extremeYears) return SCENARIO_PRESETS;
+  const { driest, wettest, warmest, yearsCompared } = extremeYears;
+  const scenarioOf = ({ tempDeltaC, rainFactor }: ExtremeYear) => ({ tempDeltaC, rainFactor });
+  return [
+    SCENARIO_PRESETS[0]!,
+    { id: "drought", label: "Si viene sequía", subtitle: `Como ${driest.year}, el año más seco`, scenario: scenarioOf(driest), notice: `Estás probando qué pasaría en un año como ${driest.year}, el más seco de los últimos ${yearsCompared} años: ${rainChangeWords(driest.rainChangePercent)}. Mira cómo cambian las estrellas de cada camino.` },
+    { id: "wet", label: "Si llueve mucho", subtitle: `Como ${wettest.year}, el año más lluvioso`, scenario: scenarioOf(wettest), notice: `Estás probando qué pasaría en un año como ${wettest.year}, el más lluvioso de los últimos ${yearsCompared} años: ${rainChangeWords(wettest.rainChangePercent)}. Mira qué cultivos aguantan mejor.` },
+    { id: "heat", label: "Si hace más calor", subtitle: `Como ${warmest.year}, el año más cálido`, scenario: scenarioOf(warmest), notice: `Estás probando qué pasaría en un año como ${warmest.year}, el más cálido de los últimos ${yearsCompared} años (${fmt(warmest.tempDeltaC, 1)} °C sobre el promedio).` },
+  ];
+}
+
 /** Identifica cuál botón de clima está activo; si no hay escenario o vuelve a 0/1, es "normal". */
-export function activeScenarioPreset(scenario: ClimateScenario | undefined): ScenarioPreset {
+export function activeScenarioPreset(scenario: ClimateScenario | undefined, presets: readonly ScenarioPreset[] = SCENARIO_PRESETS): ScenarioPreset {
   const temp = scenario?.tempDeltaC ?? 0;
   const rain = scenario?.rainFactor ?? 1;
-  return SCENARIO_PRESETS.find((preset) => preset.scenario.tempDeltaC === temp && preset.scenario.rainFactor === rain) ?? SCENARIO_PRESETS[0]!;
+  return presets.find((preset) => preset.scenario.tempDeltaC === temp && preset.scenario.rainFactor === rain) ?? presets[0]!;
 }
 
 export type NasaSupportItemId = "history" | "drought" | "worstYear" | "terrain";
@@ -270,17 +297,20 @@ function terrainSupportText(indicators: Indicators): string | null {
 }
 
 /** Traduce el respaldo del análisis a tarjetas simples sin números raros ni jerga estadística. */
-export function describeNasaSupport({ indicators }: Pick<AnalysisResponse, "indicators">): NasaSupportItem[] {
+export function describeNasaSupport({ indicators, climate }: Pick<AnalysisResponse, "indicators"> & { climate?: Pick<AnalysisClimate, "firstDate" | "lastDate"> }): NasaSupportItem[] {
   const drySpell = indicators.longestDrySpellDays;
   const terrain = terrainSupportText(indicators);
+  const firstYear = climate?.firstDate === undefined ? null : Number(climate.firstDate.slice(0, 4));
+  const lastYear = climate?.lastDate === undefined ? null : Number(climate.lastDate.slice(0, 4));
+  const span = firstYear !== null && lastYear !== null ? `${lastYear - firstYear + 1} años (${firstYear}–${lastYear})` : "muchos años hacia atrás";
   return [
-    { id: "history", title: "Muchos años de memoria", body: "Miramos las lluvias, el calor y la humedad de muchos años hacia atrás con satélites de la NASA, para no guiarnos por un solo año bueno o malo." },
+    { id: "history", title: "Muchos años de memoria", body: `Miramos las lluvias, el calor y la humedad de ${span} con un modelo de la NASA que combina satélites y mediciones, para no guiarnos por un solo año bueno o malo.` },
     ...(drySpell === undefined ? [] : [{
       id: "drought" as const,
       title: "Cuando aprieta el verano",
       body: drySpell >= 15
-        ? "En los años difíciles han pasado varias semanas seguidas sin un buen aguacero. Por eso ayuda tener cultivos que tapen y guarden la humedad de la tierra."
-        : "Incluso en épocas secas, en esta zona no suelen pasar demasiados días seguidos sin que caiga algo de agua.",
+        ? `En los años difíciles han pasado varias semanas seguidas sin un buen aguacero (el tramo más largo fue de ${drySpell} días). Por eso ayuda tener cultivos que tapen y guarden la humedad de la tierra.`
+        : `Incluso en épocas secas, en esta zona no suelen pasar demasiados días seguidos sin que caiga algo de agua (el tramo más largo sin lluvia fue de ${drySpell} ${drySpell === 1 ? "día" : "días"}).`,
     }]),
     ...(indicators.worstYear ? [{
       id: "worstYear" as const,
@@ -295,11 +325,11 @@ type SimpleSourceCard = { title: string; body: string };
 
 /** Tarjetas sencillas por tema. Varias fuentes técnicas (p. ej. T2M, T2M_MIN, T2M_MAX) se cuentan como una sola tarjeta. */
 const SIMPLE_SOURCE_CARDS = {
-  temperature: { title: "Calor y frío de tu región", body: "Satélites de la NASA que anotan todos los días qué tan caliente y qué tan frío estuvo, para saber si hay riesgo de heladas o de calor fuerte." },
-  rain: { title: "Lluvias de tu región", body: "Satélites de la NASA que anotan todos los días cuánto llovió en tu zona, para saber en qué meses cae más agua." },
+  temperature: { title: "Calor y frío de tu región", body: "Un modelo de la NASA que combina satélites y mediciones y calcula todos los días qué tan caliente y qué tan frío estuvo, para saber si hay riesgo de heladas o de calor fuerte." },
+  rain: { title: "Lluvias de tu región", body: "Un modelo de la NASA que estima todos los días cuánto llovió en tu zona (un promedio de unos 50 kilómetros), para saber en qué meses cae más agua." },
   evaporation: { title: "Agua que se pierde por el sol", body: "Calculamos cuánta agua se evapora con el calor para saber si la lluvia alcanza para los cultivos." },
-  roots: { title: "Humedad de la tierra", body: "Medida desde el espacio de qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
-  recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
+  roots: { title: "Humedad de la tierra", body: "Calculada por un modelo de la NASA: qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
+  recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del modelo de la NASA para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
   terrain: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu zona y si tiene mucha pendiente. Es de un punto cercano, no de tu lote exacto." },
   terrainUser: { title: "Altura y loma que tú contaste", body: "La altura y la inclinación de tu lote vienen de lo que tú nos dijiste." },
   crops: { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo. Son datos de partida: conviene revisarlos con un técnico de tu zona." },

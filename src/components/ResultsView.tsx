@@ -9,7 +9,7 @@ import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import { useSpeaker } from "./useSpeaker";
-import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scenarioPresets, scoreToStars } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, CurrentSeasonTone, RotationSection, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, CurrentSeason, Farm, RotationResult } from "../types";
 
@@ -195,14 +195,15 @@ function ClimateList({ response }: { response: AnalysisResponse }) {
 
 function ScenarioBar({ response, applyingScenario, scenarioError, mockMode, onSelectScenario }: Pick<ResultsViewProps, "response" | "applyingScenario" | "scenarioError" | "mockMode" | "onSelectScenario">) {
   if (!onSelectScenario) return null;
-  const active = activeScenarioPreset(response.scenario);
+  const presets = scenarioPresets(response.extremeYears);
+  const active = activeScenarioPreset(response.scenario, presets);
   return <section data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 lg:col-span-3" aria-label="¿Y si cambia el tiempo?">
     <div className="flex items-center gap-3">
       <UiIcon name="sun" className="h-10 w-10 shrink-0 text-olive-light" />
       <div><h3 className="text-xl font-bold text-bone-white">¿Y si cambia el tiempo?</h3><p className="text-sm text-silver-mist">Toca un botón para ver cómo aguantan tus 3 caminos.</p></div>
     </div>
     <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-      {SCENARIO_PRESETS.map((preset) => {
+      {presets.map((preset) => {
         const selected = preset.id === active.id;
         return <button key={preset.id} type="button" aria-pressed={selected} disabled={applyingScenario || (mockMode && preset.id !== "normal")} onClick={() => onSelectScenario(preset.scenario)} className={`flex flex-col items-start gap-1.5 rounded-2xl border-2 p-3 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 disabled:opacity-40 ${selected ? "border-cream bg-olive/50 text-bone-white" : "border-olive/40 bg-meadow/40 text-silver-mist hover:border-cream/60"}`}>
           <UiIcon name={SCENARIO_ICONS[preset.id]} className={`h-8 w-8 ${selected ? "text-cream" : "text-olive-light"}`} />
