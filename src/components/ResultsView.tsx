@@ -237,7 +237,7 @@ export default function ResultsView({ farm, response, applyingScenario, scenario
       <ScenarioBar response={response} applyingScenario={applyingScenario} scenarioError={scenarioError} mockMode={mockMode} onSelectScenario={onSelectScenario} />
 
       <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
-      <EnsoContextCard season={response.currentSeason} />
+      <EnsoContextCard season={response.currentSeason} coordinates={farm.centroid} locationLabel={farm.placeLabel ?? "tu finca"} mockMode={mockMode ?? false} />
       {response.currentSeason && <SeasonCard season={response.currentSeason} />}
       <ClimateList response={response} />
       <RainCalendar response={response} />
