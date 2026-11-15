@@ -73,3 +73,26 @@ describe("terrainEditorReducer", () => {
     expect(terrainEditorReducer(state, { type: "finish" }).error).toMatch(/tres vértices/);
   });
 });
+
+describe("terrainEditorReducer · lazo a mano", () => {
+  const lasso = [[4.8091, -75.7011], [4.8091, -75.6989], [4.8109, -75.6989], [4.8109, -75.7011]] as const;
+
+  it("set-polygon deja el terreno cerrado y listo para confirmar", () => {
+    const state = terrainEditorReducer(createTerrainEditor(location), { type: "set-polygon", points: lasso });
+    expect(state).toMatchObject({ mode: "polygon", polygonFinished: true, error: null });
+    expect(getTerrainEditorStatus(state).canConfirm).toBe(true);
+  });
+
+  it("set-polygon con un lazo mínimo no confirma y explica el error", () => {
+    const state = terrainEditorReducer(createTerrainEditor(location), { type: "set-polygon", points: [[4.8, -75.7], [4.8, -75.7001]] });
+    expect(state.polygonFinished).toBe(false);
+    expect(state.error).not.toBeNull();
+    expect(getTerrainEditorStatus(state).canConfirm).toBe(false);
+  });
+
+  it("reset vuelve al punto original", () => {
+    const initial = createTerrainEditor(location);
+    const drawn = terrainEditorReducer(initial, { type: "set-polygon", points: lasso });
+    expect(terrainEditorReducer(drawn, { type: "reset", initial })).toEqual(initial);
+  });
+});

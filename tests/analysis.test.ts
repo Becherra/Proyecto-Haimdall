@@ -139,3 +139,44 @@ describe("isInSowingCalendarRegion", () => {
     expect(isInSowingCalendarRegion(13.51, 2.11)).toBe(false);
   });
 });
+
+describe("buildAnalysis: sin cultivo actual", () => {
+  const withoutCrop = { ...priorities, noCurrentCrop: true };
+
+  it("no compara contra un cultivo actual: propone tres puntos de partida", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: withoutCrop, location: PEREIRA });
+    expect(response.rotations.map((result) => result.rotation.id)).toEqual(["single", "legume", "cover-drought"]);
+    expect(response.rotations.some((result) => result.rotation.id === "baseline")).toBe(false);
+    expect(response.rotations[0]?.rotation.cropIds).toHaveLength(1);
+    expect(analysisResponseSchema.safeParse(response).success).toBe(true);
+  });
+
+  it("ignora el cultivo actual si también llega uno", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: { ...withoutCrop, currentCropId: "papa" }, location: PEREIRA });
+    expect(response.rotations.map((result) => result.rotation.id)).not.toContain("baseline");
+  });
+
+  it("la opción de un solo cultivo es la de mayor puntaje entre los cultivos del catálogo", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: withoutCrop, location: PEREIRA });
+    const best = response.rotations[0]!;
+    const others = CROPS.map((crop) => buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: { ...priorities, currentCropId: crop.id }, location: PEREIRA }).rotations[0]!);
+    expect(best.score).toBeGreaterThanOrEqual(Math.max(...others.map((item) => item.score)) - 1e-9);
+  });
+
+  it("cada opción trae sus textos simples y ninguna dice que es el cultivo actual", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: withoutCrop, location: PEREIRA });
+    for (const result of response.rotations) {
+      expect(result.plain).toBeDefined();
+      expect(result.rotation.name).not.toMatch(/^Actual/);
+    }
+  });
+
+  it("sin la marca sigue usando el cultivo por defecto (compatibilidad)", () => {
+    const response = buildAnalysis({ climate: climateWith(), crops: CROPS, priorities, location: PEREIRA });
+    expect(response.rotations[0]?.rotation.id).toBe("baseline");
+  });
+
+  it("falla con un error claro si el catálogo está vacío", () => {
+    expect(() => buildAnalysis({ climate: climateWith(), crops: [], priorities: withoutCrop, location: PEREIRA })).toThrow();
+  });
+});

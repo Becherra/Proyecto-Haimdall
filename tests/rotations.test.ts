@@ -156,3 +156,16 @@ describe("scoreRotations con familias botánicas", () => {
     expect(alternating.evidence.join(" ")).toContain("100 + 100 = 200 días");
   });
 });
+
+describe("startingRotations: sin cultivo actual", () => {
+  it("arma opciones de un solo cultivo, de leguminosa y de cobertura con sequía", async () => {
+    const { startingRotations } = await import("../src/lib/rotations");
+    const { CROPS } = await import("../src/lib/catalog");
+    const candidates = startingRotations(CROPS);
+    expect(candidates.single).toHaveLength(CROPS.length);
+    expect(candidates.single.every((item) => item.id === "single" && item.cropIds.length === 1 && !item.name.startsWith("Actual"))).toBe(true);
+    expect(candidates.legume.length).toBeGreaterThan(0);
+    expect(candidates.coverDrought.length).toBeGreaterThan(0);
+    expect(candidates.coverDrought.every((item) => new Set(item.cropIds).size === 3)).toBe(true);
+  });
+});

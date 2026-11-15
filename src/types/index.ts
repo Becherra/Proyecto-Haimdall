@@ -84,7 +84,10 @@ export type Rotation = z.infer<typeof rotationSchema>;
 
 export const userPrioritiesSchema = z.object({
   waterSaving: score, extraIncome: score, soilImprovement: score, erosionReduction: score, lowRisk: score,
-  currentCropId: z.string().min(1).optional(), waterAvailability: z.enum(["low", "medium", "high"]).optional(),
+  currentCropId: z.string().min(1).optional(),
+  /** El agricultor declara que hoy no tiene cultivo: el análisis no compara contra uno actual (ignora `currentCropId`) y propone tres puntos de partida. */
+  noCurrentCrop: z.boolean().optional(),
+  waterAvailability: z.enum(["low", "medium", "high"]).optional(),
   /** Altitud del lote declarada por el agricultor (m s. n. m.); permite corregir la temperatura de la celda de NASA POWER. */
   elevationMeters: z.number().finite().min(-500).max(6000).optional(),
   /** Pendiente media del lote declarada por el agricultor (%, 0–100); pondera el riesgo de erosión en ladera. */
@@ -162,12 +165,21 @@ export const rotationCalendarSchema = z.object({
 });
 export type RotationCalendar = z.infer<typeof rotationCalendarSchema>;
 
+/** Versión en lenguaje simple de los textos de una rotación, pensada para quien lee poco; los campos técnicos de `RotationResult` se conservan. */
+export const rotationPlainSchema = z.object({
+  why: z.string().min(1), benefits: z.array(z.string().min(1)).min(1), risks: z.array(z.string().min(1)).min(1),
+  gaps: z.array(z.string().min(1)).min(1), validate: z.array(z.string().min(1)).min(1),
+});
+export type RotationPlain = z.infer<typeof rotationPlainSchema>;
+
 export const rotationResultSchema = z.object({
   rotation: rotationSchema, score: z.number(), whySuggested: z.string().min(1), evidence: z.array(z.string().min(1)).min(1),
   benefits: z.array(z.string().min(1)).min(1), informationGaps: z.array(z.string().min(1)).min(1),
   risks: z.array(z.string().min(1)).min(1), validateWithLocalExpert: z.array(z.string().min(1)).min(1),
   /** Ausente cuando no aplica el calendario de siembra del catálogo (fuera del Eje Cafetero) o no se pudo armar. */
   calendar: rotationCalendarSchema.optional(),
+  /** Mismos temas en palabras simples (sin cifras técnicas). Ausente en respuestas antiguas: la interfaz usa entonces los textos técnicos. */
+  plain: rotationPlainSchema.optional(),
 });
 export type RotationResult = z.infer<typeof rotationResultSchema>;
 

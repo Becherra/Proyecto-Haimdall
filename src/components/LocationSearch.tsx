@@ -12,6 +12,7 @@ export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLo
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   async function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,22 +49,24 @@ export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLo
     } finally { setLocating(false); }
   }
 
+  /** El botón secundario abre el campo; la búsqueda se dispara con Enter o con la lupa. */
+  function onManualClick(event: React.MouseEvent<HTMLButtonElement>) {
+    setManualOpen(true);
+    window.setTimeout(() => document.getElementById("location-query")?.focus(), 0);
+  }
+
   return <div className="w-full max-w-xl">
-    <form onSubmit={submitSearch} noValidate>
-    <label htmlFor="location-query" className="mb-2 block text-left text-sm font-medium text-silver-mist">Encuentra tu finca o municipio</label>
-    <div className="flex flex-col gap-3 sm:flex-row">
-      <div className="relative flex-1">
-        <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-saffron-spark" aria-hidden="true">⌕</span>
-        <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Busca tu finca, ciudad o región..." className="min-h-14 w-full rounded-full border border-white/25 bg-transparent py-3 pl-11 pr-4 text-base text-white outline-none placeholder:text-ash-gray focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
-      </div>
-      <button type="submit" disabled={loading} className="flex min-h-14 items-center justify-center gap-2 rounded-full border border-white/30 px-7 font-semibold text-white transition hover:border-saffron-spark hover:text-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark focus:ring-offset-2 focus:ring-offset-black disabled:cursor-wait disabled:opacity-60"><span aria-hidden="true">⌕</span>{loading ? "Buscando…" : "Buscar"}</button>
-    </div>
-    {loading && <p className="mt-3 text-sm text-saffron-spark" role="status" aria-live="polite">Consultando OpenStreetMap…</p>}
+    <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="flex min-h-16 w-full items-center justify-center rounded-full bg-cream px-6 py-4 text-lg font-bold text-meadow transition hover:bg-bone-white focus:outline-none focus:ring-2 focus:ring-cream focus:ring-offset-2 focus:ring-offset-meadow disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
+    <form onSubmit={submitSearch} noValidate className="mt-4 flex justify-center">
+      {manualOpen
+        ? <div className="relative w-full">
+            <label htmlFor="location-query" className="sr-only">Escribe tu finca o municipio</label>
+            <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Escribe tu vereda o municipio" className="min-h-14 w-full rounded-full border border-cream/40 bg-transparent pl-5 pr-16 text-base text-bone-white outline-none placeholder:text-ash-gray focus:border-cream focus:ring-2 focus:ring-cream/50" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
+            <button type="submit" disabled={loading || locating} aria-label="Buscar ubicación" className="absolute inset-y-1 right-1 flex w-11 items-center justify-center rounded-full text-3xl font-bold text-cream transition hover:bg-cream/15 focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-wait disabled:opacity-60">{loading ? <span aria-hidden="true" className="text-2xl">…</span> : <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m20 20-4.8-4.8" /></svg>}</button>
+          </div>
+        : <button type="button" onClick={onManualClick} disabled={locating} className="min-h-11 rounded-full border border-cream/40 px-5 text-sm font-medium text-silver-mist transition hover:border-cream hover:text-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-wait disabled:opacity-60">Escribir mi ubicación</button>}
     </form>
-    <div className="mt-3 text-left">
-      <p className="text-xs text-ash-gray">Usaremos tu ubicación para mostrarte tu zona. No la guardamos.</p>
-      <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="mt-3 flex min-h-14 w-full items-center justify-center rounded-full bg-electric-iris px-5 py-3 text-base font-semibold text-white transition hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark focus:ring-offset-2 focus:ring-offset-black disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
-    </div>
-    {error && <p id="location-error" className="mt-3 text-left text-sm text-rose-300" role="alert">{error}</p>}
+    {loading && <p className="mt-3 text-center text-sm text-cream" role="status" aria-live="polite">Buscando…</p>}
+    {error && <p id="location-error" className="mt-3 text-center text-sm text-clay-light" role="alert">{error}</p>}
   </div>;
 }

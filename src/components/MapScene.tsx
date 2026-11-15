@@ -1,25 +1,23 @@
 "use client";
 
 import L from "leaflet";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Circle, CircleMarker, LayersControl, MapContainer, Marker, Polygon, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import { convertCoordinateOrder, squareFromArea } from "../lib/geo";
-import { buildGibsTileUrl, GIBS_LAYER_CONFIG, isGibsDateAvailable } from "../lib/ui/mapLayers";
-import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { MapContainer, Marker, Polygon, Polyline, TileLayer, useMap } from "react-leaflet";
+import Logo from "./Logo";
+import { buildLassoPolygon, convertCoordinateOrder } from "../lib/geo";
+import type { PixelPoint } from "../lib/geo";
+import { validateMapLocation } from "../lib/ui/coordinates";
 import { calculateMapView } from "../lib/ui/mapView";
-import { buildFarmFromEditor, createTerrainEditor, getTerrainEditorStatus, requiresGpsPinAdjustment, terrainEditorReducer } from "../lib/ui/terrainEditor";
+import { buildFarmFromEditor, createTerrainEditor, getTerrainEditorStatus, terrainEditorReducer } from "../lib/ui/terrainEditor";
 import { validateFarmDraft } from "../lib/geo/farmValidation";
-import type { AreaRangeHa, TerrainEditorMode } from "../lib/ui/terrainEditor";
-import { APPROXIMATE_AREA_RANGES_HA, FOOTBALL_PITCH_AREA_HA } from "../lib/geo/limits";
 import type { Farm, LocationResult } from "../types";
 
-type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onBack: () => void; onFarmConfirmed: (farm: Farm) => void; debugMode?: boolean };
-type TileState = { loading: boolean; error: string | null };
+type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onBack: () => void; onFarmConfirmed: (farm: Farm) => void };
 
-const initialDate = "2026-10-16";
-const satelliteAttribution = "Tiles © Esri — Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community";
-const osmAttribution = '© OpenStreetMap contributors';
-const nasaAttribution = "NASA GIBS";
+const satelliteAttribution = "© Esri · OpenStreetMap";
+const TUTORIAL_MS = 6400;
+const TUTORIAL_STEP_MS = 3000;
+const MIN_STEP_PX = 3;
 
 const pinIcon = L.divIcon({ className: "heimdall-pin", html: '<span aria-hidden="true"></span>', iconSize: [24, 24], iconAnchor: [12, 12] });
 
@@ -40,179 +38,212 @@ function ZoomToLocation({ location, gpsAccuracyMeters }: Pick<MapSceneProps, "lo
   return null;
 }
 
-function MapPinSelector({ onSelect }: { onSelect: (lat: number, lon: number) => void }) {
-  const dragging = useRef(false);
-  useMapEvents({
-    dragstart: () => { dragging.current = true; },
-    dragend: () => { dragging.current = false; },
-    click: (event) => { if (!dragging.current) onSelect(event.latlng.lat, event.latlng.lng); },
-  });
-  return null;
-}
+/** Botones que mueven el mapa con el ratón: derecho, central, o izquierdo con Ctrl/⌘ (trackpads de Mac). */
+const isPanButton = (event: MouseEvent | PointerEvent) => event.button === 2 || event.button === 1 || (event.button === 0 && (event.ctrlKey || event.metaKey));
 
-function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
+type LassoDrawerProps = { onStart: () => void; onComplete: (points: [number, number][] | null) => void };
+
+/**
+ * Dibujo a mano alzada: un dedo traza el lazo alrededor del terreno; dos dedos (pellizco) mueven el mapa.
+ * Se usan eventos nativos porque Leaflet no expone el gesto de un solo dedo cuando el arrastre está apagado.
+ */
+function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
   const map = useMap();
-  useEffect(() => { onZoomChange(map.getZoom()); }, [map, onZoomChange]);
-  useMapEvents({ zoomend: () => onZoomChange(map.getZoom()) });
-  return null;
+  const [trail, setTrail] = useState<[number, number][]>([]);
+  const callbacks = useRef({ onStart, onComplete });
+  useEffect(() => { callbacks.current = { onStart, onComplete }; });
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const pointers = new Set<number>();
+    let stroke: PixelPoint[] = [];
+    let drawingId: number | null = null;
+    let panFrom: { x: number; y: number } | null = null;
+    map.dragging.disable();
+    container.style.touchAction = "none";
+
+    const cancel = () => { stroke = []; drawingId = null; setTrail([]); };
+    const toPixel = (event: PointerEvent): PixelPoint => { const point = map.mouseEventToContainerPoint(event); return [point.x, point.y]; };
+
+    const onDown = (event: PointerEvent) => {
+      pointers.add(event.pointerId);
+      if (pointers.size > 1) { cancel(); return; }
+      const target = event.target as HTMLElement;
+      if (event.pointerType === "mouse" && isPanButton(event)) return; // lo maneja onMouseDown
+      if (event.button !== 0 || target.closest(".leaflet-marker-icon, .leaflet-control")) return;
+      drawingId = event.pointerId;
+      stroke = [toPixel(event)];
+      callbacks.current.onStart();
+    };
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerId !== drawingId) return;
+      const point = toPixel(event);
+      const last = stroke[stroke.length - 1] as PixelPoint;
+      if (Math.hypot(point[0] - last[0], point[1] - last[1]) < MIN_STEP_PX) return;
+      stroke.push(point);
+      setTrail(stroke.map(([x, y]) => { const latLng = map.containerPointToLatLng([x, y]); return [latLng.lat, latLng.lng]; }));
+    };
+    const onUp = (event: PointerEvent) => {
+      pointers.delete(event.pointerId);
+      if (event.pointerId !== drawingId) return;
+      const polygon = buildLassoPolygon(stroke);
+      cancel();
+      callbacks.current.onComplete(polygon ? polygon.map(([x, y]) => { const latLng = map.containerPointToLatLng([x, y]); return [latLng.lat, latLng.lng] as [number, number]; }) : null);
+    };
+
+    const onContextMenu = (event: Event) => event.preventDefault();
+    // Computador: clic derecho (o central, o Ctrl/⌘ + clic) sostenido y mover el ratón arrastra el mapa.
+    // Los eventos de ratón se escuchan en window para no perder el arrastre al salir del mapa.
+    const onPanMove = (event: MouseEvent) => {
+      if (!panFrom) return;
+      map.panBy([panFrom.x - event.clientX, panFrom.y - event.clientY], { animate: false });
+      panFrom = { x: event.clientX, y: event.clientY };
+    };
+    const endPan = () => { panFrom = null; container.style.cursor = ""; };
+    const onMouseDown = (event: MouseEvent) => {
+      if (!isPanButton(event) || (event.target as HTMLElement).closest(".leaflet-control")) return;
+      event.preventDefault();
+      panFrom = { x: event.clientX, y: event.clientY };
+      container.style.cursor = "grabbing";
+    };
+    container.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onPanMove);
+    window.addEventListener("mouseup", endPan);
+    window.addEventListener("blur", endPan);
+    container.addEventListener("contextmenu", onContextMenu);
+    container.addEventListener("pointerdown", onDown);
+    container.addEventListener("pointermove", onMove);
+    container.addEventListener("pointerup", onUp);
+    container.addEventListener("pointercancel", onUp);
+    return () => {
+      container.removeEventListener("contextmenu", onContextMenu);
+      container.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onPanMove);
+      window.removeEventListener("mouseup", endPan);
+      window.removeEventListener("blur", endPan);
+      container.removeEventListener("pointerdown", onDown);
+      container.removeEventListener("pointermove", onMove);
+      container.removeEventListener("pointerup", onUp);
+      container.removeEventListener("pointercancel", onUp);
+      map.dragging.enable();
+    };
+  }, [map]);
+
+  return trail.length > 1 ? <Polyline positions={trail} pathOptions={{ color: "#EAD39D", weight: 5, opacity: 0.95 }} /> : null;
 }
 
-export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmConfirmed, debugMode = false }: MapSceneProps) {
-  const [editor, dispatch] = useReducer(terrainEditorReducer, location, (initial) => createTerrainEditor(initial, gpsAccuracyMeters === undefined ? "search" : "gps", gpsAccuracyMeters));
-  const [confirmationError, setConfirmationError] = useState<string | null>(null);
-  const [confirmedFarm, setConfirmedFarm] = useState<Farm | null>(null);
-  const draftLocation = editor.location;
-  const terrainStatus = getTerrainEditorStatus(editor);
-  const currentFarm = buildFarmFromEditor(editor);
-  const showConfirmedFarm = confirmedFarm !== null && JSON.stringify(currentFarm) === JSON.stringify(confirmedFarm);
-  const [opacity, setOpacity] = useState(65);
-  const [date, setDate] = useState(initialDate);
-  const [zoom, setZoom] = useState(8);
-  const [online, setOnline] = useState(true);
-  const [tiles, setTiles] = useState<TileState>({ loading: true, error: null });
-  const trueColorUrl = useMemo(() => {
-    try { return buildGibsTileUrl("trueColor", date); } catch { return null; }
-  }, [date]);
-  const ndviUrl = useMemo(() => {
-    try { return buildGibsTileUrl("ndvi", date); } catch { return null; }
-  }, [date]);
-  const dateError = !isGibsDateAvailable("trueColor", date) && !isGibsDateAvailable("ndvi", date)
-    ? "NASA GIBS no tiene datos para esta fecha. Elige una fecha entre 2025-11-10 y 2026-10-16."
-    : null;
-  const trueColorError = !trueColorUrl && !dateError ? "Color real NASA GIBS no tiene datos para esta fecha." : null;
-  const ndviError = !ndviUrl && !dateError ? "NDVI NASA GIBS no tiene datos para esta fecha; las demás capas siguen disponibles." : null;
-  const approximateRing = useMemo(() => {
-    if (editor.mode !== "approx_size" || terrainStatus.areaHa === null || !terrainStatus.canConfirm) return null;
-    try { return squareFromArea(draftLocation, terrainStatus.areaHa); } catch { return null; }
-  }, [draftLocation, editor.mode, terrainStatus.areaHa, terrainStatus.canConfirm]);
+/** Un dedo con la yema en (0,0) apuntando hacia arriba: cilindro suave que se desvanece hacia abajo, con uña. */
+function Finger({ x = 0, tipY = 0 }: { x?: number; tipY?: number }) {
+  const length = 30;
+  return <g transform={`translate(${x} ${tipY})`}>
+    <path d={`M -4 5 C -4 -1.2 -2.3 -3 0 -3 C 2.3 -3 4 -1.2 4 5 L 4.4 ${length} L -4.4 ${length} Z`} fill="url(#finger-fade)" />
+    <path d="M -2.3 4 C -2.3 0.6 -1.4 -0.8 0 -0.8 C 1.4 -0.8 2.3 0.6 2.3 4 C 1 5.2 -1 5.2 -2.3 4 Z" fill="#FFFFFF" opacity="0.55" />
+  </g>;
+}
+
+/** Solo los dedos (sin palma): 1 dedo para dibujar el lazo, 2 dedos para mover el mapa. */
+function Hand({ fingers }: { fingers: 1 | 2 }) {
+  return <g>
+    <defs>
+      <linearGradient id="finger-fade" gradientUnits="userSpaceOnUse" x1="0" y1="-3" x2="0" y2="30">
+        <stop offset="0" stopColor="#F8EFD2" />
+        <stop offset="0.55" stopColor="#EAD39D" stopOpacity="0.9" />
+        <stop offset="1" stopColor="#EAD39D" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    {fingers === 1 ? <Finger /> : (
+      // Dos dedos independientes (separados también en la base), ligeramente abiertos, apuntando en la dirección del arrastre.
+      <g transform="rotate(45)">
+        <g transform="rotate(-12 -10 30)"><Finger x={-10} /></g>
+        <g transform="rotate(12 10 30)"><Finger x={10} /></g>
+      </g>
+    )}
+  </g>;
+}
+
+/** Tutorial solo visual, en dos pasos: 1) un dedo rodea el terreno; 2) dos dedos mueven el mapa. */
+function LassoTutorial() {
+  const [step, setStep] = useState(0);
   useEffect(() => {
-    const updateOnline = () => setOnline(navigator.onLine);
-    updateOnline();
-    window.addEventListener("online", updateOnline);
-    window.addEventListener("offline", updateOnline);
-    return () => { window.removeEventListener("online", updateOnline); window.removeEventListener("offline", updateOnline); };
+    const timer = window.setTimeout(() => setStep(1), TUTORIAL_STEP_MS);
+    return () => window.clearTimeout(timer);
   }, []);
+  const loop = "M 28 50 C 22 28, 52 16, 72 27 C 90 38, 80 66, 56 70 C 38 73, 30 62, 28 50 Z";
+  const drag = "M 34 56 L 70 24";
+  return <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-meadow/45" aria-hidden="true">
+    <svg viewBox="0 0 100 100" className="h-3/4 max-h-96 w-3/4 max-w-96 overflow-visible">
+      {step === 0 ? <g key="lasso">
+        <path d={loop} fill="none" stroke="rgb(234 211 157 / 0.3)" strokeWidth="2" strokeDasharray="1 3" strokeLinecap="round" />
+        <path className="lasso-tutorial-stroke" d={loop} fill="rgb(234 211 157 / 0.2)" stroke="#EAD39D" strokeWidth="3.5" strokeLinecap="round" pathLength="1" />
+        <g className="lasso-tutorial-finger">
+          <circle r="7" fill="#EAD39D" opacity="0.35" />
+          <Hand fingers={1} />
+          <animateMotion dur="2.6s" repeatCount="indefinite" path={loop} />
+        </g>
+      </g> : <g key="pan">
+        <path d={drag} fill="none" stroke="rgb(234 211 157 / 0.6)" strokeWidth="3" strokeDasharray="1 5" strokeLinecap="round" />
+        <path d="M 62 22 L 72 22 L 72 32" fill="none" stroke="#EAD39D" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <g className="lasso-tutorial-finger">
+          <g transform="rotate(45)"><circle r="7" cx="-16.2" cy="0.7" fill="#EAD39D" opacity="0.35" /><circle r="7" cx="16.2" cy="0.7" fill="#EAD39D" opacity="0.35" /></g>
+          <Hand fingers={2} />
+          <animateMotion dur="2s" repeatCount="indefinite" path={drag} calcMode="linear" keyPoints="0;1;1" keyTimes="0;0.7;1" />
+        </g>
+      </g>}
+    </svg>
+  </div>;
+}
 
-  const onTileLoad = () => setTiles({ loading: false, error: null });
-  const onTileError = () => setTiles({ loading: false, error: "No se pudieron cargar las teselas. Revisa tu conexión o cambia la fecha." });
+const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const ArrowLeft = () => <svg {...iconProps} className="h-8 w-8"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>;
+const Restart = () => <svg {...iconProps} className="h-8 w-8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>;
+const ArrowRight = () => <svg {...iconProps} className="h-10 w-10" strokeWidth={3}><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
 
-  return <section className="relative w-full" aria-label="Mapa de ubicación de la finca">
-    {!online && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="status">Sin conexión: las teselas nuevas pueden no estar disponibles.</p>}
-    {tiles.loading && <p className="mb-3 rounded-lg border border-cyan-300/30 bg-cyan-950/50 p-3 text-sm text-cyan-100" role="status">Cargando teselas del mapa…</p>}
-    {tiles.error && <p className="mb-3 rounded-lg border border-red-300/40 bg-red-950/60 p-3 text-sm text-red-100" role="alert">{tiles.error}</p>}
-    {dateError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{dateError}</p>}
-    {trueColorError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{trueColorError}</p>}
-    {ndviError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{ndviError}</p>}
-    <div className="relative h-[min(38svh,280px)] min-h-[220px] overflow-hidden rounded-xl border border-white/15 sm:h-[min(58svh,520px)] sm:min-h-[360px]">
-      <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl>
-        <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Satélite">
-            <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={23} attribution={satelliteAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Calles">
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} attribution={osmAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />
-          </LayersControl.BaseLayer>
-          <LayersControl.Overlay checked name="Color real · NASA GIBS">
-            {trueColorUrl && <TileLayer url={trueColorUrl} maxZoom={GIBS_LAYER_CONFIG.trueColor.maxZoom} opacity={opacity / 100} attribution={nasaAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />}
-          </LayersControl.Overlay>
-          <LayersControl.Overlay name="NDVI · NASA GIBS">
-            {ndviUrl && <TileLayer url={ndviUrl} maxZoom={GIBS_LAYER_CONFIG.ndvi.maxZoom} opacity={opacity / 100} attribution={nasaAttribution} eventHandlers={{ load: onTileLoad, tileerror: onTileError }} />}
-          </LayersControl.Overlay>
-        </LayersControl>
+export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmConfirmed }: MapSceneProps) {
+  const [initialEditor] = useState(() => createTerrainEditor(location, gpsAccuracyMeters === undefined ? "search" : "gps", gpsAccuracyMeters));
+  const [editor, dispatch] = useReducer(terrainEditorReducer, initialEditor);
+  const [showTutorial, setShowTutorial] = useState(true);
+  const [tutorialRun, setTutorialRun] = useState(0);
+  const [message, setMessage] = useState<string | null>(null);
+  const status = getTerrainEditorStatus(editor);
+  const draft = editor.location;
+  const isPolygon = editor.mode === "polygon";
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowTutorial(false), TUTORIAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [tutorialRun]);
+
+  const onLasso = (points: [number, number][] | null) => {
+    if (!points) { setMessage("Rodea todo tu terreno con el dedo"); return; }
+    setMessage(null);
+    dispatch({ type: "set-polygon", points });
+  };
+  const reset = () => { dispatch({ type: "reset", initial: initialEditor }); setMessage(null); setShowTutorial(true); setTutorialRun((run) => run + 1); };
+  const confirm = () => {
+    const candidate = buildFarmFromEditor(editor);
+    const result = candidate ? validateFarmDraft(candidate) : null;
+    if (!result?.valid) { setMessage(result?.errors.join(" ") ?? status.error ?? "Rodea tu terreno otra vez"); return; }
+    onFarmConfirmed(result.farm);
+  };
+  const shownMessage = message ?? editor.error;
+
+  return <section className="fixed inset-0 z-40 flex flex-col bg-scene" aria-label="Mapa para marcar tu finca">
+    <div className="relative h-[70svh] w-full overflow-hidden">
+      <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl={false}>
+        <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} attribution={satelliteAttribution} />
         <ZoomToLocation location={location} gpsAccuracyMeters={gpsAccuracyMeters} />
-        <MapZoomObserver onZoomChange={setZoom} />
-        <MapPinSelector onSelect={(lat, lon) => {
-          if (editor.mode === "polygon") dispatch({ type: "add-vertex", lat, lon });
-          else dispatch({ type: "set-location", location: validateMapLocation(lat, lon, draftLocation.label) });
-        }} />
-        {approximateRing && <Polygon positions={approximateRing.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#ffb829", weight: 2, fillColor: "#ffb829", fillOpacity: 0.12 }} />}
-        {editor.mode === "polygon" && editor.vertices.length >= 3 && <Polygon positions={editor.vertices.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#ffb829", weight: 2, fillColor: "#ffb829", fillOpacity: 0.12, dashArray: editor.polygonFinished ? undefined : "6 6" }} />}
-        {editor.mode === "polygon" && editor.vertices.map((point, index) => <Marker key={`vertex-${index}`} position={convertCoordinateOrder(point, "geojson")} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const moved = marker.getLatLng(); dispatch({ type: "move-vertex", index, lat: moved.lat, lon: moved.lng }); } }} title={`Vértice ${index + 1}`} />)}
-        <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable={editor.mode !== "polygon" || requiresGpsPinAdjustment(editor)} eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draftLocation.label), locationSource: "map" }); }} } title="Pin de la finca" />
-        <CircleMarker center={[draftLocation.lat, draftLocation.lon]} radius={8} pathOptions={{ color: "#fbbf24", fillColor: "#fbbf24", fillOpacity: 0.25 }} />
-        {gpsAccuracyMeters !== undefined && <Circle center={[draftLocation.lat, draftLocation.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
+        <LassoDrawer onStart={() => setShowTutorial(false)} onComplete={onLasso} />
+        {isPolygon && editor.vertices.length >= 3 && <Polygon positions={editor.vertices.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#EAD39D", weight: 4, fillColor: "#EAD39D", fillOpacity: 0.25 }} />}
+        <Marker position={[draft.lat, draft.lon]} icon={pinIcon} draggable={!isPolygon} eventHandlers={{ dragend: (event) => { const point = (event.target as L.Marker).getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draft.label), locationSource: "map" }); } }} title="Tu finca" />
       </MapContainer>
+      <div className="pointer-events-none absolute left-3 top-3 z-[600] rounded-full bg-meadow/85 px-3 py-1.5 backdrop-blur"><Logo variant="horizontal" size={36} /></div>
+      {showTutorial && <LassoTutorial key={tutorialRun} />}
+      {shownMessage && <p className="pointer-events-none absolute inset-x-4 top-16 z-[600] rounded-2xl bg-meadow/90 px-4 py-3 text-center text-base font-semibold text-cream" role="status">{shownMessage}</p>}
     </div>
-    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto grid max-h-[40svh] max-w-[1440px] grid-cols-[1fr_auto] gap-3 overflow-y-auto border-t border-white/15 bg-black/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-left shadow-[0_-12px_36px_rgba(0,0,0,0.6)] backdrop-blur sm:grid-cols-[1fr_auto] sm:p-4">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-saffron-spark">Finca seleccionada</p>
-        <p className="mt-2 text-base font-semibold text-white">{draftLocation.label}</p>
-        <p className="mt-1 text-sm text-slate-300">{formatCoordinates(draftLocation)}</p>
-        <p className="mt-2 text-xs text-slate-400">{editor.mode === "polygon" ? "Toca el mapa para añadir vértices; arrástralos para ajustar." : "Toca el mapa o arrastra el pin para ajustar la ubicación."}</p>
-      </div>
-      <div className="flex min-w-28 flex-col gap-2 sm:min-w-44">
-        <label htmlFor="gibs-date" className="text-xs font-semibold text-slate-300">Fecha NASA GIBS</label>
-        <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-black px-3 py-2 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" />
-        <label htmlFor="gibs-opacity" className="text-xs font-semibold text-slate-300">Opacidad de capas: {opacity}%</label>
-        <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-[#8052ff]" />
-      </div>
-      <p className="col-span-2 text-xs leading-5 text-slate-400">NASA POWER representa clima regional según la resolución de cada producto; no mide el detalle del lote.</p>
-      <fieldset className="col-span-2 min-w-0">
-        <legend className="mb-2 text-sm font-semibold text-white">Define el terreno (opcional)</legend>
-        <div role="radiogroup" aria-label="Tipo de terreno" className="grid grid-cols-3 gap-2">
-          {([
-            ["point", "Solo el punto"], ["approx_size", "Tamaño aproximado"], ["polygon", "Dibujar el terreno"],
-          ] as const satisfies readonly (readonly [TerrainEditorMode, string])[]).map(([mode, label]) => (
-            <label key={mode} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-xs font-medium focus-within:ring-2 focus-within:ring-saffron-spark sm:text-sm ${editor.mode === mode ? "border-saffron-spark bg-saffron-spark/15 text-white" : "border-white/20 text-slate-300"}`}>
-              <input className="sr-only" type="radio" name="terrain-mode" value={mode} checked={editor.mode === mode} onChange={() => dispatch({ type: "set-mode", mode })} />
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {editor.mode === "approx_size" && <div className="col-span-2 space-y-3">
-        <fieldset>
-          <legend className="mb-2 text-xs font-medium text-slate-300">Elige un rango</legend>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {APPROXIMATE_AREA_RANGES_HA.map((range) => {
-              const label = range[0] === 0.01 ? "Menos de 1 ha" : range[0] === 20 ? "Más de 20 ha" : `${range[0]}–${range[1]} ha`;
-              const selected = editor.areaRangeHa?.[0] === range[0] && editor.areaRangeHa[1] === range[1];
-              return <label key={label} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-xs focus-within:ring-2 focus-within:ring-saffron-spark ${selected ? "border-saffron-spark bg-saffron-spark/15 text-white" : "border-white/20 text-slate-300"}`}>
-                <input className="sr-only" type="radio" name="terrain-area-range" checked={selected} onChange={() => dispatch({ type: "set-area-range", range: range as AreaRangeHa })} />
-                {label}
-              </label>;
-            })}
-          </div>
-        </fieldset>
-        <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-          <div>
-            <label htmlFor="terrain-area" className="mb-1 block text-xs font-medium text-slate-300">O escribe el área exacta</label>
-            <input id="terrain-area" type="number" min="0" step="any" value={editor.exactAreaHa === null ? "" : editor.areaUnit === "m2" ? editor.exactAreaHa * 10_000 : editor.exactAreaHa} onChange={(event) => dispatch({ type: "set-exact-area", value: event.target.value === "" ? null : Number(event.target.value), unit: editor.areaUnit })} className="min-h-11 w-full rounded-lg border border-white/20 bg-black px-3 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" />
-          </div>
-          <div>
-            <label htmlFor="terrain-area-unit" className="mb-1 block text-xs font-medium text-slate-300">Unidad</label>
-            <select id="terrain-area-unit" value={editor.areaUnit} onChange={(event) => dispatch({ type: "set-area-unit", unit: event.target.value as "ha" | "m2" })} className="min-h-11 rounded-lg border border-white/20 bg-black px-3 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50"><option value="ha">ha</option><option value="m2">m²</option></select>
-          </div>
-        </div>
-      </div>}
-      {editor.mode === "polygon" && <div className="col-span-2 flex flex-wrap gap-2">
-        <button type="button" disabled={editor.vertices.length === 0} onClick={() => dispatch({ type: "undo" })} className="min-h-11 rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:border-saffron-spark focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Deshacer</button>
-        <button type="button" disabled={editor.vertices.length === 0} onClick={() => dispatch({ type: "clear" })} className="min-h-11 rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:border-saffron-spark focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Borrar</button>
-        <button type="button" disabled={editor.vertices.length < 3} onClick={() => dispatch({ type: "finish" })} className="min-h-11 rounded-full border border-saffron-spark/70 px-4 text-sm font-semibold text-saffron-spark hover:bg-saffron-spark/10 focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Terminar</button>
-      </div>}
-      {editor.mode === "polygon" && <p className="col-span-2 rounded-lg border border-saffron-spark/20 bg-saffron-spark/5 p-3 text-xs leading-5 text-slate-200" role="note">
-        Toca el mapa para marcar el contorno (mínimo 3 puntos). Puedes arrastrar cada punto y usar «Deshacer» o «Borrar». Cuando termines, pulsa «Terminar» para cerrar y validar el área; después podrás confirmar la finca.
-      </p>}
-      {terrainStatus.areaHa !== null && <p className="col-span-2 text-sm text-white">Área: {terrainStatus.areaHa.toFixed(2)} ha{terrainStatus.areaHa >= FOOTBALL_PITCH_AREA_HA ? ` · ≈ ${Math.round(terrainStatus.areaHa / FOOTBALL_PITCH_AREA_HA)} canchas de fútbol` : ""}</p>}
-      {editor.mode === "polygon" && terrainStatus.areaHa === null && <p className="col-span-2 text-xs text-slate-300">Añade al menos tres puntos para calcular el área. La vía accesible para indicar el tamaño es el modo aproximado con campo numérico.</p>}
-      {(editor.error ?? terrainStatus.error) && <p className="col-span-2 text-sm text-amber-200" role="alert">{editor.error ?? terrainStatus.error}</p>}
-      {terrainStatus.warnings.map((warning) => <p key={warning} className="col-span-2 text-sm text-amber-200" role="alert">{warning}</p>)}
-      <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" onClick={onBack} className="min-h-11 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark">Volver al globo</button>
-        <button type="button" aria-describedby={!terrainStatus.canConfirm ? "farm-confirm-guidance" : undefined} disabled={!terrainStatus.canConfirm} onClick={() => {
-          const candidate = buildFarmFromEditor(editor);
-          if (!candidate) { setConfirmationError(terrainStatus.error ?? "Completa y valida el terreno antes de confirmar."); return; }
-          const result = validateFarmDraft(candidate);
-          if (!result.valid) { setConfirmationError(result.errors.join(" ")); return; }
-          setConfirmationError(null); setConfirmedFarm(result.farm); onFarmConfirmed(result.farm);
-        }} className="min-h-11 rounded-full bg-electric-iris px-4 py-3 text-sm font-semibold text-white hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
-      </div>
-      {!terrainStatus.canConfirm && <p id="farm-confirm-guidance" className="col-span-2 -mt-1 text-xs leading-5 text-amber-200" role="status">Antes de confirmar: {terrainStatus.error ?? "Completa y valida el terreno."}</p>}
-      {confirmationError && <p className="col-span-2 text-sm text-red-200" role="alert">No se pudo confirmar la finca: {confirmationError}</p>}
-      {showConfirmedFarm && confirmedFarm && debugMode && <details className="col-span-2 rounded-lg border border-white/15 p-3 text-xs text-slate-200"><summary className="cursor-pointer font-semibold">Farm enviado (depuración)</summary><pre className="mt-2 overflow-auto">{JSON.stringify(confirmedFarm, null, 2)}</pre></details>}
-      <p className="col-span-2 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
+    <div className="flex flex-1 items-center gap-3 px-4 pb-[env(safe-area-inset-bottom)]">
+      <button type="button" onClick={onBack} aria-label="Volver al inicio" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><ArrowLeft /></button>
+      <button type="button" onClick={reset} aria-label="Borrar y dibujar de nuevo" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><Restart /></button>
+      <button type="button" onClick={confirm} disabled={!status.canConfirm} aria-label="Siguiente" className="flex h-20 min-w-0 flex-1 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 disabled:opacity-40"><ArrowRight /></button>
     </div>
-    {gpsAccuracyMeters !== undefined && gpsAccuracyMeters > 1000 && <p className="mt-1 text-xs text-amber-200">La precisión del GPS es aproximada ({Math.round(gpsAccuracyMeters)} m); ajusta el pin manualmente.</p>}
-    {zoom < 14 && <p className="mt-1 text-xs text-amber-200">Toca el mapa donde queda tu finca.</p>}
   </section>;
 }

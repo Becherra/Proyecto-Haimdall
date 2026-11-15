@@ -54,6 +54,24 @@ export function candidateRotations(crops: readonly Crop[], current: Crop): Rotat
   return { legume: legumeCandidates(crops, current), coverDrought: coverDroughtCandidates(crops, current) };
 }
 
+/** Un solo cultivo, sin rotación: punto de partida para quien hoy no tiene cultivo. */
+function singleCropRotation(crop: Crop): Rotation {
+  return { id: "single", name: commonName(crop), cropIds: [crop.id], description: "Sembrar un solo cultivo, sin rotación." };
+}
+
+/** Opciones para quien no tiene cultivo actual: un solo cultivo, o las dos estrategias alternativas armadas a partir de cualquier cultivo del catálogo. */
+export type StartingRotations = RotationCandidates & { single: Rotation[] };
+
+/**
+ * Arma los candidatos cuando no hay cultivo actual: todos los cultivos solos y todas las parejas/tríos válidos
+ * (cada cultivo del catálogo hace de punto de partida). El motor de puntuación elige la mejor de cada lista.
+ */
+export function startingRotations(crops: readonly Crop[]): StartingRotations {
+  const fromEach = crops.map((crop) => candidateRotations(crops, crop));
+  const neutral = (rotations: Rotation[]) => rotations.map((rotation) => ({ ...rotation, description: rotation.description.replace(/^Mantiene /, "Empieza con ") }));
+  return { single: crops.map(singleCropRotation), legume: fromEach.flatMap((candidates) => candidates.legume), coverDrought: neutral(fromEach.flatMap((candidates) => candidates.coverDrought)) };
+}
+
 /**
  * Fracción (0–1) de relevos de la secuencia que cambian de familia botánica, contando la vuelta del último cultivo al primero.
  * Un monocultivo da 0; una rotación que nunca repite familia en relevos seguidos da 1.

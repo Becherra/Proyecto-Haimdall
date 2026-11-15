@@ -23,3 +23,13 @@ describe("contratos de datos", () => {
     expect(analysisResponseSchema.safeParse(response).success).toBe(false);
   });
 });
+
+describe("userPrioritiesSchema · noCurrentCrop", () => {
+  const base = { waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3 };
+  it("acepta la declaración de que no hay cultivo actual", () => {
+    expect(userPrioritiesSchema.safeParse({ ...base, noCurrentCrop: true }).success).toBe(true);
+  });
+  it("rechaza un valor que no sea booleano", () => {
+    expect(userPrioritiesSchema.safeParse({ ...base, noCurrentCrop: "si" }).success).toBe(false);
+  });
+});

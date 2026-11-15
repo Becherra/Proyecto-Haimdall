@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import AnalysisDashboard from "./AnalysisDashboard";
-import PrioritiesForm from "./PrioritiesForm";
+import PrioritiesSlides from "./PrioritiesSlides";
+import ResultsView from "./ResultsView";
 import { buildAnalysisRequest, isAnalysisMockMode, runAnalysis } from "../services/analysis";
 import type { AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "../types";
 
 const initialPriorities: UserPriorities = {
   waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3,
-  currentCropId: "maiz", waterAvailability: "medium",
 };
 const neutralScenario: ClimateScenario = { tempDeltaC: 0, rainFactor: 1 };
 
@@ -16,6 +16,7 @@ type AnalysisFlowProps = { farm: Farm; onChangeFarm: () => void };
 
 export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) {
   const [step, setStep] = useState<"priorities" | "results">("priorities");
+  const [technical, setTechnical] = useState(false);
   const [priorities, setPriorities] = useState(initialPriorities);
   const [baseResponse, setBaseResponse] = useState<AnalysisResponse | null>(null);
   const [response, setResponse] = useState<AnalysisResponse | null>(null);
@@ -33,6 +34,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
       setBaseResponse(result);
       setResponse(result);
       setScenarioDraft(neutralScenario);
+      setTechnical(false);
       setStep("results");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo analizar la finca. Inténtalo de nuevo.");
@@ -63,13 +65,13 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
   }
 
   if (step === "priorities" || !response || !baseResponse) {
-    return <>
-      <PrioritiesForm farm={farm} initialValues={priorities} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />
-      <p className="mx-auto -mt-5 mb-8 max-w-5xl px-4 text-center text-[11px] text-slate-600 sm:px-8">Periodo climático de referencia: 2020–2022. Los escenarios se prueban después y no son pronósticos.</p>
-    </>;
+    return <PrioritiesSlides farm={farm} initialValues={priorities} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />;
   }
 
+  if (!technical) return <ResultsView farm={farm} response={response} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;
+
   return <AnalysisDashboard
+    onBackToSimple={() => setTechnical(false)}
     farm={farm}
     response={response}
     baseline={baseResponse}
