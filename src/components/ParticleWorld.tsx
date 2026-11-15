@@ -189,6 +189,8 @@ export default function ParticleWorld({ stage = "settled", startRef, anchorRef, 
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
   const [fps, setFps] = useState(0);
   const [renderError, setRenderError] = useState(false);
+  const [firstFrameRendered, setFirstFrameRendered] = useState(false);
+  const firstFrameRenderedRef = useRef(false);
   const isPreview = stage === "preview";
   const [reducedForPerformance, setReducedForPerformance] = useState(false);
   const pointCount = Math.round((isMobile ? 9000 : 22000) * (reducedForPerformance ? 0.7 : 1));
@@ -327,6 +329,10 @@ export default function ParticleWorld({ stage = "settled", startRef, anchorRef, 
         world.rotation.y = Math.pow(1 - assemble, 2) * 1.2;
       }
       renderer.render(scene, camera);
+      if (!firstFrameRenderedRef.current) {
+        firstFrameRenderedRef.current = true;
+        setFirstFrameRendered(true);
+      }
 
     };
     frame = window.requestAnimationFrame(render);
@@ -348,6 +354,7 @@ export default function ParticleWorld({ stage = "settled", startRef, anchorRef, 
   }, [isMobile, pointCount, isPreview, startRef, anchorRef, reducedForPerformance]);
 
   return <div ref={hostRef} data-intro-stage={stage} className={`particle-world pointer-events-none fixed inset-0 z-20 overflow-hidden particle-stage-${stage}`}>
+    <div aria-hidden="true" className={`particle-loading pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 motion-reduce:transition-none ${firstFrameRendered ? "opacity-0" : "opacity-100"}`} />
     {renderError
       ? <p className="absolute inset-x-4 bottom-4 text-center text-xs text-silver-mist" role="alert">No fue posible iniciar WebGL para la vista de partículas.</p>
       : isPreview && <output className="fixed bottom-3 right-3 z-10 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 font-mono text-[10px] text-silver-mist" aria-live="off">
