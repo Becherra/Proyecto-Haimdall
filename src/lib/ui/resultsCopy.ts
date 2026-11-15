@@ -1,4 +1,5 @@
-import type { Indicators, MonthlyClimate, RotationResult } from "../../types";
+import type { CurrentSeason, CurrentSeasonStatus, Indicators, MonthlyClimate, RotationResult } from "../../types";
+import { CURRENT_SEASON_BAR_MAX_PERCENT, CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C } from "../config";
 import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
 
 /** Un pedazo de texto para leer en voz alta; con `audioId` se usa la grabación `public/audio/<audioId>.mp3` si existe. */
@@ -144,4 +145,86 @@ export const RAIN_CALENDAR_INTRO = { title: "Calendario de lluvia", explanation:
 export function rainCalendarSpeechItems(calendar: readonly RainMonth[]): SpeechItem[] {
   const sentence = rainCalendarSentence(calendar);
   return [{ text: `${RAIN_CALENDAR_INTRO.title}. ${RAIN_CALENDAR_INTRO.explanation}`, audioId: RAIN_CALENDAR_INTRO.audioId }, ...(sentence ? [{ text: sentence }] : [])];
+}
+
+export type CurrentSeasonTone = "dry" | "normal" | "wet";
+export type CurrentSeasonCard = {
+  title: string;
+  technicalName: string;
+  /** Qué significa: texto fijo, se puede grabar con la voz propia (`explanationAudioId`). */
+  explanation: string;
+  explanationAudioId: string;
+  statusLabel: string;
+  tone: CurrentSeasonTone;
+  /** Resumen de una línea de cómo va la lluvia. */
+  headline: string;
+  /** Cuánto cayó en la ventana y cuánto es lo normal. */
+  amount: string;
+  /** Temperatura y días sin lluvia, solo si valen la pena. */
+  details: string[];
+  /** Fecha del dato y que es reciente, no un pronóstico. */
+  note: string;
+  /** Anchos de barra (0–100) de lluvia normal y reciente, con la misma escala. */
+  normalBar: number;
+  currentBar: number;
+};
+
+export const CURRENT_SEASON_EXPLANATION = {
+  title: "¿Cómo va esta temporada?",
+  technicalName: "Lluvia reciente frente a lo normal",
+  explanation: "Compara la lluvia de los últimos meses con la que suele caer en esa misma época. Sirve para saber si este año va más seco o más lluvioso que de costumbre.",
+  audioId: "clima-temporada",
+} as const;
+
+const SEASON_STATUS: Record<CurrentSeasonStatus, { label: string; tone: CurrentSeasonTone; headline: string }> = {
+  "much-drier": { label: "Muy seca", tone: "dry", headline: "Ha llovido mucho menos de lo normal." },
+  drier: { label: "Más seca de lo normal", tone: "dry", headline: "Ha llovido menos de lo normal." },
+  normal: { label: "Normal", tone: "normal", headline: "Ha llovido lo normal para esta época." },
+  wetter: { label: "Más lluviosa de lo normal", tone: "wet", headline: "Ha llovido más de lo normal." },
+  "much-wetter": { label: "Muy lluviosa", tone: "wet", headline: "Ha llovido mucho más de lo normal." },
+};
+
+/** "20261112" → "12 de noviembre". */
+const dayAndMonth = (date: string) => `${Number(date.slice(6, 8))} de ${MONTH_NAMES[Number(date.slice(4, 6)) - 1]}`;
+
+function temperatureSentence(anomalyC: number | null): string[] {
+  if (anomalyC === null) return [];
+  if (Math.abs(anomalyC) < CURRENT_SEASON_TEMPERATURE_NOTICE_C) return ["La temperatura ha sido normal."];
+  return [`Ha hecho ${fmt(Math.abs(anomalyC), 1)} grados ${anomalyC > 0 ? "más" : "menos"} calor de lo normal.`];
+}
+
+/** Anchos de barra de lluvia normal y reciente; la escala crece si llovió más que el tope para que ambas quepan. */
+function seasonBars({ rainPercentOfNormal, rainMm }: Pick<CurrentSeason, "rainPercentOfNormal" | "rainMm">): { normalBar: number; currentBar: number } {
+  if (rainPercentOfNormal === null) return { normalBar: 0, currentBar: rainMm > 0 ? 100 : 0 };
+  const scale = Math.max(CURRENT_SEASON_BAR_MAX_PERCENT, rainPercentOfNormal);
+  return { normalBar: (100 / scale) * 100, currentBar: (rainPercentOfNormal / scale) * 100 };
+}
+
+/** La temporada actual explicada con palabras simples: cómo va la lluvia y la temperatura frente a lo normal. */
+export function describeCurrentSeason(season: CurrentSeason): CurrentSeasonCard {
+  const status = SEASON_STATUS[season.status];
+  return {
+    ...CURRENT_SEASON_EXPLANATION, explanationAudioId: CURRENT_SEASON_EXPLANATION.audioId,
+    statusLabel: status.label, tone: status.tone, headline: status.headline,
+    amount: `En los últimos ${season.windowDays} días cayeron ${fmt(season.rainMm)} milímetros; lo normal en esa época son ${fmt(season.normalRainMm)}.`,
+    details: [
+      ...temperatureSentence(season.temperatureAnomalyC),
+      ...(season.currentDryStreakDays >= CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS ? [`Llevas ${season.currentDryStreakDays} días seguidos casi sin lluvia.`] : []),
+    ],
+    note: `Dato de la NASA hasta el ${dayAndMonth(season.lastDate)}. Es una lectura reciente que puede cambiar un poco y no es un pronóstico.`,
+    ...seasonBars(season),
+  };
+}
+
+/** La temporada actual para leer en voz alta: la explicación fija (grabable) y luego lo que dicen los datos. */
+export function currentSeasonSpeechItems(card: CurrentSeasonCard): SpeechItem[] {
+  return [{ text: `${card.title} ${card.explanation}`, audioId: card.explanationAudioId }, { text: sentences([card.headline, card.amount, ...card.details, card.note]) }];
+}
+
+/**
+ * Cómo se unen los cultivos de una opción en pantalla: "then" (flecha) para una rotación, "with" (+) para un cultivo anual
+ * asociado en las calles de uno permanente. El motor nombra las asociaciones "Café + Fríjol" y las rotaciones "Maíz → Soya".
+ */
+export function cropLink(rotation: Pick<RotationResult["rotation"], "name">): "then" | "with" {
+  return rotation.name.includes(" + ") ? "with" : "then";
 }

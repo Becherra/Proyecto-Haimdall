@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, bestRotationIndex, climateTopicSpeechItems, describeClimate, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
-import type { Indicators, MonthlyClimate, RotationResult } from "../src/types";
+import { NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import type { CurrentSeason, Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
 const rotation = (score: number, id = "x"): RotationResult => ({ rotation: { id, name: id, cropIds: ["maiz"], description: "d" }, score, whySuggested: "Porque sí.", evidence: ["Dato A"], benefits: ["Beneficio 1", "Beneficio 2."], informationGaps: ["Vacío"], risks: ["Riesgo"], validateWithLocalExpert: ["Validar"] });
@@ -99,5 +99,93 @@ describe("rotationSections con texto simple", () => {
     const sections = rotationSections(rotation(3));
     expect(sections.find((section) => section.id === "evidence")?.texts).toEqual(["Dato A"]);
     expect(sections.find((section) => section.id === "why")?.texts).toEqual(["Porque sí."]);
+  });
+});
+
+describe("describeCurrentSeason: cómo va la temporada", () => {
+  const season = (overrides: Partial<CurrentSeason> = {}): CurrentSeason => ({
+    windowDays: 87, firstDate: "20260818", lastDate: "20261112", daysWithData: 87, rainMm: 563.27, normalRainMm: 507.42, rainPercentOfNormal: 111,
+    status: "normal", temperatureAnomalyC: 1.4, currentDryStreakDays: 0, baselineYears: 15, ...overrides,
+  });
+
+  it("traduce cada estado a una etiqueta simple y a un tono", () => {
+    const labelOf = (status: CurrentSeason["status"]) => { const card = describeCurrentSeason(season({ status })); return [card.statusLabel, card.tone]; };
+    expect(labelOf("much-drier")).toEqual(["Muy seca", "dry"]);
+    expect(labelOf("drier")).toEqual(["Más seca de lo normal", "dry"]);
+    expect(labelOf("normal")).toEqual(["Normal", "normal"]);
+    expect(labelOf("wetter")).toEqual(["Más lluviosa de lo normal", "wet"]);
+    expect(labelOf("much-wetter")).toEqual(["Muy lluviosa", "wet"]);
+  });
+
+  it("dice con palabras simples si ha llovido menos, igual o más que lo normal", () => {
+    expect(describeCurrentSeason(season({ status: "much-drier" })).headline).toBe("Ha llovido mucho menos de lo normal.");
+    expect(describeCurrentSeason(season({ status: "drier" })).headline).toBe("Ha llovido menos de lo normal.");
+    expect(describeCurrentSeason(season({ status: "normal" })).headline).toBe("Ha llovido lo normal para esta época.");
+    expect(describeCurrentSeason(season({ status: "wetter" })).headline).toBe("Ha llovido más de lo normal.");
+    expect(describeCurrentSeason(season({ status: "much-wetter" })).headline).toBe("Ha llovido mucho más de lo normal.");
+  });
+
+  it("cuenta cuántos milímetros cayeron en los días de la ventana y cuántos son lo normal", () => {
+    expect(describeCurrentSeason(season()).amount).toBe("En los últimos 87 días cayeron 563 milímetros; lo normal en esa época son 507.");
+  });
+
+  it("habla de la temperatura solo si se aparta de lo normal y no inventa si falta el dato", () => {
+    const sentenceFor = (temperatureAnomalyC: number | null) => describeCurrentSeason(season({ temperatureAnomalyC })).details.join(" ");
+    expect(sentenceFor(1.4)).toContain("1,4 grados más calor de lo normal");
+    expect(sentenceFor(-0.8)).toContain("0,8 grados menos calor de lo normal");
+    expect(sentenceFor(0.2)).toContain("La temperatura ha sido normal");
+    expect(sentenceFor(null)).not.toContain("temperatura");
+    expect(sentenceFor(null)).not.toContain("calor");
+  });
+
+  it("avisa de los días seguidos casi sin lluvia solo si son varios", () => {
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 12 })).details.join(" ")).toContain("12 días seguidos casi sin lluvia");
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 3 })).details.join(" ")).not.toContain("sin lluvia");
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 1 })).details.join(" ")).not.toContain("seguidos");
+  });
+
+  it("aclara la fecha del dato y que es reciente y no un pronóstico", () => {
+    const { note } = describeCurrentSeason(season());
+    expect(note).toContain("12 de noviembre");
+    expect(note).toContain("no es un pronóstico");
+  });
+
+  it("dibuja las barras de lluvia normal y reciente con la misma escala", () => {
+    const low = describeCurrentSeason(season({ rainPercentOfNormal: 40 }));
+    expect(low.normalBar).toBeCloseTo(66.67, 1);
+    expect(low.currentBar).toBeCloseTo(26.67, 1);
+    const high = describeCurrentSeason(season({ rainPercentOfNormal: 200 }));
+    expect(high.currentBar).toBe(100);
+    expect(high.normalBar).toBeCloseTo(50, 5);
+  });
+
+  it("sin porcentaje (lo normal es 0 mm) no inventa barras de comparación", () => {
+    const card = describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 0, status: "normal" }));
+    expect(card.normalBar).toBe(0);
+    expect(card.currentBar).toBe(0);
+    expect(describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 12, status: "much-wetter" })).currentBar).toBe(100);
+  });
+
+  it("para leer en voz alta: la explicación fija (grabable) y luego lo que dicen los datos", () => {
+    const [fixed, data] = currentSeasonSpeechItems(describeCurrentSeason(season({ status: "drier", currentDryStreakDays: 12 })));
+    expect(fixed.audioId).toBe("clima-temporada");
+    expect(fixed.text).toContain("¿Cómo va esta temporada?");
+    expect(data.audioId).toBeUndefined();
+    expect(data.text).toContain("Ha llovido menos de lo normal");
+    expect(data.text).toContain("563 milímetros");
+    expect(data.text).toContain("no es un pronóstico");
+  });
+});
+
+describe("cropLink: cómo se unen los cultivos de una opción", () => {
+  it("una rotación se lee como relevo (flecha) y una asociación con un cultivo permanente como mezcla (+)", () => {
+    expect(cropLink({ name: "Maíz → Soya" })).toBe("then");
+    expect(cropLink({ name: "Maíz → Crotalaria → Yuca" })).toBe("then");
+    expect(cropLink({ name: "Café + Fríjol" })).toBe("with");
+    expect(cropLink({ name: "Plátano + Maíz" })).toBe("with");
+  });
+
+  it("un solo cultivo no tiene unión, y se queda en relevo por defecto", () => {
+    expect(cropLink({ name: "Actual: Café (Coffea arabica)" })).toBe("then");
   });
 });
