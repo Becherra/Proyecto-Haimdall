@@ -1,5 +1,7 @@
 import { z } from "zod";
-import samplePayload from "../../data/samples/power-pereira.json";
+import armeniaSample from "../../data/samples/power-armenia.json";
+import manizalesSample from "../../data/samples/power-manizales.json";
+import pereiraSample from "../../data/samples/power-pereira.json";
 import { CLIMATE_PARAMETERS, climateResultSchema, type ClimateParameter, type ClimateRecord, type ClimateRequest, type ClimateResult } from "../types";
 
 const BASE_URL = "https://power.larc.nasa.gov/api/temporal/daily/point";
@@ -8,7 +10,15 @@ const MAX_RANGE_YEARS = 15;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [100, 250] as const;
-const PEREIRA = { lat: 4.8133, lon: -75.6961, tolerance: 0.1 } as const;
+/**
+ * Respuestas reales de NASA POWER (2020–2022) guardadas para que la demo no dependa de la red.
+ * Cada una cubre los sitios a menos de `tolerance` grados; Santa Rosa de Cabal cae dentro de la de Pereira (misma celda de NASA POWER).
+ */
+const SAMPLES: ReadonlyArray<{ lat: number; lon: number; tolerance: number; payload: unknown }> = [
+  { lat: 4.8133, lon: -75.6961, tolerance: 0.1, payload: pereiraSample },
+  { lat: 5.0689, lon: -75.5174, tolerance: 0.1, payload: manizalesSample },
+  { lat: 4.5339, lon: -75.6811, tolerance: 0.1, payload: armeniaSample },
+];
 const responseSchema = z.object({
   geometry: z.object({ coordinates: z.array(z.number()) }).optional(),
   properties: z.object({ parameter: z.record(z.string(), z.record(z.string(), z.number())) }),
@@ -29,9 +39,6 @@ function buildUrl(input: ClimateRequest): string {
   return `${BASE_URL}?${params.toString()}`;
 }
 
-function isPereira(input: ClimateRequest): boolean {
-  return Math.abs(input.lat - PEREIRA.lat) <= PEREIRA.tolerance && Math.abs(input.lon - PEREIRA.lon) <= PEREIRA.tolerance;
-}
 
 function parseResponse(payload: unknown, source: ClimateResult["source"], input?: ClimateRequest): ClimateResult {
   const parsed = responseSchema.safeParse(payload);
@@ -87,7 +94,8 @@ async function requestLive(url: string): Promise<ClimateResult> {
 }
 
 function sampleFor(input: ClimateRequest): ClimateResult | null {
-  return isPereira(input) ? parseResponse(samplePayload, "sample", input) : null;
+  const sample = SAMPLES.find(({ lat, lon, tolerance }) => Math.abs(input.lat - lat) <= tolerance && Math.abs(input.lon - lon) <= tolerance);
+  return sample ? parseResponse(sample.payload, "sample", input) : null;
 }
 
 /** Obtiene clima diario con timeout, reintentos y respaldo precargado por zona. */
