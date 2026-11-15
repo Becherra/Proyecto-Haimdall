@@ -49,6 +49,40 @@ describe("fetchDailyClimate", () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
+  it("usa la muestra de Manizales o de Armenia cuando NASA POWER no responde en esos sitios", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const manizales = await fetchDailyClimate({ ...request, lat: 5.0689, lon: -75.5174 });
+    const armenia = await fetchDailyClimate({ ...request, lat: 4.5339, lon: -75.6811 });
+    for (const result of [manizales, armenia]) {
+      expect(result.source).toBe("sample");
+      expect(result.records).toHaveLength(1096);
+    }
+    // Armenia cae en otra celda de NASA POWER: otra altitud media y otra serie de temperatura.
+    expect(manizales.cellElevationMeters).toBeCloseTo(2138.33, 2);
+    expect(armenia.cellElevationMeters).toBeCloseTo(2266.93, 2);
+    expect(armenia.records[0].T2M).not.toBe(manizales.records[0].T2M);
+  });
+
+  it("cubre Santa Rosa de Cabal con la muestra de Pereira, que está en la misma celda de NASA POWER", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const santaRosa = await fetchDailyClimate({ ...request, lat: 4.868, lon: -75.605 });
+    clearClimateCache();
+    const pereira = await fetchDailyClimate(request);
+    expect(santaRosa.source).toBe("sample");
+    expect(santaRosa.records).toEqual(pereira.records);
+  });
+
+  it("usa la muestra de Armenia para un sitio cercano dentro de su tolerancia", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    const nearArmenia = await fetchDailyClimate({ ...request, lat: 4.62, lon: -75.69 });
+    expect(nearArmenia.cellElevationMeters).toBeCloseTo(2266.93, 2);
+  });
+
+  it("no inventa una muestra para un sitio sin datos precargados", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    await expect(fetchDailyClimate({ ...request, lat: 6.25, lon: -75.56 })).rejects.toThrow();
+  });
+
   it("rechaza años fuera del periodo disponible y rangos mayores a 15 años", () => {
     expect(() => fetchDailyClimate({ ...request, startYear: 1980 })).toThrow("1981");
     expect(() => fetchDailyClimate({ ...request, startYear: 1981, endYear: 1996 })).toThrow("15 años");
