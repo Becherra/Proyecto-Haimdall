@@ -6,7 +6,7 @@ import {
 } from "./config";
 import { formatTemperatureRange, frostExposure, frostUnprotected, temperatureMismatch, temperatureSuitability } from "./climateFit";
 import { commonName, familyBreakShare } from "./rotations";
-import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
+import { assessSowing, assessSowingSoil, formatMonths, type MonthSeason, type SowingAssessment, type SowingSoil } from "./seasonality";
 import { buildPlain, type PenaltyKind } from "./plainText";
 import { slopeErosionExposure } from "./terrain";
 import { clearnessLabel, fournierClass } from "./indicators";
@@ -15,7 +15,7 @@ import { sowingWindows, type SowingWindows } from "./sowingWindows";
 type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk";
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
 type Penalty = { label: string; value: number; kind: PenaltyKind };
-type SowingFinding = { crop: Crop; assessment: SowingAssessment };
+type SowingFinding = { crop: Crop; assessment: SowingAssessment; soil: SowingSoil };
 type WindowFinding = { crop: Crop; windows: SowingWindows };
 /** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
 type Evaluation = { rotation: Rotation; crops: Crop[]; permanent: boolean; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined; windows: WindowFinding[] };
@@ -151,7 +151,7 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
   // Un cultivo permanente (café, plátano) no se siembra cada año ni se rota: no tiene meses de siembra, calendario de rotación ni relevos de familia.
   const permanent = crops.some((crop) => crop.perennial === true);
-  const sowing = seasonality ? crops.filter((crop) => crop.perennial !== true).map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
+  const sowing = seasonality ? crops.filter((crop) => crop.perennial !== true).map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality), soil: assessSowingSoil(crop.sowingMonths, seasonality) })) : null;
   const calendar = seasonality && !permanent ? buildRotationCalendar(crops, seasonality) : null;
   const familyBreak = permanent ? null : familyBreakShare(crops);
   const windows = monthlyClimate ? crops.flatMap((crop) => { const found = sowingWindows(crop, monthlyClimate); return found ? [{ crop, windows: found }] : []; }) : [];
@@ -180,7 +180,12 @@ function sowingEvidence(sowing: SowingFinding[] | null, { waterBalanceMethod }: 
     return `Siembra de ${crop.name} (${formatMonths(crop.sowingMonths)}): ${verdict} (${source}; meses de siembra del catálogo).`;
   });
   const rule = `Mes seco: lluvia media del mes menor al ${(SEASON_DRY_RAIN_RATIO * 100).toFixed(0)} % del promedio mensual del sitio, o evaporación mayor que la lluvia (regla de diseño, no dato NASA).`;
-  return lines.length > 0 ? [...lines, rule] : [];
+  return lines.length > 0 ? [...lines, ...soilWetnessEvidence(sowing ?? []), rule] : [];
+}
+
+/** Humedad de zona radicular de NASA en los meses de siembra de cada cultivo. Es un proxy de ~50 km y solo se muestra: no entra al puntaje. */
+function soilWetnessEvidence(sowing: SowingFinding[]): string[] {
+  return sowing.flatMap(({ crop, soil }) => (soil.wetness === null ? [] : [`Humedad del suelo en los meses de siembra de ${crop.name} (${formatMonths(crop.sowingMonths)}): ${soil.wetness.min.toFixed(2)}–${soil.wetness.max.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]));
 }
 
 const WATER_BALANCE_SOURCE = {
@@ -356,6 +361,9 @@ function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   if (low((crop) => crop.marketPotential)) risks.push("Bajo potencial de mercado según el catálogo.");
   for (const { crop, assessment } of sowing ?? []) {
     if (assessment.dryMonths.length > 0) risks.push(`Parte de los meses de siembra de ${crop.name} (${formatMonths(assessment.dryMonths)}) cae en época seca del sitio.`);
+  }
+  for (const { crop, soil } of sowing ?? []) {
+    if (soil.soilDryMonths.length > 0) risks.push(`En ${formatMonths(soil.soilDryMonths)} (meses de siembra de ${crop.name}) la humedad del suelo queda por debajo de lo normal del sitio (NASA POWER, GWETROOT; proxy, no medición del lote).`);
   }
   if (evaluation.calendar) risks.push(...calendarRisks(evaluation.calendar, crops));
   risks.push(...familyRisks(evaluation));
