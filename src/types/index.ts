@@ -77,8 +77,9 @@ const terrainSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("approx_size"),
     areaHa: z.number().finite().positive(),
+    // Manual area entry is exact and intentionally has no selected estimate bucket.
     areaRangeHa: z.tuple([z.number().finite().positive(), z.number().finite().positive()])
-      .refine(([minimum, maximum]) => minimum < maximum, "El rango de área debe crecer"),
+      .refine(([minimum, maximum]) => minimum < maximum, "El rango de área debe crecer").optional(),
   }),
   z.object({
     kind: z.literal("polygon"),
