@@ -84,7 +84,10 @@ export type Rotation = z.infer<typeof rotationSchema>;
 
 export const userPrioritiesSchema = z.object({
   waterSaving: score, extraIncome: score, soilImprovement: score, erosionReduction: score, lowRisk: score,
-  currentCropId: z.string().min(1).optional(), waterAvailability: z.enum(["low", "medium", "high"]).optional(),
+  currentCropId: z.string().min(1).optional(),
+  /** El agricultor declara que hoy no tiene cultivo: el análisis no compara contra uno actual (ignora `currentCropId`) y propone tres puntos de partida. */
+  noCurrentCrop: z.boolean().optional(),
+  waterAvailability: z.enum(["low", "medium", "high"]).optional(),
   /** Altitud del lote declarada por el agricultor (m s. n. m.); permite corregir la temperatura de la celda de NASA POWER. */
   elevationMeters: z.number().finite().min(-500).max(6000).optional(),
   /** Pendiente media del lote declarada por el agricultor (%, 0–100); pondera el riesgo de erosión en ladera. */
