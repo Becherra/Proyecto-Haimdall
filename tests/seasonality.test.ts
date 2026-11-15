@@ -43,7 +43,8 @@ describe("computeSeasonality", () => {
   it("deja sin dato (y no seco) los meses que no aparecen en la serie", () => {
     const seasonality = computeSeasonality([month(2020, 1, 100, 20), month(2020, 2, 100, 20)]);
     expect(seasonality).toHaveLength(12);
-    expect(seasonOf(seasonality, 7)).toEqual({ month: 7, meanRainMm: null, meanBalanceMm: null, dry: false });
+    // Sin dato de lluvia ni de humedad: ni seco por lluvia ni suelo seco (la humedad ahora también se reporta, en null).
+    expect(seasonOf(seasonality, 7)).toEqual({ month: 7, meanRainMm: null, meanBalanceMm: null, dry: false, meanWetness: null, soilDry: false });
   });
 
   it("usa solo la regla de lluvia relativa cuando falta la evaporación", () => {

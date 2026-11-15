@@ -46,6 +46,12 @@ export const LOW_ATTRIBUTE_THRESHOLD = 2;
 /** Un mes es "seco" si llueve menos de esta fracción del promedio mensual del sitio (heurística de diseño, no dato NASA). */
 export const SEASON_DRY_RAIN_RATIO = 0.75;
 /**
+ * Un mes tiene el suelo "más seco de lo normal" si su humedad de zona radicular (GWETROOT) queda por debajo de esta fracción de la media anual del sitio.
+ * La humedad de NASA varía poco en el trópico húmedo (en el Eje Cafetero, de 0,75 a 0,85 durante el año), por eso el corte es fino.
+ * Heurística de diseño, no un dato; solo se muestra como evidencia y aviso, no entra al puntaje.
+ */
+export const SEASON_DRY_SOIL_RATIO = 0.97;
+/**
  * Zona donde vale el calendario de siembra del catálogo (`sowingMonths`): caja aproximada del Eje Cafetero
  * (Caldas, Risaralda, Quindío), de donde sale la fuente. Fuera de ella el calendario no se cruza con la lluvia.
  */
