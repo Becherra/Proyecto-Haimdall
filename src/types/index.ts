@@ -143,10 +143,31 @@ export const farmSchema = z.object({
 export type Farm = z.infer<typeof farmSchema>;
 export type FarmTerrain = z.infer<typeof terrainSchema>;
 
+/** Un mes del calendario estimado de una rotación: qué cultivo ocupa el lote (null = campo vacío) y si el mes es vulnerable. */
+export const rotationCalendarMonthSchema = z.object({
+  /** Meses transcurridos desde la primera siembra de la rotación (0 = mes de la primera siembra). */
+  offset: z.number().int().nonnegative(), month: z.number().int().min(1).max(12),
+  cropId: z.string().min(1).nullable(),
+  /** Mes seco según la estacionalidad del sitio; null si no hubo dato de lluvia para ese mes. */
+  dry: z.boolean().nullable(),
+  /** "water-stress": cultivo poco tolerante a sequía en mes seco; "bare-soil-rain": campo vacío en mes lluvioso (erosión). */
+  risk: z.enum(["water-stress", "bare-soil-rain"]).nullable(),
+});
+export type RotationCalendarMonth = z.infer<typeof rotationCalendarMonthSchema>;
+
+/** Calendario ilustrativo de un ciclo completo de la rotación, armado con los meses de siembra y ciclos típicos del catálogo. */
+export const rotationCalendarSchema = z.object({
+  months: z.array(rotationCalendarMonthSchema).min(1),
+  fallowMonths: z.number().int().nonnegative(), vulnerableMonths: z.number().int().nonnegative(),
+});
+export type RotationCalendar = z.infer<typeof rotationCalendarSchema>;
+
 export const rotationResultSchema = z.object({
   rotation: rotationSchema, score: z.number(), whySuggested: z.string().min(1), evidence: z.array(z.string().min(1)).min(1),
   benefits: z.array(z.string().min(1)).min(1), informationGaps: z.array(z.string().min(1)).min(1),
   risks: z.array(z.string().min(1)).min(1), validateWithLocalExpert: z.array(z.string().min(1)).min(1),
+  /** Ausente cuando no aplica el calendario de siembra del catálogo (fuera del Eje Cafetero) o no se pudo armar. */
+  calendar: rotationCalendarSchema.optional(),
 });
 export type RotationResult = z.infer<typeof rotationResultSchema>;
 
