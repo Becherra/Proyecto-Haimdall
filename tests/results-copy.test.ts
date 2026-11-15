@@ -217,12 +217,25 @@ describe("activeScenarioPreset y describeNasaSupport: simulador simple y respald
     expect(gentle.find((item) => item.id === "terrain")?.body).toContain("bastante parejo");
   });
 
-  it("explica las fuentes de la NASA con palabras sencillas", () => {
+  it("explica las fuentes reales de la NASA con palabras sencillas y sin siglas", () => {
+    const source = (id: string, name: string) => ({ id, name, provider: "NASA POWER", use: "Uso técnico" });
     const sources = describeSimpleSources([
-      { id: "power-climate", name: "NASA POWER", provider: "NASA", use: "Uso técnico" },
-      { id: "srtm", name: "SRTM", provider: "NASA", use: "Elevación" },
+      source("power-t2m", "Temperatura media a 2 m (T2M)"), source("power-t2m_min", "Temperatura mínima a 2 m (T2M_MIN)"), source("power-t2m_max", "Temperatura máxima a 2 m (T2M_MAX)"),
+      source("power-prectotcorr", "Precipitación corregida (PRECTOTCORR)"), source("power-evland", "Evaporación terrestre (EVLAND)"), source("power-gwetroot", "Humedad de la zona de raíces (GWETROOT)"),
+      source("power-allsky_sfc_sw_dwn", "Radiación solar en superficie (ALLSKY_SFC_SW_DWN)"), source("power-recent", "Clima de los últimos días"),
+      source("power-cell-elevation", "Altitud media de la celda"), source("terrain-srtm", "Altitud y pendiente del punto piloto más cercano"), source("crops-catalog", "Catálogo de cultivos (data/crops.json)"),
     ]);
-    expect(sources[0]?.title).toBe("Lluvias y sol de tu región");
-    expect(sources[1]?.title).toBe("Altura y loma del terreno");
+    expect(sources.map((item) => item.id)).toEqual(["temperature", "rain", "evaporation", "roots", "recent", "terrain", "crops"]);
+    expect(sources.map((item) => `${item.title} ${item.body}`).join(" ")).not.toMatch(/T2M|PRECTOTCORR|EVLAND|GWETROOT|ALLSKY|SRTM|\.json/);
+  });
+
+  it("usa la tarjeta de terreno declarado y conserva el nombre de una fuente desconocida", () => {
+    const sources = describeSimpleSources([
+      { id: "terrain-user", name: "Altitud y pendiente del lote", provider: "Agricultor", use: "Ajuste por altitud" },
+      { id: "otra-fuente", name: "Fuente nueva", provider: "X", use: "Uso nuevo" },
+    ]);
+    expect(sources.map((item) => item.id)).toEqual(["terrainUser", "otra-fuente"]);
+    expect(sources[1]).toMatchObject({ title: "Fuente nueva", body: "Uso nuevo" });
+    expect(describeSimpleSources()).toEqual([]);
   });
 });

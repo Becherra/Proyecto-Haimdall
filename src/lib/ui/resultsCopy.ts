@@ -291,14 +291,40 @@ export function describeNasaSupport({ indicators }: Pick<AnalysisResponse, "indi
   ];
 }
 
-const SIMPLE_SOURCES: Record<string, { title: string; body: string }> = {
-  "power-climate": { title: "Lluvias y sol de tu región", body: "Satélites de la NASA que anotan todos los días cuánto llovió, qué tanto calentó el sol y qué tan húmeda estuvo la tierra." },
-  "power-recent": { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
-  srtm: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu lote y si tiene mucha pendiente." },
-  "crops-catalog": { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo para darse bien." },
+type SimpleSourceCard = { title: string; body: string };
+
+/** Tarjetas sencillas por tema. Varias fuentes técnicas (p. ej. T2M, T2M_MIN, T2M_MAX) se cuentan como una sola tarjeta. */
+const SIMPLE_SOURCE_CARDS = {
+  temperature: { title: "Calor y frío de tu región", body: "Satélites de la NASA que anotan todos los días qué tan caliente y qué tan frío estuvo, para saber si hay riesgo de heladas o de calor fuerte." },
+  rain: { title: "Lluvias de tu región", body: "Satélites de la NASA que anotan todos los días cuánto llovió en tu zona, para saber en qué meses cae más agua." },
+  evaporation: { title: "Agua que se pierde por el sol", body: "Calculamos cuánta agua se evapora con el calor para saber si la lluvia alcanza para los cultivos." },
+  roots: { title: "Humedad de la tierra", body: "Medida desde el espacio de qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
+  recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
+  terrain: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu zona y si tiene mucha pendiente. Es de un punto cercano, no de tu lote exacto." },
+  terrainUser: { title: "Altura y loma que tú contaste", body: "La altura y la inclinación de tu lote vienen de lo que tú nos dijiste." },
+  crops: { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo. Son datos de partida: conviene revisarlos con un técnico de tu zona." },
+} as const satisfies Record<string, SimpleSourceCard>;
+
+type SimpleSourceCardId = keyof typeof SIMPLE_SOURCE_CARDS;
+
+/** Id de la fuente técnica (ver `listDataSources`) → tarjeta sencilla. La radiación solar no se muestra: todavía no interviene en los puntajes. */
+const SOURCE_TO_CARD: Record<string, SimpleSourceCardId | null> = {
+  "power-t2m": "temperature", "power-t2m_min": "temperature", "power-t2m_max": "temperature",
+  "power-prectotcorr": "rain", "power-evland": "evaporation", "power-gwetroot": "roots",
+  "power-allsky_sfc_sw_dwn": null,
+  "power-recent": "recent", "power-cell-elevation": "terrain", "terrain-srtm": "terrain", "terrain-user": "terrainUser",
+  "crops-catalog": "crops",
 };
 
-/** Explica cada fuente de datos sin siglas ni palabras de ingeniero. */
+/** Explica cada fuente de datos sin siglas ni palabras de ingeniero; las fuentes desconocidas conservan su nombre y uso originales. */
 export function describeSimpleSources(sources: readonly DataSource[] = []): { id: string; title: string; body: string }[] {
-  return sources.map((source) => ({ id: source.id, ...(SIMPLE_SOURCES[source.id] ?? { title: source.name, body: source.use }) }));
+  const seen = new Set<string>();
+  return sources.flatMap((source) => {
+    const cardId = SOURCE_TO_CARD[source.id];
+    if (cardId === null) return [];
+    const id = cardId ?? source.id;
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, ...(cardId ? SIMPLE_SOURCE_CARDS[cardId] : { title: source.name, body: source.use }) }];
+  });
 }

@@ -44,12 +44,15 @@ function Stars({ score }: { score: number }) {
   </span>;
 }
 
-function changePhrase(current: number, base: number | undefined): { text: string; tone: string } | null {
-  if (base === undefined) return null;
+/** Los ids de rotación son "ranuras" (p. ej. "legume"): con otro clima la misma ranura puede traer otro camino, así que también se comparan los cultivos. */
+const sameRotation = (a: RotationResult, b: RotationResult) => a.rotation.id === b.rotation.id && a.rotation.cropIds.join(",") === b.rotation.cropIds.join(",");
+
+function changePhrase(current: number, base: number | undefined): { text: string; tone: string } {
+  if (base === undefined) return { text: "Este camino aparece con este clima: no estaba entre los 3 con clima normal", tone: "text-cream" };
   const diff = scoreToStars(current) - scoreToStars(base);
-  if (diff > 0) return { text: "Aguanta mejor que los demás con este clima", tone: "text-olive-light" };
-  if (diff < 0) return { text: "Sufre más si viene este clima", tone: "text-clay-light" };
-  return { text: "Se mantiene firme con este clima", tone: "text-silver-mist" };
+  if (diff > 0) return { text: "Con este clima le va mejor que con el normal", tone: "text-olive-light" };
+  if (diff < 0) return { text: "Con este clima le va peor que con el normal", tone: "text-clay-light" };
+  return { text: "Con este clima le va igual que con el normal", tone: "text-silver-mist" };
 }
 
 function VisualRotationCard({ result, base, best, showChange }: { result: RotationResult; base: RotationResult | undefined; best: boolean; showChange: boolean }) {
@@ -114,7 +117,7 @@ export default function AnalysisDashboard({ farm, response, baseline, mockMode, 
       </section>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {response.rotations.map((result, index) => <VisualRotationCard key={result.rotation.id} result={result} base={baseline.rotations.find((item) => item.rotation.id === result.rotation.id)} best={index === bestIndex} showChange={showChange} />)}
+        {response.rotations.map((result, index) => <VisualRotationCard key={result.rotation.id} result={result} base={baseline.rotations.find((item) => sameRotation(item, result))} best={index === bestIndex} showChange={showChange} />)}
       </div>
 
       <h2 data-reveal className="mt-2 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="calendar" className="h-8 w-8 text-olive-light" />Lo que ha vivido tu zona</h2>
