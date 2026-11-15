@@ -162,12 +162,21 @@ export const rotationCalendarSchema = z.object({
 });
 export type RotationCalendar = z.infer<typeof rotationCalendarSchema>;
 
+/** Versión en lenguaje simple de los textos de una rotación, pensada para quien lee poco; los campos técnicos de `RotationResult` se conservan. */
+export const rotationPlainSchema = z.object({
+  why: z.string().min(1), benefits: z.array(z.string().min(1)).min(1), risks: z.array(z.string().min(1)).min(1),
+  gaps: z.array(z.string().min(1)).min(1), validate: z.array(z.string().min(1)).min(1),
+});
+export type RotationPlain = z.infer<typeof rotationPlainSchema>;
+
 export const rotationResultSchema = z.object({
   rotation: rotationSchema, score: z.number(), whySuggested: z.string().min(1), evidence: z.array(z.string().min(1)).min(1),
   benefits: z.array(z.string().min(1)).min(1), informationGaps: z.array(z.string().min(1)).min(1),
   risks: z.array(z.string().min(1)).min(1), validateWithLocalExpert: z.array(z.string().min(1)).min(1),
   /** Ausente cuando no aplica el calendario de siembra del catálogo (fuera del Eje Cafetero) o no se pudo armar. */
   calendar: rotationCalendarSchema.optional(),
+  /** Mismos temas en palabras simples (sin cifras técnicas). Ausente en respuestas antiguas: la interfaz usa entonces los textos técnicos. */
+  plain: rotationPlainSchema.optional(),
 });
 export type RotationResult = z.infer<typeof rotationResultSchema>;
 
