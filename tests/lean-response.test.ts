@@ -7,6 +7,10 @@ import { listDataSources } from "../src/lib/dataSources";
 import { clearClimateCache } from "../src/lib/nasaPower";
 import { analysisResponseSchema, CLIMATE_PARAMETERS, type ClimateRecord, type ClimateResult, type Indicators, type UserPriorities } from "../src/types";
 
+
+// El terreno en vivo llama a otro servicio con el mismo fetch global: aquí se apaga para que estos tests solo cuenten las llamadas a NASA POWER.
+vi.mock("../src/lib/terrainLive", () => ({ fetchLiveTerrain: vi.fn().mockResolvedValue(null), clearLiveTerrainCache: vi.fn() }));
+
 const PEREIRA = { lat: 4.8133, lon: -75.6961 };
 const EQUAL: UserPriorities = { waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3 };
 const record = (date: string): ClimateRecord => ({ date, T2M: 20, T2M_MIN: 14, T2M_MAX: 27, PRECTOTCORR: 6, EVLAND: 3, GWETROOT: 0.7, ALLSKY_SFC_SW_DWN: 15 });

@@ -59,8 +59,12 @@ export const indicatorsSchema = z.object({
   siteElevationMeters: z.number().finite().optional(),
   /** Pendiente media del lote (%, SRTM o declarada) para evaluar erosión en ladera. */
   slopePercent: z.number().finite().min(0).max(100).optional(),
-  /** Origen de los datos de terreno del lote: muestra precargada de NASA SRTM ("srtm-sample") o declarados por el usuario ("user"). */
-  terrainSource: z.enum(["srtm-sample", "user"]).optional(),
+  /** Origen de los datos de terreno del lote: NASA SRTM medido en vivo ("srtm-live"), muestra precargada de NASA SRTM ("srtm-sample") o declarados por el usuario ("user"). */
+  terrainSource: z.enum(["srtm-live", "srtm-sample", "user"]).optional(),
+  /** Menor y mayor pendiente (%) entre las celdas medidas; solo con `terrainSource: "srtm-live"`. La pendiente varía mucho en pocos metros, el promedio no lo dice. */
+  slopeRangePercent: z.tuple([z.number().min(0), z.number().min(0)]).optional(),
+  /** Lado (m) de la celda con que se midió la pendiente en vivo: 30 m en lotes chicos, más grueso en lotes grandes, donde la pendiente sale suavizada. */
+  terrainCellMeters: z.number().positive().optional(),
   /** Racha más larga de días secos seguidos (lluvia menor que el umbral de día seco) en toda la serie. */
   longestDrySpellDays: z.number().int().nonnegative().optional(),
   /** Promedio, entre los años con dato suficiente, de la racha seca más larga de cada año (días). */

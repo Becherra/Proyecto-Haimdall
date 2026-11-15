@@ -7,7 +7,10 @@ export type TerrainIndicatorsInput = {
   cellElevationMeters?: number;
   siteElevationMeters?: number;
   slopePercent?: number;
-  terrainSource?: "srtm-sample" | "user";
+  terrainSource?: "srtm-live" | "srtm-sample" | "user";
+  /** Solo con `srtm-live`: menor y mayor pendiente entre las celdas medidas, y lado de la celda (m). */
+  slopeRangePercent?: [number, number];
+  terrainCellMeters?: number;
 };
 
 type NumericParameter = ClimateParameter;
@@ -258,6 +261,8 @@ export function computeIndicators(rawRecords: readonly ClimateRecord[], latitude
     ...(terrain?.siteElevationMeters === undefined ? {} : { siteElevationMeters: terrain.siteElevationMeters }),
     ...(terrain?.slopePercent === undefined ? {} : { slopePercent: terrain.slopePercent }),
     ...(terrain?.terrainSource === undefined ? {} : { terrainSource: terrain.terrainSource }),
+    ...(terrain?.slopeRangePercent === undefined ? {} : { slopeRangePercent: terrain.slopeRangePercent }),
+    ...(terrain?.terrainCellMeters === undefined ? {} : { terrainCellMeters: terrain.terrainCellMeters }),
     missingByParameter: Object.fromEntries(CLIMATE_PARAMETERS.map((name) => [name, validValues(records, name).missing])),
     waterBalanceMethod: latitude === undefined ? "evland" : "potential",
   };

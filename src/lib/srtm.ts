@@ -81,14 +81,22 @@ export function meanElevationAt(tile: HgtTile, lat: number, lon: number, radiusC
   return average(cells.flatMap(({ row, col }) => { const value = heightAt(tile, row, col); return value === null ? [] : [value]; }));
 }
 
-/** Pendiente de Horn en una celda (%, metros de desnivel por cada 100 m); null si falta algún vecino o hay un vacío en sus 3×3. */
-function hornSlopePercent(tile: HgtTile, row: number, col: number, cellEastWestMeters: number, cellNorthSouthMeters: number): number | null {
-  const around = [-1, 0, 1].map((dr) => [-1, 0, 1].map((dc) => heightAt(tile, row + dr, col + dc)));
-  if (around.some((line) => line.some((value) => value === null))) return null;
-  const [[a, b, c], [d, , f], [g, h, i]] = around as number[][];
+/**
+ * Pendiente de Horn (%, metros de desnivel por cada 100 m) de una ventana 3×3 de alturas (fila 0 al norte, columna 0 al oeste);
+ * null si algún valor de la ventana es un vacío. Sirve igual para un tile .hgt que para una malla de alturas consultada a un servicio.
+ */
+export function hornSlopeFromWindow(window: ReadonlyArray<ReadonlyArray<number | null>>, cellEastWestMeters: number, cellNorthSouthMeters: number): number | null {
+  if (window.some((line) => line.some((value) => value === null))) return null;
+  const [[a, b, c], [d, , f], [g, h, i]] = window as number[][];
   const gradientEast = ((c + 2 * f + i) - (a + 2 * d + g)) / (8 * cellEastWestMeters);
   const gradientSouth = ((g + 2 * h + i) - (a + 2 * b + c)) / (8 * cellNorthSouthMeters);
   return 100 * Math.hypot(gradientEast, gradientSouth);
+}
+
+/** Pendiente de Horn en una celda del tile; null si falta algún vecino o hay un vacío en sus 3×3. */
+function hornSlopePercent(tile: HgtTile, row: number, col: number, cellEastWestMeters: number, cellNorthSouthMeters: number): number | null {
+  const around = [-1, 0, 1].map((dr) => [-1, 0, 1].map((dc) => heightAt(tile, row + dr, col + dc)));
+  return hornSlopeFromWindow(around, cellEastWestMeters, cellNorthSouthMeters);
 }
 
 /**

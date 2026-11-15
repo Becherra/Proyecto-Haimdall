@@ -62,6 +62,16 @@ export const STEEP_SLOPE_REFERENCE_PERCENT = 30;
 export const EROSIVE_RAIN_REFERENCE_MM = 25;
 /** Penalización máxima (escala 0–5) para una rotación sin cobertura en una ladera empinada con aguaceros fuertes. */
 export const MAX_SLOPE_EROSION_PENALTY = 0.75;
+/**
+ * Altitud y pendiente medidas en vivo con NASA SRTM (30 m) a través de OpenTopoData, que acepta hasta 100 puntos por consulta. Parámetros de operación, no datos:
+ * - `cellMeters`: separación de la malla; 30 m es la resolución nativa de SRTM.
+ * - `pointGridSize`: malla de 9×9 puntos = 7×7 celdas con los ocho vecinos (~210 m), la misma ventana que usan las muestras precargadas.
+ * - `polygonGridSize`: 10×10 = 100 puntos (el máximo por consulta) repartidos sobre el lote; si el lote es grande la celda crece y la pendiente sale más suavizada.
+ * - `minCells`: celdas con dato mínimas para fiarse del promedio.
+ * - `cacheTtlMs` y `cacheMaxEntries`: el relieve no cambia, pero el servicio público limita el uso (1 consulta por segundo, 1000 al día).
+ * - `timeoutMs`: tope de espera; el análisis no debe depender de un servicio gratuito.
+ */
+export const LIVE_TERRAIN = { cellMeters: 30, pointGridSize: 9, polygonGridSize: 10, minCells: 3, cacheTtlMs: 7 * 24 * 60 * 60 * 1000, cacheMaxEntries: 200, timeoutMs: 5000 } as const;
 
 /** Días por mes para pasar el ciclo de un cultivo (días) a meses de ocupación del lote en el calendario de la rotación. */
 export const CALENDAR_DAYS_PER_MONTH = 30;
