@@ -14,9 +14,9 @@ const ParticleLoading = () => <div className="particle-loading pointer-events-no
 const ParticleWorld = dynamic(() => import("../components/ParticleWorld"), { ssr: false, loading: ParticleLoading });
 
 const subscribePreview = () => () => {};
+const getDebugMode = () => new URLSearchParams(window.location.search).get("debug") === "1";
 export default function Home() {
   const [flow, dispatch] = useReducer(locationFlowReducer, initialLocationFlow);
-  const [mapLocation, setMapLocation] = useState<LocationResult | null>(null);
   // Arranca en "scatter" para que el globo real NO parpadee antes de la intro.
   const [introStage, setIntroStage] = useState<HeroIntroStage>("scatter");
   const introStageRef = useRef<HeroIntroStage>("scatter");
@@ -24,6 +24,7 @@ export default function Home() {
   const introFrame = useRef(0);
   const globeAnchor = useRef<HTMLDivElement>(null);
   const particlesPreview = useSyncExternalStore(subscribePreview, () => new URLSearchParams(window.location.search).get("particles") === "1", () => false);
+  const debugMode = useSyncExternalStore(subscribePreview, getDebugMode, () => false);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [webglAvailable] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -78,11 +79,11 @@ export default function Home() {
     const delay = flow.status === "flying" ? (instant ? 0 : 1800) : (instant ? 0 : 500);
     const timer = window.setTimeout(() => dispatch({ type: "vueloTerminado", instantaneo: instant }), delay);
     return () => window.clearTimeout(timer);
-  }, [flow.status, reducedMotion, webglAvailable]);
+  }, [flow.location, flow.status, reducedMotion, webglAvailable]);
 
-  const onLocationSelected = (selected: LocationResult) => { setMapLocation(null); dispatch({ type: "buscar", location: selected }); };
-  const onGpsLocationSelected = (selected: LocationResult, accuracyMeters: number) => { setMapLocation(null); dispatch({ type: "gpsOk", location: selected, accuracyMeters }); };
-  const onBackToGlobe = () => { setMapLocation(null); dispatch({ type: "volver" }); };
+  const onLocationSelected = (selected: LocationResult) => { dispatch({ type: "buscar", location: selected }); };
+  const onGpsLocationSelected = (selected: LocationResult, accuracyMeters: number) => { dispatch({ type: "gpsOk", location: selected, accuracyMeters }); };
+  const onBackToGlobe = () => { dispatch({ type: "volver" }); };
   const globeFading = flow.status === "transitioning";
   const introIsEarly = introStage === "scatter" || introStage === "gather" || introStage === "hold";
   const globeIntroOpacity = particlesPreview
@@ -115,7 +116,7 @@ export default function Home() {
       <footer className="order-4 mt-2 space-y-1 text-center text-xs text-ash-gray lg:col-span-2"><p>© Colaboradores de OpenStreetMap</p><p>Imagen: NASA Blue Marble, con tratamiento de color propio</p></footer>
     </section> : <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
       <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-saffron-spark">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
-      {location && <MapScene location={mapLocation ?? location} gpsAccuracyMeters={gpsAccuracyMeters} onLocationSelected={setMapLocation} onBack={onBackToGlobe} onConfirmed={() => dispatch({ type: "confirmar" })} />}
+      {location && <MapScene key={`${location.lat}:${location.lon}:${gpsAccuracyMeters ?? "search"}`} location={location} gpsAccuracyMeters={gpsAccuracyMeters} onBack={onBackToGlobe} debugMode={debugMode} onFarmConfirmed={() => dispatch({ type: "confirmar" })} />}
     </section>}
   </main>;
 }
