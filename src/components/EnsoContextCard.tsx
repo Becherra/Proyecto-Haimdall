@@ -20,12 +20,12 @@ export default function EnsoContextCard({ season }: { season?: CurrentSeason }) 
         </span>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-cream">Contexto climático · ENSO</p>
-          <h3 id="enso-context-title" className="mt-1 text-xl font-bold text-bone-white">El Niño está presente</h3>
+          <h3 id="enso-context-title" className="mt-1 text-xl font-bold text-bone-white">El Niño está activo</h3>
         </div>
       </div>
       <span className="rounded-full border border-olive-light/40 px-3 py-1 text-sm text-silver-mist">Boletín: 12 nov 2026</span>
     </div>
-    <p className="mt-4 text-base leading-6 text-silver-mist">El IDEAM reporta 61 % de probabilidad de que persista hasta mayo de 2027 y 79 % de que su intensidad baje de muy fuerte a fuerte entre enero y marzo.</p>
+    <p className="mt-4 text-base leading-6 text-silver-mist">El IDEAM prevé que el fenómeno podría continuar hasta mayo de 2027 y debilitarse durante los primeros meses del año.</p>
     <p className="mt-2 text-sm leading-5 text-ash-gray">Es contexto nacional del fenómeno, no un pronóstico ni una medición de riesgo para esta finca. Sus efectos cambian según la región, la época y el cultivo.</p>
     <div className="mt-4 rounded-2xl border border-olive/40 bg-meadow/40 p-3" aria-live="polite">
       <p className="text-xs font-bold uppercase tracking-wider text-olive-light">Señal reciente en esta ubicación · NASA POWER</p>
@@ -37,6 +37,7 @@ export default function EnsoContextCard({ season }: { season?: CurrentSeason }) 
       </> : <p className="mt-1 text-sm leading-5 text-silver-mist">No hay observación reciente suficiente para esta ubicación; el contexto ENSO no permite inferir por sí solo el riesgo de la finca.</p>}
       <p className="mt-1 text-xs text-ash-gray">Es una observación climática regional reciente, no un pronóstico ni una medición del lote.</p>
     </div>
+    <p className="mt-4 rounded-xl border border-cream/20 p-3 text-sm leading-5 text-silver-mist">El fenómeno no afecta igual a todas las zonas. Para saber qué se espera cerca de tu finca, debemos revisar el pronóstico regional del IDEAM; la señal de lluvia de arriba muestra lo que ya pasó, no lo que va a pasar.</p>
     <a href={IDEAM_UPDATE_URL} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-cream/50 px-4 text-sm font-semibold text-cream underline-offset-4 hover:underline focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50">Consultar fuente oficial del IDEAM<span className="sr-only"> (abre en una pestaña nueva)</span></a>
   </article>;
 }
