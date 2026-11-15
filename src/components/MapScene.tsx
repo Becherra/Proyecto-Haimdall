@@ -134,10 +134,10 @@ function Hand({ fingers }: { fingers: 1 | 2 }) {
       </linearGradient>
     </defs>
     {fingers === 1 ? <Finger /> : (
-      // Dos dedos abiertos en "<" (índice y medio separados), apuntando en la dirección del arrastre.
+      // Dos dedos independientes (separados también en la base), ligeramente abiertos, apuntando en la dirección del arrastre.
       <g transform="rotate(45)">
-        <g transform="rotate(-20 0 30)"><Finger /></g>
-        <g transform="rotate(20 0 30)"><Finger /></g>
+        <g transform="rotate(-12 -10 30)"><Finger x={-10} /></g>
+        <g transform="rotate(12 10 30)"><Finger x={10} /></g>
       </g>
     )}
   </g>;
@@ -166,7 +166,7 @@ function LassoTutorial() {
         <path d={drag} fill="none" stroke="rgb(234 211 157 / 0.6)" strokeWidth="3" strokeDasharray="1 5" strokeLinecap="round" />
         <path d="M 62 22 L 72 22 L 72 32" fill="none" stroke="#EAD39D" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         <g className="lasso-tutorial-finger">
-          <g transform="rotate(45)"><circle r="7" cx="-10.3" cy="1.8" fill="#EAD39D" opacity="0.35" /><circle r="7" cx="10.3" cy="1.8" fill="#EAD39D" opacity="0.35" /></g>
+          <g transform="rotate(45)"><circle r="7" cx="-16.2" cy="0.7" fill="#EAD39D" opacity="0.35" /><circle r="7" cx="16.2" cy="0.7" fill="#EAD39D" opacity="0.35" /></g>
           <Hand fingers={2} />
           <animateMotion dur="2s" repeatCount="indefinite" path={drag} calcMode="linear" keyPoints="0;1;1" keyTimes="0;0.7;1" />
         </g>
