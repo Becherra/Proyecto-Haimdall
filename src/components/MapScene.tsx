@@ -114,6 +114,29 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
   return trail.length > 1 ? <Polyline positions={trail} pathOptions={{ color: "#EAD39D", weight: 5, opacity: 0.95 }} /> : null;
 }
 
+/** Un dedo con la yema en (0,0) apuntando hacia arriba: cilindro suave que se desvanece hacia abajo, con uña. */
+function Finger({ x = 0, tipY = 0 }: { x?: number; tipY?: number }) {
+  const length = 30;
+  return <g transform={`translate(${x} ${tipY})`}>
+    <path d={`M -4 5 C -4 -1.2 -2.3 -3 0 -3 C 2.3 -3 4 -1.2 4 5 L 4.4 ${length} L -4.4 ${length} Z`} fill="url(#finger-fade)" />
+    <path d="M -2.3 4 C -2.3 0.6 -1.4 -0.8 0 -0.8 C 1.4 -0.8 2.3 0.6 2.3 4 C 1 5.2 -1 5.2 -2.3 4 Z" fill="#FFFFFF" opacity="0.55" />
+  </g>;
+}
+
+/** Solo los dedos (sin palma): 1 dedo para dibujar el lazo, 2 dedos para mover el mapa. */
+function Hand({ fingers }: { fingers: 1 | 2 }) {
+  return <g>
+    <defs>
+      <linearGradient id="finger-fade" gradientUnits="userSpaceOnUse" x1="0" y1="-3" x2="0" y2="30">
+        <stop offset="0" stopColor="#F8EFD2" />
+        <stop offset="0.55" stopColor="#EAD39D" stopOpacity="0.9" />
+        <stop offset="1" stopColor="#EAD39D" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    {fingers === 1 ? <Finger /> : <><Finger x={-5.2} /><Finger x={5.2} tipY={-3} /></>}
+  </g>;
+}
+
 /** Tutorial solo visual, en dos pasos: 1) un dedo rodea el terreno; 2) dos dedos mueven el mapa. */
 function LassoTutorial() {
   const [step, setStep] = useState(0);
@@ -121,25 +144,25 @@ function LassoTutorial() {
     const timer = window.setTimeout(() => setStep(1), TUTORIAL_STEP_MS);
     return () => window.clearTimeout(timer);
   }, []);
-  const loop = "M 28 58 C 22 34, 52 20, 72 32 C 90 44, 80 74, 56 78 C 38 81, 30 70, 28 58 Z";
-  const drag = "M 38 62 L 66 38";
-  return <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-meadow/35" aria-hidden="true">
-    <svg viewBox="0 0 100 100" className="h-3/4 max-h-80 w-3/4 max-w-80">
+  const loop = "M 28 50 C 22 28, 52 16, 72 27 C 90 38, 80 66, 56 70 C 38 73, 30 62, 28 50 Z";
+  const drag = "M 34 56 L 70 24";
+  return <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-meadow/45" aria-hidden="true">
+    <svg viewBox="0 0 100 100" className="h-3/4 max-h-96 w-3/4 max-w-96 overflow-visible">
       {step === 0 ? <g key="lasso">
-        <path d={loop} fill="none" stroke="rgb(234 211 157 / 0.25)" strokeWidth="2" strokeDasharray="1 3" strokeLinecap="round" />
-        <path className="lasso-tutorial-stroke" d={loop} fill="rgb(234 211 157 / 0.18)" stroke="#EAD39D" strokeWidth="3" strokeLinecap="round" pathLength="1" />
+        <path d={loop} fill="none" stroke="rgb(234 211 157 / 0.3)" strokeWidth="2" strokeDasharray="1 3" strokeLinecap="round" />
+        <path className="lasso-tutorial-stroke" d={loop} fill="rgb(234 211 157 / 0.2)" stroke="#EAD39D" strokeWidth="3.5" strokeLinecap="round" pathLength="1" />
         <g className="lasso-tutorial-finger">
           <circle r="7" fill="#EAD39D" opacity="0.35" />
-          <circle r="3.5" fill="#EAD39D" />
+          <Hand fingers={1} />
           <animateMotion dur="2.6s" repeatCount="indefinite" path={loop} />
         </g>
       </g> : <g key="pan">
-        <path d={drag} fill="none" stroke="rgb(234 211 157 / 0.5)" strokeWidth="2.5" strokeDasharray="1 4" strokeLinecap="round" />
-        <path d="M 60 36 L 68 36 L 68 44" fill="none" stroke="#EAD39D" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={drag} fill="none" stroke="rgb(234 211 157 / 0.6)" strokeWidth="3" strokeDasharray="1 5" strokeLinecap="round" />
+        <path d="M 62 22 L 72 22 L 72 32" fill="none" stroke="#EAD39D" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         <g className="lasso-tutorial-finger">
-          <g><circle r="7" fill="#EAD39D" opacity="0.35" /><circle r="3.5" fill="#EAD39D" /></g>
-          <g transform="translate(15 6)"><circle r="7" fill="#EAD39D" opacity="0.35" /><circle r="3.5" fill="#EAD39D" /></g>
-          <animateMotion dur="1.5s" repeatCount="indefinite" path={drag} />
+          <circle r="7" cx="-5.2" fill="#EAD39D" opacity="0.35" /><circle r="7" cx="5.2" cy="-3" fill="#EAD39D" opacity="0.35" />
+          <Hand fingers={2} />
+          <animateMotion dur="2s" repeatCount="indefinite" path={drag} calcMode="linear" keyPoints="0;1;1" keyTimes="0;0.7;1" />
         </g>
       </g>}
     </svg>
@@ -155,6 +178,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
   const [initialEditor] = useState(() => createTerrainEditor(location, gpsAccuracyMeters === undefined ? "search" : "gps", gpsAccuracyMeters));
   const [editor, dispatch] = useReducer(terrainEditorReducer, initialEditor);
   const [showTutorial, setShowTutorial] = useState(true);
+  const [tutorialRun, setTutorialRun] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const status = getTerrainEditorStatus(editor);
   const draft = editor.location;
@@ -163,14 +187,14 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
   useEffect(() => {
     const timer = window.setTimeout(() => setShowTutorial(false), TUTORIAL_MS);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [tutorialRun]);
 
   const onLasso = (points: [number, number][] | null) => {
     if (!points) { setMessage("Rodea todo tu terreno con el dedo"); return; }
     setMessage(null);
     dispatch({ type: "set-polygon", points });
   };
-  const reset = () => { dispatch({ type: "reset", initial: initialEditor }); setMessage(null); setShowTutorial(true); };
+  const reset = () => { dispatch({ type: "reset", initial: initialEditor }); setMessage(null); setShowTutorial(true); setTutorialRun((run) => run + 1); };
   const confirm = () => {
     const candidate = buildFarmFromEditor(editor);
     const result = candidate ? validateFarmDraft(candidate) : null;
@@ -189,7 +213,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
         <Marker position={[draft.lat, draft.lon]} icon={pinIcon} draggable={!isPolygon} eventHandlers={{ dragend: (event) => { const point = (event.target as L.Marker).getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draft.label), locationSource: "map" }); } }} title="Tu finca" />
       </MapContainer>
       <div className="pointer-events-none absolute left-3 top-3 z-[600] rounded-full bg-meadow/85 px-3 py-1.5 backdrop-blur"><Logo variant="horizontal" size={36} /></div>
-      {showTutorial && <LassoTutorial />}
+      {showTutorial && <LassoTutorial key={tutorialRun} />}
       {shownMessage && <p className="pointer-events-none absolute inset-x-4 top-16 z-[600] rounded-2xl bg-meadow/90 px-4 py-3 text-center text-base font-semibold text-cream" role="status">{shownMessage}</p>}
     </div>
     <div className="flex flex-1 items-center gap-3 px-4 pb-[env(safe-area-inset-bottom)]">
