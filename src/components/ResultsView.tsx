@@ -1,7 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { prefersReducedMotion, useReveal } from "./motion";
 import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
@@ -10,7 +13,7 @@ import { bestRotationIndex, climateTopicSpeechItems, describeClimate, isCurrentR
 import type { ClimateTopicId, RotationSection } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, Farm, RotationResult } from "../types";
 
-const FarmMiniMap = dynamic(() => import("./FarmMiniMap"), { ssr: false, loading: () => <div className="h-full w-full bg-spruce" aria-hidden="true" /> });
+const FarmMiniMap = dynamic(() => import("./FarmMiniMap"), { ssr: false, loading: () => <div className="h-full w-full bg-moss" aria-hidden="true" /> });
 
 type ResultsViewProps = { farm: Farm; response: AnalysisResponse; onEditPriorities: () => void; onChangeFarm: () => void; onShowTechnical: () => void };
 
@@ -28,27 +31,32 @@ function PlayButton({ playing, onClick, size = "small" }: PlayProps) {
 
 function Stars({ score, className = "h-7 w-7" }: { score: number; className?: string }) {
   const full = scoreToStars(score);
-  return <span className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
-    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "" : "opacity-25"}><UiIcon name="star" className={className} /></span>)}
+  const stars = useRef<HTMLSpanElement>(null);
+  useGSAP(() => {
+    if (prefersReducedMotion()) return;
+    gsap.from(".star-on", { scale: 0, rotation: -40, duration: 0.55, ease: "back.out(2.6)", stagger: 0.11, delay: 0.35, clearProps: "transform" });
+  }, { scope: stars });
+  return <span ref={stars} className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
+    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "star-on" : "opacity-25"}><UiIcon name="star" className={className} /></span>)}
   </span>;
 }
 
 function CropChain({ cropIds, className = "h-14 w-14" }: { cropIds: readonly string[]; className?: string }) {
-  return <span className="flex items-center gap-1 text-bone-white" aria-hidden="true">
-    {cropIds.map((id, index) => <Fragment key={`${id}-${index}`}>{index > 0 && <UiIcon name="arrow" className="h-6 w-6 text-cream/60" />}<CropIcon id={id} className={className} /></Fragment>)}
+  return <span className="flex items-center gap-1 text-olive-light" aria-hidden="true">
+    {cropIds.map((id, index) => <Fragment key={`${id}-${index}`}>{index > 0 && <UiIcon name="arrow" className="h-6 w-6 text-olive-light/50" />}<CropIcon id={id} className={className} /></Fragment>)}
   </span>;
 }
 
 function Badges({ result, best }: { result: RotationResult; best: boolean }) {
   const chip = "flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold";
   return <div className="flex flex-wrap gap-2">
-    {isCurrentRotation(result) && <span className={`${chip} bg-bone-white/15 text-bone-white`}><UiIcon name="field" className="h-5 w-5" />Hoy</span>}
+    {isCurrentRotation(result) && <span className={`${chip} bg-olive text-bone-white`}><UiIcon name="field" className="h-5 w-5" />Hoy</span>}
     {best && <span className={`${chip} bg-cream text-meadow`}><UiIcon name="star" className="h-5 w-5" />Mejor</span>}
   </div>;
 }
 
 function RotationCard({ result, best, onOpen }: { result: RotationResult; best: boolean; onOpen: () => void }) {
-  return <button type="button" onClick={onOpen} className={`flex w-full flex-col gap-3 rounded-3xl border-2 bg-spruce p-4 text-left transition hover:border-cream focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 ${best ? "border-cream" : "border-olive/50"}`}>
+  return <button type="button" data-reveal onClick={onOpen} className={`flex w-full flex-col gap-3 rounded-3xl border-2 bg-moss card-surface p-4 text-left transition-colors hover:border-cream focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 ${best ? "border-cream" : "border-olive/50"}`}>
     <div className="flex items-start justify-between gap-2"><Badges result={result} best={best} /><UiIcon name="arrow" className="h-7 w-7 shrink-0 text-cream" /></div>
     <CropChain cropIds={result.rotation.cropIds} />
     <p className="text-lg font-bold text-bone-white">{result.rotation.name}</p>
@@ -56,19 +64,31 @@ function RotationCard({ result, best, onOpen }: { result: RotationResult; best: 
   </button>;
 }
 
+/** Cuerpo del acordeón: se despliega con altura animada y los textos entran en cascada. */
+function AccordionBody({ texts }: { texts: readonly string[] }) {
+  const body = useRef<HTMLDivElement>(null);
+  useGSAP(() => {
+    if (prefersReducedMotion()) return;
+    gsap.from(body.current, { height: 0, opacity: 0, duration: 0.4, ease: "power2.out", clearProps: "height,opacity" });
+    gsap.from(body.current?.querySelectorAll("li") ?? [], { opacity: 0, x: -14, duration: 0.45, stagger: 0.08, delay: 0.1, ease: "power2.out", clearProps: "opacity,transform" });
+  }, { scope: body });
+  return <div ref={body} className="overflow-hidden"><ul className="space-y-2 px-4 pb-4 text-lg leading-7 text-bone-white">{texts.map((text) => <li key={text}>{text}</li>)}</ul></div>;
+}
+
 function RotationDetail({ result, best, onClose }: { result: RotationResult; best: boolean; onClose: () => void }) {
   const { playingKey, play, stop } = useSpeaker();
   const [openId, setOpenId] = useState<RotationSection["id"] | null>(null);
   const key = `rotation-${result.rotation.id}`;
   const close = () => { stop(); onClose(); };
-  return <section className="fixed inset-0 z-50 overflow-y-auto bg-meadow" aria-label={result.rotation.name}>
+  const reveal = useReveal<HTMLElement>();
+  return <section ref={reveal} className="fixed inset-0 z-50 overflow-y-auto bg-scene" aria-label={result.rotation.name}>
     <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-10 pt-4">
       <div className="flex items-center justify-between">
         <button type="button" onClick={close} aria-label="Volver" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><UiIcon name="back" className="h-8 w-8" /></button>
         <Logo variant="mark" size={44} />
       </div>
-      <PlayButton size="big" playing={playingKey === key} onClick={() => play(key, rotationSpeechItems(result))} />
-      <div className="flex flex-col gap-3 rounded-3xl border-2 border-olive/50 bg-spruce p-4">
+      <div data-reveal><PlayButton size="big" playing={playingKey === key} onClick={() => play(key, rotationSpeechItems(result))} /></div>
+      <div data-reveal className="flex flex-col gap-3 rounded-3xl border-2 border-olive/50 bg-moss card-surface p-4">
         <Badges result={result} best={best} />
         <CropChain cropIds={result.rotation.cropIds} />
         <p className="text-xl font-bold text-bone-white">{result.rotation.name}</p>
@@ -77,13 +97,13 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
       <div className="flex flex-col gap-3">
         {rotationSections(result).map((section) => {
           const isOpen = openId === section.id;
-          return <article key={section.id} className={`rounded-3xl border bg-spruce transition ${isOpen ? "border-cream" : "border-olive/40"}`}>
+          return <article key={section.id} data-reveal className={`rounded-3xl border bg-moss card-surface transition-colors ${isOpen ? "border-cream" : "border-olive/40"}`}>
             <button type="button" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : section.id)} className="flex min-h-20 w-full items-center gap-4 rounded-3xl px-4 text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50">
-              <UiIcon name={SECTION_ICONS[section.id]} className="h-10 w-10 shrink-0 text-cream" />
+              <UiIcon name={SECTION_ICONS[section.id]} className="h-10 w-10 shrink-0 text-olive-light" />
               <span className="flex-1 text-xl font-bold text-bone-white">{section.title}</span>
               <UiIcon name={isOpen ? "up" : "down"} className="h-7 w-7 shrink-0 text-cream" />
             </button>
-            {isOpen && <ul className="space-y-2 px-4 pb-4 text-lg leading-7 text-bone-white">{section.texts.map((text) => <li key={text}>{text}</li>)}</ul>}
+            {isOpen && <AccordionBody texts={section.texts} />}
           </article>;
         })}
       </div>
@@ -94,12 +114,12 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
 function RainCalendar({ response }: { response: AnalysisResponse }) {
   const { playingKey, play } = useSpeaker();
   const calendar = useMemo(() => rainCalendar(response.monthlyClimate), [response.monthlyClimate]);
-  return <article className="rounded-3xl border border-olive/40 bg-spruce p-4">
-    <div className="mb-3 flex items-center gap-3"><UiIcon name="calendar" className="h-10 w-10 shrink-0 text-cream" /><h3 className="flex-1 text-xl font-bold text-bone-white">{RAIN_CALENDAR_INTRO.title}</h3><PlayButton playing={playingKey === "rain-calendar"} onClick={() => play("rain-calendar", rainCalendarSpeechItems(calendar))} /></div>
+  return <article data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+    <div className="mb-3 flex items-center gap-3"><UiIcon name="calendar" className="h-10 w-10 shrink-0 text-olive-light" /><h3 className="flex-1 text-xl font-bold text-bone-white">{RAIN_CALENDAR_INTRO.title}</h3><PlayButton playing={playingKey === "rain-calendar"} onClick={() => play("rain-calendar", rainCalendarSpeechItems(calendar))} /></div>
     <ol className="grid grid-cols-6 gap-x-1 gap-y-3 text-center" aria-label={RAIN_CALENDAR_INTRO.title}>
       {calendar.map((month) => <li key={month.month} className="flex flex-col items-center gap-1">
         <span className="text-xs font-semibold uppercase text-silver-mist">{month.label}</span>
-        <span className="flex h-12 flex-col items-center justify-end gap-0.5 text-cream" role="img" aria-label={month.level === null ? "Sin dato" : `${month.level} de 3`}>
+        <span className="flex h-12 flex-col items-center justify-end gap-0.5 text-olive-light" role="img" aria-label={month.level === null ? "Sin dato" : `${month.level} de 3`}>
           {month.level === null ? <span className="text-sm text-ash-gray">—</span> : Array.from({ length: month.level }, (_, index) => <UiIcon key={index} name="dropFilled" className="h-4 w-4" />)}
         </span>
       </li>)}
@@ -111,13 +131,13 @@ function RainCalendar({ response }: { response: AnalysisResponse }) {
 function ClimateList({ response }: { response: AnalysisResponse }) {
   const { playingKey, play } = useSpeaker();
   const topics = useMemo(() => describeClimate(response.indicators), [response.indicators]);
-  return <>{topics.map((topic) => <article key={topic.id} className="rounded-3xl border border-olive/40 bg-spruce p-4">
+  return <>{topics.map((topic) => <article key={topic.id} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
     <div className="flex items-center gap-3">
-      <UiIcon name={CLIMATE_ICONS[topic.id]} className="h-12 w-12 shrink-0 text-cream" />
+      <UiIcon name={CLIMATE_ICONS[topic.id]} className="h-12 w-12 shrink-0 text-olive-light" />
       <div className="min-w-0 flex-1"><h3 className="text-xl font-bold leading-6 text-bone-white">{topic.simpleTitle}</h3><p className="text-xs uppercase tracking-wider text-ash-gray">{topic.technicalName}</p></div>
       <PlayButton playing={playingKey === topic.id} onClick={() => play(topic.id, climateTopicSpeechItems(topic))} />
     </div>
-    <p className="mt-3 text-lg font-semibold leading-7 text-cream">{topic.yourZone}</p>
+    <p className="mt-3 text-lg font-semibold leading-7 text-olive-light">{topic.yourZone}</p>
     <p className="mt-1 text-base leading-6 text-silver-mist">{topic.explanation}</p>
   </article>)}</>;
 }
@@ -129,21 +149,22 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
   const bestIndex = bestRotationIndex(response.rotations);
   const open = openIndex === null ? null : response.rotations[openIndex] ?? null;
 
-  return <main className="fixed inset-0 z-40 overflow-y-auto bg-meadow">
+  const reveal = useReveal<HTMLElement>();
+  return <main ref={reveal} className="fixed inset-0 z-40 overflow-y-auto bg-scene">
     <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4">
-      <header className="flex items-center justify-between gap-3">
+      <header data-reveal className="flex items-center justify-between gap-3">
         <Logo variant="horizontal" size={36} />
         <div className="relative isolate z-0 h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-cream/60 shadow-lg" role="img" aria-label={`Mapa de ${farm.placeLabel ?? "tu finca"}`}><FarmMiniMap farm={farm} /></div>
       </header>
 
-      <h2 className="flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-cream" />Tus 3 caminos</h2>
+      <h2 data-reveal className="flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-olive-light" />Tus 3 caminos</h2>
       {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} onOpen={() => setOpenIndex(index)} />)}
 
-      <h2 className="mt-4 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-cream" />El clima de tu zona</h2>
+      <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
       <ClimateList response={response} />
       <RainCalendar response={response} />
 
-      <p className="mt-2 rounded-2xl bg-spruce/60 p-4 text-center text-sm leading-6 text-silver-mist">Esto es una ayuda para decidir. No reemplaza tu experiencia ni a un técnico de tu zona. Datos del clima: NASA POWER.</p>
+      <p className="mt-2 rounded-2xl bg-moss/60 p-4 text-center text-sm leading-6 text-silver-mist">Esto es una ayuda para decidir. No reemplaza tu experiencia ni a un técnico de tu zona. Datos del clima: NASA POWER.</p>
       <nav className="flex items-start justify-center gap-6" aria-label="Más opciones">
         <button type="button" onClick={onEditPriorities} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="back" className="h-8 w-8" /></span>Preguntas</button>
         <button type="button" onClick={onChangeFarm} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="pin" className="h-8 w-8" /></span>Otra finca</button>

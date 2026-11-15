@@ -227,7 +227,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
   };
   const shownMessage = message ?? editor.error;
 
-  return <section className="fixed inset-0 z-40 flex flex-col bg-meadow" aria-label="Mapa para marcar tu finca">
+  return <section className="fixed inset-0 z-40 flex flex-col bg-scene" aria-label="Mapa para marcar tu finca">
     <div className="relative h-[70svh] w-full overflow-hidden">
       <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl={false}>
         <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} attribution={satelliteAttribution} />

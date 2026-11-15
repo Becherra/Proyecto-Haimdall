@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { popElement, prefersReducedMotion } from "./motion";
+import { stackPose } from "../lib/ui/stackPose";
 import { CropIcon, GoalIcon } from "./icons";
 import Logo from "./Logo";
 import { applySelection, cropAnswerFields, cropAnswerFromPriorities, NO_CROP, selectionFromPriorities } from "../lib/ui/prioritySelection";
@@ -43,17 +47,26 @@ const Drop = ({ filled }: { filled: boolean }) => <svg viewBox="0 0 24 24" class
 
 /** Tarjeta de la pila: la activa al frente, las siguientes asomando detrás y las contestadas fuera de pantalla. */
 function StackCard({ offset, children }: { offset: number; children: ReactNode }) {
-  const style = offset < 0
-    ? { transform: "translateY(-115%) rotate(-5deg) scale(0.96)", opacity: 0 }
-    : offset === 0 ? { transform: "translateY(0) scale(1)", opacity: 1 }
-    : { transform: `translateY(${offset * 16}px) scale(${1 - offset * 0.06})`, opacity: offset > 2 ? 0 : 1 - offset * 0.25 };
-  return <div style={{ ...style, transformOrigin: "bottom center", zIndex: 10 - Math.abs(offset), ...(offset > 0 ? { backgroundColor: offset === 1 ? "#1B3A3F" : "#163233" } : {}) }} inert={offset !== 0} aria-hidden={offset !== 0}
-    className="absolute inset-0 flex flex-col overflow-y-auto rounded-3xl border border-olive/50 bg-spruce p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] transition-all duration-500 ease-out motion-reduce:transition-none">
+  const card = useRef<HTMLDivElement>(null);
+  const mounted = useRef(false);
+  // GSAP mueve la tarjeta con un resorte suave; la primera vez y con "menos movimiento" se coloca sin animar.
+  useGSAP(() => {
+    const pose = stackPose(offset);
+    const animate = mounted.current && !prefersReducedMotion();
+    mounted.current = true;
+    if (animate) gsap.to(card.current, { ...pose, duration: 0.75, ease: "power3.out" });
+    else gsap.set(card.current, pose);
+    if (offset === 0 && !prefersReducedMotion()) {
+      gsap.from(card.current?.querySelectorAll("[data-option]") ?? [], { opacity: 0, y: 18, scale: 0.94, duration: 0.5, ease: "back.out(1.7)", stagger: 0.045, delay: animate ? 0.25 : 0.1, clearProps: "opacity,transform" });
+    }
+  }, { scope: card, dependencies: [offset] });
+  return <div ref={card} style={{ transformOrigin: "bottom center", zIndex: 10 - Math.abs(offset), ...(offset > 0 ? { backgroundColor: `color-mix(in srgb, var(--color-moss) ${offset === 1 ? 70 : 40}%, var(--color-meadow))` } : {}) }} inert={offset !== 0} aria-hidden={offset !== 0}
+    className="absolute inset-0 flex flex-col overflow-y-auto rounded-3xl border border-olive/50 bg-moss card-surface p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
     {children}
   </div>;
 }
 
-const optionBase = "flex items-center rounded-2xl border-2 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50";
+const optionBase = "flex items-center rounded-2xl border-2 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50";
 const optionOff = "border-cream/25 text-bone-white hover:border-cream";
 const optionOn = "border-cream bg-cream text-meadow";
 
@@ -78,7 +91,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
   const onNext = step === last ? submit : goNext;
   const onBack = step === 0 ? onChangeFarm : () => setStep(step - 1);
 
-  return <section className="fixed inset-0 z-40 flex flex-col bg-meadow" aria-label={`Preguntas sobre ${placeLabel}`}>
+  return <section className="fixed inset-0 z-40 flex flex-col bg-scene" aria-label={`Preguntas sobre ${placeLabel}`}>
     <header className="flex items-center justify-between px-4 pt-4">
       <Logo variant="horizontal" size={34} />
       <ol className="flex items-center gap-2" aria-label={`Pregunta ${step + 1} de ${TITLES.length}`}>
@@ -91,7 +104,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
         <StackCard offset={0 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[0]}</h2>
           <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 grid-cols-3 content-start gap-2.5">
-            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} onClick={() => setCrop(id)} className={`${optionBase} min-h-[5.5rem] flex-col justify-center gap-1 ${crop === id ? optionOn : optionOff}`}>
+            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} data-option onClick={(event) => { popElement(event.currentTarget); setCrop(id); }} className={`${optionBase} min-h-[5.5rem] flex-col justify-center gap-1 ${crop === id ? optionOn : optionOff}`}>
               <CropIcon id={id} /><span className="text-sm font-semibold">{name}</span>
             </button>)}
           </div>
@@ -100,7 +113,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
         <StackCard offset={1 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[1]}</h2>
           <div role="radiogroup" aria-label={TITLES[1]} className="flex flex-1 flex-col justify-center gap-4">
-            {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} onClick={() => setWater(id)} className={`${optionBase} min-h-24 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
+            {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} data-option onClick={(event) => { popElement(event.currentTarget); setWater(id); }} className={`${optionBase} min-h-24 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
               <span className={`flex gap-1 ${water === id ? "text-meadow" : "text-cream"}`} aria-hidden="true">{[1, 2, 3].map((slot) => <Drop key={slot} filled={slot <= drops} />)}</span>
               <span className="text-xl font-bold">{name}</span>
             </button>)}
@@ -112,7 +125,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
           <div role="group" aria-label={TITLES[2]} className="grid flex-1 grid-cols-2 content-start gap-2.5">
             {GOALS.map(([key, name], index) => {
               const on = goals.includes(key);
-              return <button key={key} type="button" aria-pressed={on} onClick={() => toggleGoal(key)} className={`${optionBase} relative min-h-28 flex-col justify-center gap-1.5 ${index === GOALS.length - 1 ? "col-span-2" : ""} ${on ? optionOn : optionOff}`}>
+              return <button key={key} type="button" aria-pressed={on} data-option onClick={(event) => { popElement(event.currentTarget); toggleGoal(key); }} className={`${optionBase} relative min-h-28 flex-col justify-center gap-1.5 ${index === GOALS.length - 1 ? "col-span-2" : ""} ${on ? optionOn : optionOff}`}>
                 <GoalIcon id={key} /><span className="text-sm font-semibold">{name}</span>
                 {on && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-meadow text-cream" aria-hidden="true"><svg {...iconProps} className="h-4 w-4" strokeWidth={3.5}><path d="M4 12.5l5 5L20 6.5" /></svg></span>}
               </button>;
