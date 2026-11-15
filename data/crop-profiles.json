@@ -207,10 +207,11 @@
         },
         {
           "id": "castillo-regionales",
-          "name": "Castillo® Regionales (Naranjal, Paraguacito, El Rosario, Pueblo Bello, Santa Bárbara, La Trinidad)",
+          "name": "Castillo® Regional",
           "kind": "variedad",
           "propagation": { "status": "documented", "value": "Semilla certificada por el ICA", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 12, recuadro «Señor caficultor»" }] },
           "attributes": [
+            { "statement": "Incluye Castillo Naranjal, Paraguacito, El Rosario, Pueblo Bello, Santa Bárbara y La Trinidad.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "Literatura citada, refs. 2–7" }] },
             { "statement": "Compuestos regionales de la variedad Castillo, liberados hacia 2005–2006.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 1" }] },
             { "statement": "Variedad compuesta (multilínea) resistente a la roya.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figura 5" }] }
           ],
