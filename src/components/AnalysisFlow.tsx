@@ -8,7 +8,6 @@ import type { AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "..
 
 const initialPriorities: UserPriorities = {
   waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3,
-  currentCropId: "maiz", waterAvailability: "medium",
 };
 const neutralScenario: ClimateScenario = { tempDeltaC: 0, rainFactor: 1 };
 

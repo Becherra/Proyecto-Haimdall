@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { CropIcon, GoalIcon } from "./icons";
 import Logo from "./Logo";
 import { applySelection, selectionFromPriorities } from "../lib/ui/prioritySelection";
 import type { PriorityKey } from "../lib/ui/prioritySelection";
@@ -18,21 +19,21 @@ type PrioritiesSlidesProps = {
 
 type Water = NonNullable<UserPriorities["waterAvailability"]>;
 
+const NO_CROP = "none";
 const CROPS = [
-  ["maiz", "🌽", "Maíz"], ["frijol", "🫘", "Fríjol"], ["soya", "🌱", "Soya"], ["arveja", "🫛", "Arveja"],
-  ["mucuna", "🌿", "Mucuna"], ["crotalaria", "🌼", "Crotalaria"], ["yuca", "🍠", "Yuca"], ["papa", "🥔", "Papa"],
-  ["avena", "🌾", "Avena"], ["repollo", "🥬", "Repollo"],
+  ["maiz", "Maíz"], ["frijol", "Fríjol"], ["soya", "Soya"], ["arveja", "Arveja"],
+  ["mucuna", "Mucuna"], ["crotalaria", "Crotalaria"], ["yuca", "Yuca"], ["papa", "Papa"],
+  ["avena", "Avena"], ["repollo", "Repollo"], [NO_CROP, "Ninguno"],
 ] as const;
 
 const WATER: readonly (readonly [Water, number, string])[] = [["low", 1, "Poca"], ["medium", 2, "Normal"], ["high", 3, "Mucha"]];
 
-const GOALS: readonly (readonly [PriorityKey, string, string])[] = [
-  ["waterSaving", "💧", "Ahorrar agua"], ["extraIncome", "💰", "Ganar más"], ["soilImprovement", "🌱", "Cuidar el suelo"],
-  ["erosionReduction", "⛰️", "Frenar la erosión"], ["lowRisk", "🛡️", "Menos riesgo"],
+const GOALS: readonly (readonly [PriorityKey, string])[] = [
+  ["waterSaving", "Ahorrar agua"], ["extraIncome", "Ganar más"], ["soilImprovement", "Cuidar el suelo"],
+  ["erosionReduction", "Frenar la erosión"], ["lowRisk", "Menos riesgo"],
 ];
 
 const TITLES = ["¿Qué cultivo tienes?", "¿Cuánta agua tienes?", "¿Qué te importa más?"] as const;
-const AUTO_ADVANCE_MS = 380;
 
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const ArrowLeft = () => <svg {...iconProps} className="h-8 w-8"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>;
@@ -59,24 +60,22 @@ const optionOn = "border-cream bg-cream text-meadow";
 
 export default function PrioritiesSlides({ farm, initialValues, error, submitting, onSubmit, onChangeFarm }: PrioritiesSlidesProps) {
   const [step, setStep] = useState(0);
-  const [crop, setCrop] = useState(initialValues.currentCropId ?? "maiz");
-  const [water, setWater] = useState<Water>(initialValues.waterAvailability ?? "medium");
+  const [crop, setCrop] = useState<string | null>(initialValues.currentCropId ?? null);
+  const [water, setWater] = useState<Water | null>(initialValues.waterAvailability ?? null);
   const [goals, setGoals] = useState<PriorityKey[]>(() => selectionFromPriorities(initialValues));
-  const [advanceTimer, setAdvanceTimer] = useState<number | null>(null);
   const last = TITLES.length - 1;
   const placeLabel = farm.placeLabel ?? "Tu finca";
 
-  useEffect(() => () => { if (advanceTimer !== null) window.clearTimeout(advanceTimer); }, [advanceTimer]);
-
   const goNext = () => setStep((current) => Math.min(last, current + 1));
-  // En las preguntas de una sola respuesta se avanza solo, para que sea un toque y listo.
-  const chooseAndAdvance = (apply: () => void) => { apply(); setAdvanceTimer(window.setTimeout(goNext, AUTO_ADVANCE_MS)); };
   const toggleGoal = (key: PriorityKey) => setGoals((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
 
   function submit() {
-    const parsed = userPrioritiesSchema.safeParse(applySelection({ ...initialValues, currentCropId: crop, waterAvailability: water }, goals));
+    // «Ninguno» no manda cultivo actual: el campo es opcional en el análisis.
+    const answers = { ...initialValues, currentCropId: crop === NO_CROP ? undefined : crop ?? undefined, waterAvailability: water ?? undefined };
+    const parsed = userPrioritiesSchema.safeParse(applySelection(answers, goals));
     if (parsed.success) onSubmit(parsed.data);
   }
+  const unanswered = (step === 0 && crop === null) || (step === 1 && water === null);
   const onNext = step === last ? submit : goNext;
   const onBack = step === 0 ? onChangeFarm : () => setStep(step - 1);
 
@@ -93,8 +92,8 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
         <StackCard offset={0 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[0]}</h2>
           <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 grid-cols-3 content-start gap-2.5">
-            {CROPS.map(([id, emoji, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} onClick={() => chooseAndAdvance(() => setCrop(id))} className={`${optionBase} min-h-[5.5rem] flex-col justify-center gap-1 ${crop === id ? optionOn : optionOff}`}>
-              <span className="text-4xl leading-none" aria-hidden="true">{emoji}</span><span className="text-sm font-semibold">{name}</span>
+            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} onClick={() => setCrop(id)} className={`${optionBase} min-h-[5.5rem] flex-col justify-center gap-1 ${crop === id ? optionOn : optionOff}`}>
+              <CropIcon id={id} /><span className="text-sm font-semibold">{name}</span>
             </button>)}
           </div>
         </StackCard>
@@ -102,7 +101,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
         <StackCard offset={1 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[1]}</h2>
           <div role="radiogroup" aria-label={TITLES[1]} className="flex flex-1 flex-col justify-center gap-4">
-            {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} onClick={() => chooseAndAdvance(() => setWater(id))} className={`${optionBase} min-h-24 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
+            {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} onClick={() => setWater(id)} className={`${optionBase} min-h-24 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
               <span className={`flex gap-1 ${water === id ? "text-meadow" : "text-cream"}`} aria-hidden="true">{[1, 2, 3].map((slot) => <Drop key={slot} filled={slot <= drops} />)}</span>
               <span className="text-xl font-bold">{name}</span>
             </button>)}
@@ -112,10 +111,10 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
         <StackCard offset={2 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[2]}</h2>
           <div role="group" aria-label={TITLES[2]} className="grid flex-1 grid-cols-2 content-start gap-2.5">
-            {GOALS.map(([key, emoji, name], index) => {
+            {GOALS.map(([key, name], index) => {
               const on = goals.includes(key);
               return <button key={key} type="button" aria-pressed={on} onClick={() => toggleGoal(key)} className={`${optionBase} relative min-h-28 flex-col justify-center gap-1.5 ${index === GOALS.length - 1 ? "col-span-2" : ""} ${on ? optionOn : optionOff}`}>
-                <span className="text-4xl leading-none" aria-hidden="true">{emoji}</span><span className="text-sm font-semibold">{name}</span>
+                <GoalIcon id={key} /><span className="text-sm font-semibold">{name}</span>
                 {on && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-meadow text-cream" aria-hidden="true"><svg {...iconProps} className="h-4 w-4" strokeWidth={3.5}><path d="M4 12.5l5 5L20 6.5" /></svg></span>}
               </button>;
             })}
@@ -127,7 +126,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
     {error && <p className="mx-4 mb-2 rounded-2xl bg-clay/40 px-4 py-3 text-center text-sm text-clay-light" role="alert">{error}</p>}
     <div className="flex items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <button type="button" onClick={onBack} disabled={submitting} aria-label={step === 0 ? "Volver al mapa" : "Pregunta anterior"} className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:opacity-40"><ArrowLeft /></button>
-      <button type="button" onClick={onNext} disabled={submitting} aria-label={step === last ? "Ver resultados" : "Siguiente"} className="flex h-20 min-w-0 flex-1 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 disabled:cursor-wait disabled:opacity-70">
+      <button type="button" onClick={onNext} disabled={submitting || unanswered} aria-label={step === last ? "Ver resultados" : "Siguiente"} className={`flex h-20 min-w-0 flex-1 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 ${submitting ? "cursor-wait opacity-70" : "disabled:cursor-not-allowed disabled:opacity-40"}`}>
         {submitting ? <Spinner /> : step === last ? <Check /> : <ArrowRight />}
       </button>
     </div>
