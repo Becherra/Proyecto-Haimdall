@@ -275,8 +275,31 @@ export const currentSeasonSchema = z.object({
   currentDryStreakDays: z.number().int().nonnegative(),
   /** Años de la serie histórica con dato suficiente en esa misma época. */
   baselineYears: z.number().int().positive(),
+  /** En cuántos de esos años cayó menos lluvia que ahora en esa misma época (empates no cuentan). Ausente en respuestas antiguas. */
+  baselineYearsDrier: z.number().int().nonnegative().optional(),
+  /** Lugar de la lluvia actual entre los años de la serie (0 = la más seca, 1 = la más lluviosa; los empates cuentan la mitad). Ausente en respuestas antiguas. */
+  rainPercentile: z.number().min(0).max(1).optional(),
 });
 export type CurrentSeason = z.infer<typeof currentSeasonSchema>;
+
+/**
+ * Un año real de la serie de NASA POWER convertido a escenario: cuánto cambió su lluvia y su temperatura frente al promedio de los años comparados.
+ * Los factores están acotados a los límites de `climateScenarioSchema`; `rainChangePercent` es el cambio real sin acotar, para mostrarlo.
+ */
+export const extremeYearSchema = z.object({
+  year: z.number().int(),
+  rainFactor: z.number().min(0.5).max(1.5), tempDeltaC: z.number().min(-2).max(5),
+  rainChangePercent: z.number(),
+});
+export type ExtremeYear = z.infer<typeof extremeYearSchema>;
+
+/** El año más seco, el más lluvioso y el más cálido de la serie, para ofrecer escenarios con años que de verdad ocurrieron en el sitio. */
+export const extremeYearsSchema = z.object({
+  driest: extremeYearSchema, wettest: extremeYearSchema, warmest: extremeYearSchema,
+  /** Años completos que se compararon. */
+  yearsCompared: z.number().int().positive(),
+});
+export type ExtremeYears = z.infer<typeof extremeYearsSchema>;
 
 export const analysisResponseSchema = z.object({
   climate: analysisClimateSchema, monthlyClimate: z.array(monthlyClimateSchema), indicators: indicatorsSchema, rotations: z.array(rotationResultSchema).min(3),
@@ -286,6 +309,8 @@ export const analysisResponseSchema = z.object({
   dataSources: z.array(dataSourceSchema).optional(),
   /** Temporada actual frente a lo normal; ausente si no se pudo consultar NASA POWER reciente o no hay línea base. */
   currentSeason: currentSeasonSchema.optional(),
+  /** Años reales extremos de la serie original de NASA (sin escenario aplicado); ausente si la serie no tiene años completos suficientes. */
+  extremeYears: extremeYearsSchema.optional(),
 });
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
 
