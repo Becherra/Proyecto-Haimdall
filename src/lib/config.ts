@@ -79,3 +79,5 @@ export const MIN_MONTHS_FOR_WORST_YEAR = 10;
  * 0 la ignora y 1 la trata igual que al promedio. Heurística de diseño, no un dato; validar con un agrónomo local.
  */
 export const WORST_YEAR_DROUGHT_WEIGHT = 0.5;
+/** Racha seca (días seguidos) desde la cual se avisa a los cultivos de baja tolerancia a sequía. Heurística de diseño; validar con un agrónomo local. */
+export const DRY_SPELL_ALERT_DAYS = 20;
