@@ -94,9 +94,10 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
   const reveal = useReveal<HTMLElement>();
   return <section ref={reveal} className="fixed inset-0 z-50 overflow-y-auto bg-scene" aria-label={result.rotation.name}>
     <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-10 pt-4 lg:max-w-3xl lg:pt-8">
-      <div className="flex items-center justify-between">
+      {/* Columnas iguales a ambos lados para que el logo quede centrado y no flote un ícono suelto en la esquina. */}
+      <div className="grid grid-cols-[4rem_1fr_4rem] items-center">
         <button type="button" onClick={close} aria-label="Volver" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><UiIcon name="back" className="h-8 w-8" /></button>
-        <Logo variant="mark" size={44} />
+        <Logo variant="horizontal" size={36} className="justify-self-center" />
       </div>
       <div data-reveal><PlayButton size="big" playing={playingKey === key} onClick={() => play(key, rotationSpeechItems(result))} /></div>
       <div data-reveal className="flex flex-col gap-3 rounded-3xl border-2 border-olive/50 bg-moss card-surface p-4">
