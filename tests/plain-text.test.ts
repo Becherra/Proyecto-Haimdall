@@ -41,6 +41,13 @@ describe("texto simple de cada rotación", () => {
     expect(plain!.why).toMatch(/ayuda para decidir/);
   });
 
+  it("avisa en palabras simples que altura y pendiente vienen de un punto cercano y no de su terreno exacto", () => {
+    const withTerrain = plainOf(["thirsty"], { ...WET, siteElevationMeters: 1413, slopePercent: 12, terrainSource: "srtm-sample" });
+    expect(withTerrain.plain!.gaps.join(" ")).toContain("punto cercano de tu zona");
+    expect(withTerrain.plain!.gaps.join(" ")).not.toMatch(JARGON);
+    expect(plainOf(["thirsty"], WET).plain!.gaps.join(" ")).not.toContain("punto cercano");
+  });
+
   it("menciona los problemas que restan puntos con palabras simples", () => {
     const { plain } = plainOf(["thirsty"], DRY);
     expect(plain!.why).toMatch(/calor/);

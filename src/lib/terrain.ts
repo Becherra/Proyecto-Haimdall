@@ -7,7 +7,7 @@ const MAX_SCORE = 5;
 
 /**
  * Muestras precargadas de altitud y pendiente para la zona piloto, validadas al importar.
- * Son estimaciones de referencia: todavía no se leyeron del ráster de NASA SRTM (ver el campo `source` de cada una).
+ * Son lecturas del ráster NASA SRTMGL1 en cada punto piloto (ver el campo `source` y docs/srtm-samples.md): valen para el punto, no para todo el lote.
  */
 export const TERRAIN_SAMPLES: readonly TerrainSample[] = z.array(terrainSampleSchema).parse(srtmSamplesData);
 

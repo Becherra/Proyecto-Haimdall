@@ -2,6 +2,7 @@ import type { ClimateParameter, DataSource, Indicators } from "../types";
 
 const POWER_PROVIDER = "NASA POWER";
 const POWER_URL = "https://power.larc.nasa.gov/";
+const SRTM_URL = "https://www.earthdata.nasa.gov/data/catalog/lpcloud-srtmgl1-003";
 
 type ParameterUse = { label: string; use: (indicators: Indicators) => string };
 
@@ -34,7 +35,7 @@ function terrainSources({ cellElevationMeters, siteElevationMeters, slopePercent
     sources.push({ id: "power-cell-elevation", name: "Altitud media de la celda", provider: POWER_PROVIDER, use: "Corregir la temperatura de la celda a la altitud del lote.", url: POWER_URL });
   }
   if (hasSiteTerrain && terrainSource === "srtm-sample") {
-    sources.push({ id: "terrain-estimate", name: "Altitud y pendiente de referencia de la zona", provider: "Estimación del equipo, sin verificar contra el modelo de elevación SRTM", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera." });
+    sources.push({ id: "terrain-srtm", name: "Altitud y pendiente del punto piloto más cercano", provider: "NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC)", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera.", url: SRTM_URL });
   }
   if (hasSiteTerrain && terrainSource === "user") {
     sources.push({ id: "terrain-user", name: "Altitud y pendiente del lote", provider: "Declarado por el agricultor", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera." });

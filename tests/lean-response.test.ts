@@ -64,20 +64,22 @@ describe("listDataSources", () => {
     expect(catalog?.use).toContain("preliminares");
   });
 
-  it("solo menciona la altitud de la celda y el terreno estimado cuando se usaron", () => {
+  it("solo menciona la altitud de la celda y el terreno SRTM cuando se usaron", () => {
     expect(ids(indicators)).not.toContain("power-cell-elevation");
-    expect(ids(indicators)).not.toContain("terrain-estimate");
+    expect(ids(indicators)).not.toContain("terrain-srtm");
     const adjusted = ids({ ...indicators, cellElevationMeters: 2138, siteElevationMeters: 1411, terrainSource: "srtm-sample" });
     expect(adjusted).toContain("power-cell-elevation");
-    expect(adjusted).toContain("terrain-estimate");
+    expect(adjusted).toContain("terrain-srtm");
   });
 
-  it("presenta el terreno de la muestra como estimación sin verificar y el declarado como dato del agricultor", () => {
-    const sample = listDataSources({ ...indicators, siteElevationMeters: 1411, terrainSource: "srtm-sample" }).find(({ id }) => id === "terrain-estimate");
-    expect(sample?.provider).toContain("sin verificar");
+  it("presenta el terreno de la muestra como lectura de NASA SRTM y el declarado como dato del agricultor", () => {
+    const sample = listDataSources({ ...indicators, siteElevationMeters: 1411, terrainSource: "srtm-sample" }).find(({ id }) => id === "terrain-srtm");
+    expect(sample?.provider).toContain("SRTMGL1");
+    expect(sample?.provider).not.toContain("sin verificar");
+    expect(sample?.url).toContain("earthdata.nasa.gov");
     const declared = listDataSources({ ...indicators, siteElevationMeters: 1500, terrainSource: "user" });
     expect(declared.map(({ id }) => id)).toContain("terrain-user");
-    expect(declared.map(({ id }) => id)).not.toContain("terrain-estimate");
+    expect(declared.map(({ id }) => id)).not.toContain("terrain-srtm");
   });
 });
 
