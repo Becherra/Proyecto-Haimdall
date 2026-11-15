@@ -188,7 +188,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
         {isPolygon && editor.vertices.length >= 3 && <Polygon positions={editor.vertices.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#EAD39D", weight: 4, fillColor: "#EAD39D", fillOpacity: 0.25 }} />}
         <Marker position={[draft.lat, draft.lon]} icon={pinIcon} draggable={!isPolygon} eventHandlers={{ dragend: (event) => { const point = (event.target as L.Marker).getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draft.label), locationSource: "map" }); } }} title="Tu finca" />
       </MapContainer>
-      <div className="pointer-events-none absolute left-3 top-3 z-[600] rounded-full bg-meadow/85 px-3 py-1.5 backdrop-blur"><Logo variant="horizontal" className="h-7 w-auto" /></div>
+      <div className="pointer-events-none absolute left-3 top-3 z-[600] rounded-full bg-meadow/85 px-3 py-1.5 backdrop-blur"><Logo variant="horizontal" size={36} /></div>
       {showTutorial && <LassoTutorial />}
       {shownMessage && <p className="pointer-events-none absolute inset-x-4 top-16 z-[600] rounded-2xl bg-meadow/90 px-4 py-3 text-center text-base font-semibold text-cream" role="status">{shownMessage}</p>}
     </div>
