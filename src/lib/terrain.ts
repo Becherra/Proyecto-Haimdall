@@ -1,6 +1,6 @@
 import { z } from "zod";
 import srtmSamplesData from "../../data/samples/srtm-eje-cafetero.json";
-import { terrainSampleSchema, type Crop, type TerrainSample, type UserPriorities } from "../types";
+import { terrainSampleSchema, type ClimateRecord, type Crop, type TerrainSample, type UserPriorities } from "../types";
 import { EROSIVE_RAIN_REFERENCE_MM, SLOPE_CAUTION_THRESHOLD_PERCENT, STEEP_SLOPE_REFERENCE_PERCENT, TEMPERATURE_LAPSE_RATE_C_PER_METER } from "./config";
 
 const MAX_SCORE = 5;
@@ -54,6 +54,19 @@ export function resolveTerrain(
  */
 export function adjustTemperatureForElevation(cellMeanC: number, cellElevationMeters: number, siteElevationMeters: number): number {
   return cellMeanC + (cellElevationMeters - siteElevationMeters) * TEMPERATURE_LAPSE_RATE_C_PER_METER;
+}
+
+/**
+ * Lleva las temperaturas diarias (media, mínima y máxima) de la celda de NASA POWER a la altitud del lote con el mismo
+ * gradiente que la media. Así heladas, calor y evaporación potencial se calculan con la temperatura del lote y no con la de la celda.
+ * Supuesto: el gradiente vertical medio también vale para las mínimas y máximas (en la práctica varía según la hora y la humedad).
+ * Si falta alguna de las dos altitudes devuelve la misma serie. Los demás parámetros (lluvia, EVLAND, humedad, radiación) no se tocan.
+ */
+export function adjustRecordsForElevation(records: readonly ClimateRecord[], cellElevationMeters: number | undefined, siteElevationMeters: number | undefined): readonly ClimateRecord[] {
+  if (cellElevationMeters === undefined || siteElevationMeters === undefined) return records;
+  const shift = adjustTemperatureForElevation(0, cellElevationMeters, siteElevationMeters);
+  const moved = (value: number | null) => (value === null ? null : value + shift);
+  return records.map((record) => ({ ...record, T2M: moved(record.T2M), T2M_MIN: moved(record.T2M_MIN), T2M_MAX: moved(record.T2M_MAX) }));
 }
 
 /**

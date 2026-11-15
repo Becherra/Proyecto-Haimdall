@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildAnalysis } from "../src/lib/analysis";
 import { CROPS } from "../src/lib/catalog";
+import { computeIndicators } from "../src/lib/indicators";
 import { clearClimateCache, fetchDailyClimate } from "../src/lib/nasaPower";
 import { scoreRotations } from "../src/lib/scoring";
-import { adjustTemperatureForElevation, findTerrainSample, resolveTerrain, slopeErosionExposure, TERRAIN_SAMPLES } from "../src/lib/terrain";
-import { terrainSampleSchema, type Crop, type Indicators, type Rotation, type UserPriorities } from "../src/types";
+import { adjustRecordsForElevation, adjustTemperatureForElevation, findTerrainSample, resolveTerrain, slopeErosionExposure, TERRAIN_SAMPLES } from "../src/lib/terrain";
+import { terrainSampleSchema, type ClimateRecord, type Crop, type Indicators, type Rotation, type UserPriorities } from "../src/types";
 
 const powerFixture = readFileSync("tests/fixtures/power-pereira.json", "utf8");
 const EQUAL: UserPriorities = { waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3 };
@@ -70,6 +71,76 @@ describe("adjustTemperatureForElevation", () => {
   });
 });
 
+function dayRecord(overrides: Partial<ClimateRecord> = {}): ClimateRecord {
+  return { date: "20210115", T2M: 16, T2M_MIN: 10, T2M_MAX: 22, PRECTOTCORR: 5, EVLAND: 3, GWETROOT: 0.8, ALLSKY_SFC_SW_DWN: 15, ...overrides };
+}
+
+describe("adjustRecordsForElevation", () => {
+  const CELL_M = 2000;
+  const SITE_M = 1000;
+  const shift = adjustTemperatureForElevation(0, CELL_M, SITE_M);
+
+  it("desplaza T2M, T2M_MIN y T2M_MAX con el mismo gradiente y deja intactos los demás parámetros", () => {
+    const [adjusted] = adjustRecordsForElevation([dayRecord()], CELL_M, SITE_M);
+    expect(shift).toBeCloseTo(6, 5);
+    expect(adjusted.T2M).toBeCloseTo(22, 5);
+    expect(adjusted.T2M_MIN).toBeCloseTo(16, 5);
+    expect(adjusted.T2M_MAX).toBeCloseTo(28, 5);
+    expect(adjusted).toMatchObject({ date: "20210115", PRECTOTCORR: 5, EVLAND: 3, GWETROOT: 0.8, ALLSKY_SFC_SW_DWN: 15 });
+  });
+
+  it("conserva como dato faltante (null) la temperatura que no existe", () => {
+    const [adjusted] = adjustRecordsForElevation([dayRecord({ T2M_MIN: null, T2M_MAX: null })], CELL_M, SITE_M);
+    expect(adjusted.T2M_MIN).toBeNull();
+    expect(adjusted.T2M_MAX).toBeNull();
+    expect(adjusted.T2M).toBeCloseTo(22, 5);
+  });
+
+  it("no cambia nada si falta la altitud de la celda o la del lote", () => {
+    const records = [dayRecord()];
+    expect(adjustRecordsForElevation(records, undefined, SITE_M)).toEqual(records);
+    expect(adjustRecordsForElevation(records, CELL_M, undefined)).toEqual(records);
+  });
+
+  it("no modifica los registros originales", () => {
+    const records = [dayRecord()];
+    adjustRecordsForElevation(records, CELL_M, SITE_M);
+    expect(records[0].T2M_MAX).toBe(22);
+  });
+
+  it("devuelve lista vacía con una serie vacía", () => {
+    expect(adjustRecordsForElevation([], CELL_M, SITE_M)).toEqual([]);
+  });
+});
+
+describe("indicadores con la temperatura corregida por altitud", () => {
+  const cold = [dayRecord({ T2M: 2, T2M_MIN: -2, T2M_MAX: 9 })];
+  const hot = [dayRecord({ T2M: 24, T2M_MIN: 18, T2M_MAX: 30 })];
+
+  it("no cuenta como helada un día que en la celda helaba pero en el lote, 1000 m más abajo, no", () => {
+    expect(computeIndicators(cold, 4.8).frostRiskDays).toBe(1);
+    expect(computeIndicators(cold, 4.8, { cellElevationMeters: 2000, siteElevationMeters: 1000 }).frostRiskDays).toBe(0);
+  });
+
+  it("sí cuenta estrés por calor cuando el lote queda más bajo que la celda y la máxima corregida pasa el umbral", () => {
+    expect(computeIndicators(hot, 4.8).heatStressDays).toBe(0);
+    expect(computeIndicators(hot, 4.8, { cellElevationMeters: 2000, siteElevationMeters: 500 }).heatStressDays).toBe(1);
+  });
+
+  it("calcula la evaporación potencial con la temperatura del lote: más calor, más déficit de agua", () => {
+    const dry = Array.from({ length: 28 }, (_, day) => dayRecord({ date: `202101${String(day + 1).padStart(2, "0")}`, PRECTOTCORR: 0 }));
+    const cell = computeIndicators(dry, 4.8).waterDeficitMm as number;
+    const site = computeIndicators(dry, 4.8, { cellElevationMeters: 2000, siteElevationMeters: 1000 }).waterDeficitMm as number;
+    expect(site).toBeLessThan(cell);
+  });
+
+  it("mantiene la media de la celda aparte de la media del lote", () => {
+    const result = computeIndicators(hot, 4.8, { cellElevationMeters: 2000, siteElevationMeters: 1000 });
+    expect(result.cellMeanTemperatureC).toBeCloseTo(24, 5);
+    expect(result.meanTemperatureC).toBeCloseTo(30, 5);
+  });
+});
+
 describe("slopeErosionExposure y penalización en ladera", () => {
   const bare = testCrop("bare", 0);
   const cover = testCrop("cover", 5);
@@ -116,6 +187,26 @@ describe("integración NASA POWER + SRTM en Pereira", () => {
       expect(result.evidence.join(" ")).toContain("estimación de referencia");
       expect(result.evidence.join(" ")).not.toContain("con NASA SRTM)");
       expect(result.informationGaps.join(" ")).toContain("no son mediciones del lote");
+    }
+  });
+
+  it("dice que heladas y calor usan temperaturas ajustadas a la altitud y avisa que el gradiente es un supuesto", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(powerFixture, { status: 200 })));
+    const climate = await fetchDailyClimate({ lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022 });
+    const analysis = buildAnalysis({ climate, crops: CROPS, priorities: EQUAL, location: { lat: 4.8133, lon: -75.6961 } });
+    for (const result of analysis.rotations) {
+      expect(result.evidence.join(" ")).toContain("temperaturas ajustadas a la altitud del lote");
+      expect(result.informationGaps.join(" ")).toContain("mismo gradiente");
+    }
+  });
+
+  it("no promete ajuste por altitud cuando no hay altitud del lote", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(powerFixture, { status: 200 })));
+    const climate = await fetchDailyClimate({ lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022 });
+    const analysis = buildAnalysis({ climate: { ...climate, cellElevationMeters: undefined }, crops: CROPS, priorities: EQUAL, location: { lat: 40, lon: -3 } });
+    for (const result of analysis.rotations) {
+      expect(result.evidence.join(" ")).not.toContain("temperaturas ajustadas a la altitud del lote");
+      expect(result.informationGaps.join(" ")).not.toContain("mismo gradiente");
     }
   });
 
