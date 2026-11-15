@@ -1,6 +1,7 @@
 import type { AnalysisClimate, AnalysisResponse, ClimateResult, ClimateScenario, Crop, Rotation, RotationResult, UserPriorities } from "../types";
 import { DEFAULT_CURRENT_CROP_ID, SOWING_CALENDAR_REGION } from "./config";
 import { listDataSources } from "./dataSources";
+import { computeCurrentSeason } from "./currentSeason";
 import { aggregateMonthly, computeIndicators, countYears } from "./indicators";
 import { baselineRotation, candidateRotations, pickBest, startingRotations } from "./rotations";
 import { applyScenario, isNeutralScenario, scenarioGap } from "./scenario";
@@ -47,7 +48,23 @@ export type AnalysisInput = {
   scenario?: ClimateScenario;
   /** Incluye los registros diarios originales en la respuesta; por defecto solo va el resumen de la serie. */
   includeDailyRecords?: boolean;
+  /** Últimos días de NASA POWER: con ellos se compara la temporada actual con lo normal. Sin ellos no hay `currentSeason`. */
+  recentClimate?: ClimateResult;
+  /** Años de clima que se pidieron; si la serie trae menos (p. ej. una muestra de respaldo corta) se avisa como vacío de información. */
+  requestedYears?: number;
 };
+
+const formatDate = (date: string) => `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+
+/** Avisos sobre la serie de clima: muestra guardada en lugar de consulta en vivo, o menos años de los pedidos. */
+function seriesGaps({ records, source }: ClimateResult, requestedYears: number | undefined): string[] {
+  const years = countYears(records);
+  const lastDate = records.map((record) => record.date).sort().at(-1);
+  return [
+    ...(source === "sample" && lastDate ? [`Los datos de clima son una muestra guardada de NASA POWER, no una consulta en vivo: llegan hasta ${formatDate(lastDate)}.`] : []),
+    ...(requestedYears !== undefined && years < requestedYears ? [`Se pidieron ${requestedYears} años de clima y la serie trae ${years}.`] : []),
+  ];
+}
 
 /** Resumen de la serie de NASA para la respuesta: sin los miles de registros diarios salvo que se pidan. */
 function summarizeClimate({ records, ...summary }: ClimateResult, includeDailyRecords: boolean): AnalysisClimate {
@@ -70,7 +87,7 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  * Con `scenario` todo se calcula sobre la serie modificada, pero `climate` conserva los datos originales de NASA.
  * Es pura (sin red ni archivos). Lanza `AnalysisInputError` si no hay registros o si el cultivo actual es desconocido.
  */
-export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false }: AnalysisInput): AnalysisResponse {
+export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false, recentClimate, requestedYears }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   // «No tengo cultivo» no compara contra uno actual; sin esa marca se mantiene el cultivo declarado o el por defecto.
   const current = priorities.noCurrentCrop ? null : resolveCurrentCrop(crops, priorities.currentCropId);
@@ -80,7 +97,8 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
     : undefined;
   const applied = scenario && !isNeutralScenario(scenario) ? scenario : undefined;
   const records = applied ? applyScenario(climate.records, applied) : climate.records;
-  const extraGaps = applied ? [...siteGaps, scenarioGap(applied)] : siteGaps;
+  const baseGaps = [...siteGaps, ...seriesGaps(climate, requestedYears)];
+  const extraGaps = applied ? [...baseGaps, scenarioGap(applied)] : baseGaps;
   const indicators = computeIndicators(records, location.lat, terrainInput);
   const monthlyClimate = aggregateMonthly(adjustRecordsForElevation(records, terrainInput?.cellElevationMeters, terrainInput?.siteElevationMeters), location.lat);
   const seasonality = isInSowingCalendarRegion(location.lat, location.lon) ? computeSeasonality(monthlyClimate) : undefined;
@@ -88,5 +106,7 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const score = (rotations: readonly Rotation[]) => scoreRotations({ rotations, crops, indicators, priorities, seasonality, yearsAnalyzed });
   const rotations = current ? alternativesAround(crops, current, score) : startingOptions(crops, score);
   const results = rotations.map((result) => ({ ...result, informationGaps: [...result.informationGaps, ...extraGaps] }));
-  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators), ...(scenario ? { scenario } : {}) };
+  // La temporada actual se compara con los datos originales de NASA, no con la serie modificada por un escenario.
+  const currentSeason = recentClimate ? computeCurrentSeason(recentClimate.records, climate.records) : null;
+  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators, { currentSeason: currentSeason !== null }), ...(currentSeason ? { currentSeason } : {}), ...(scenario ? { scenario } : {}) };
 }

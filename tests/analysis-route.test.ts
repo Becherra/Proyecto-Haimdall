@@ -25,6 +25,26 @@ describe("POST /api/analysis", () => {
     expect(body.rotations).toHaveLength(3);
   });
 
+  it("pide también los últimos días y avisa cuando la serie trae menos años de los pedidos", async () => {
+    const fetchSpy = vi.fn().mockImplementation(() => Promise.resolve(new Response(fixture, { status: 200 })));
+    vi.stubGlobal("fetch", fetchSpy);
+    const body = await (await POST(post({ ...pereira, startYear: 2011, endYear: 2025 }))).json();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const recentUrl = new URL(String(fetchSpy.mock.calls[1]?.[0]));
+    expect(Number(recentUrl.searchParams.get("end"))).toBeGreaterThan(Number(recentUrl.searchParams.get("start")));
+    for (const rotation of body.rotations) expect(rotation.informationGaps.join(" ")).toContain("Se pidieron 15 años de clima y la serie trae 3");
+  });
+
+  it("sigue sin la temporada actual y lo dice si NASA POWER no entrega los últimos días", async () => {
+    const fetchSpy = vi.fn().mockImplementationOnce(() => Promise.resolve(new Response(fixture, { status: 200 }))).mockImplementation(() => Promise.resolve(new Response("", { status: 503 })));
+    vi.stubGlobal("fetch", fetchSpy);
+    const response = await POST(post(pereira));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.currentSeason).toBeUndefined();
+    for (const rotation of body.rotations) expect(rotation.informationGaps.join(" ")).toContain("No se pudo consultar el clima de los últimos días");
+  });
+
   it("devuelve 400 si el cuerpo no es JSON", async () => {
     const response = await POST(post("{no es json"));
     expect(response.status).toBe(400);

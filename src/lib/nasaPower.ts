@@ -2,6 +2,7 @@ import { z } from "zod";
 import armeniaSample from "../../data/samples/power-armenia.json";
 import manizalesSample from "../../data/samples/power-manizales.json";
 import pereiraSample from "../../data/samples/power-pereira.json";
+import { CURRENT_SEASON_DAYS } from "./config";
 import { CLIMATE_PARAMETERS, climateResultSchema, type ClimateParameter, type ClimateRecord, type ClimateRequest, type ClimateResult } from "../types";
 
 const BASE_URL = "https://power.larc.nasa.gov/api/temporal/daily/point";
@@ -11,7 +12,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [100, 250] as const;
 /**
- * Respuestas reales de NASA POWER (2020–2022) guardadas para que la demo no dependa de la red.
+ * Respuestas reales de NASA POWER (2011–2025, regenerables con scripts/build-power-samples.mjs) guardadas para que la demo no dependa de la red.
  * Cada una cubre los sitios a menos de `tolerance` grados; Santa Rosa de Cabal cae dentro de la de Pereira (misma celda de NASA POWER).
  */
 const SAMPLES: ReadonlyArray<{ lat: number; lon: number; tolerance: number; payload: unknown }> = [
@@ -34,8 +35,8 @@ export class InvalidClimateRequestError extends Error {}
 class RetryableClimateError extends Error {}
 class ClimateServerError extends RetryableClimateError {}
 
-function buildUrl(input: ClimateRequest): string {
-  const params = new URLSearchParams({ parameters: CLIMATE_PARAMETERS.join(","), community: "AG", latitude: String(input.lat), longitude: String(input.lon), start: `${input.startYear}0101`, end: `${input.endYear}1231`, format: "JSON" });
+function buildUrl(input: { lat: number; lon: number; start: string; end: string }): string {
+  const params = new URLSearchParams({ parameters: CLIMATE_PARAMETERS.join(","), community: "AG", latitude: String(input.lat), longitude: String(input.lon), start: input.start, end: input.end, format: "JSON" });
   return `${BASE_URL}?${params.toString()}`;
 }
 
@@ -103,7 +104,7 @@ export function fetchDailyClimate(input: ClimateRequest): Promise<ClimateResult>
   const parsed = requestSchema.safeParse(input);
   if (!parsed.success) throw new InvalidClimateRequestError(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
   const normalizedInput = parsed.data;
-  const url = buildUrl(normalizedInput);
+  const url = buildUrl({ lat: normalizedInput.lat, lon: normalizedInput.lon, start: `${normalizedInput.startYear}0101`, end: `${normalizedInput.endYear}1231` });
   const cached = cache.get(url);
   if (cached) return cached.then((result) => ({ ...result, source: "cache" }));
   const request = requestLive(url).catch((error: unknown) => {
@@ -114,6 +115,31 @@ export function fetchDailyClimate(input: ClimateRequest): Promise<ClimateResult>
     throw error;
   }).catch((error: unknown) => { cache.delete(url); throw error; });
   // Esta caché vive solo en el proceso; en serverless no persiste entre instancias.
+  cache.set(url, request);
+  return request;
+}
+
+const MAX_RECENT_DAYS = 90;
+const recentRequestSchema = z.object({
+  lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
+  days: z.number().int().gte(1).lte(MAX_RECENT_DAYS),
+});
+const compactDate = (time: number) => new Date(time).toISOString().slice(0, 10).replaceAll("-", "");
+
+/**
+ * Obtiene los últimos `days` días de NASA POWER hasta hoy (por defecto `CURRENT_SEASON_DAYS`). NASA publica con unos días de retraso:
+ * los días aún no disponibles llegan como dato faltante (null). Sin respaldo precargado: una muestra vieja no describe la temporada actual.
+ * `now` se inyecta para poder probarla.
+ */
+export function fetchRecentClimate(input: { lat: number; lon: number; days?: number }, now: Date = new Date()): Promise<ClimateResult> {
+  const parsed = recentRequestSchema.safeParse({ days: CURRENT_SEASON_DAYS, ...input });
+  if (!parsed.success) throw new InvalidClimateRequestError(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
+  const { lat, lon, days } = parsed.data;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const url = buildUrl({ lat, lon, start: compactDate(today - (days - 1) * 86_400_000), end: compactDate(today) });
+  const cached = cache.get(url);
+  if (cached) return cached.then((result) => ({ ...result, source: "cache" }));
+  const request = requestLive(url).then((result) => result).catch((error: unknown) => { cache.delete(url); throw error; });
   cache.set(url, request);
   return request;
 }

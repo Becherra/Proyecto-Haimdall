@@ -2,6 +2,7 @@ import type { ClimateParameter, DataSource, Indicators } from "../types";
 
 const POWER_PROVIDER = "NASA POWER";
 const POWER_URL = "https://power.larc.nasa.gov/";
+const SRTM_URL = "https://www.earthdata.nasa.gov/data/catalog/lpcloud-srtmgl1-003";
 
 type ParameterUse = { label: string; use: (indicators: Indicators) => string };
 
@@ -34,7 +35,7 @@ function terrainSources({ cellElevationMeters, siteElevationMeters, slopePercent
     sources.push({ id: "power-cell-elevation", name: "Altitud media de la celda", provider: POWER_PROVIDER, use: "Corregir la temperatura de la celda a la altitud del lote.", url: POWER_URL });
   }
   if (hasSiteTerrain && terrainSource === "srtm-sample") {
-    sources.push({ id: "terrain-estimate", name: "Altitud y pendiente de referencia de la zona", provider: "Estimación del equipo, sin verificar contra el modelo de elevación SRTM", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera." });
+    sources.push({ id: "terrain-srtm", name: "Altitud y pendiente del punto piloto más cercano", provider: "NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC)", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera.", url: SRTM_URL });
   }
   if (hasSiteTerrain && terrainSource === "user") {
     sources.push({ id: "terrain-user", name: "Altitud y pendiente del lote", provider: "Declarado por el agricultor", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera." });
@@ -46,9 +47,10 @@ function terrainSources({ cellElevationMeters, siteElevationMeters, slopePercent
  * Lista los datos que alimentan un análisis y para qué se usó cada uno, para que todo número mostrado se pueda rastrear
  * a un dato de NASA POWER, al catálogo de cultivos o a lo que declaró el agricultor.
  */
-export function listDataSources(indicators: Indicators): DataSource[] {
+export function listDataSources(indicators: Indicators, { currentSeason = false }: { currentSeason?: boolean } = {}): DataSource[] {
   return [
     ...powerSources(indicators),
+    ...(currentSeason ? [{ id: "power-recent", name: "Clima de los últimos días", provider: POWER_PROVIDER, use: "Comparar la lluvia de la temporada actual con lo normal de esa misma época (lectura reciente y preliminar, no un pronóstico).", url: POWER_URL }] : []),
     ...terrainSources(indicators),
     {
       id: "crops-catalog", name: "Catálogo de cultivos (data/crops.json)", provider: "Equipo Heimdall, con fuente por cultivo en docs/crops-rubric.md",

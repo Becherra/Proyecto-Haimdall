@@ -24,10 +24,13 @@ describe("TERRAIN_SAMPLES y findTerrainSample", () => {
     for (const sample of TERRAIN_SAMPLES) expect(terrainSampleSchema.safeParse(sample).success).toBe(true);
   });
 
-  it("declara en cada muestra que sus cifras son estimaciones sin verificar contra el ráster de NASA SRTM", () => {
+  it("declara en cada muestra que sus cifras se leyeron del ráster oficial NASA SRTMGL1 y que son del punto, no del lote", () => {
     for (const sample of TERRAIN_SAMPLES) {
-      expect(sample.source, sample.id).toContain("Estimación de referencia");
-      expect(sample.source, sample.id).toContain("sin verificar");
+      expect(sample.source, sample.id).toContain("Leído del tile");
+      expect(sample.source, sample.id).toContain("SRTMGL1");
+      expect(sample.source, sample.id).toContain("no de todo el lote");
+      expect(sample.source, sample.id).not.toContain("Estimación de referencia");
+      expect(sample.source, sample.id).not.toContain("sin verificar");
     }
   });
 
@@ -47,7 +50,7 @@ describe("resolveTerrain", () => {
 
   it("usa la muestra SRTM cuando hay elevación de celda o de muestra y el usuario no declaró terreno", () => {
     const resolved = resolveTerrain({ lat: 4.8133, lon: -75.6961 }, undefined, true);
-    expect(resolved).toMatchObject({ elevationMeters: 1411, slopePercent: 18, source: "srtm-sample" });
+    expect(resolved).toMatchObject({ elevationMeters: 1413, slopePercent: 12, source: "srtm-sample" });
   });
 
   it("devuelve null cuando no se pide muestra por defecto ni el usuario declaró terreno", () => {
@@ -177,16 +180,18 @@ describe("integración NASA POWER + SRTM en Pereira", () => {
 
     const analysis = buildAnalysis({ climate, crops: CROPS, priorities: EQUAL, location: { lat: 4.8133, lon: -75.6961 } });
     expect(analysis.indicators.cellElevationMeters).toBeCloseTo(2138.33, 2);
-    expect(analysis.indicators.siteElevationMeters).toBe(1411);
-    expect(analysis.indicators.slopePercent).toBe(18);
+    expect(analysis.indicators.siteElevationMeters).toBe(1413);
+    expect(analysis.indicators.slopePercent).toBe(12);
     expect(analysis.indicators.cellMeanTemperatureC).toBeCloseTo(16.27, 2);
-    expect(analysis.indicators.meanTemperatureC).toBeCloseTo(20.64, 2);
-    expect(analysis.rotations[0].evidence.join(" ")).toContain("1411 m");
-    // La altitud y la pendiente de la muestra no se leyeron del ráster: se muestran como estimación y como vacío de información.
+    expect(analysis.indicators.meanTemperatureC).toBeCloseTo(20.63, 2);
+    expect(analysis.rotations[0].evidence.join(" ")).toContain("1413 m");
+    // La altitud y la pendiente son lecturas reales de SRTM, pero del punto piloto cercano: se dice en la evidencia y como vacío de información.
     for (const result of analysis.rotations) {
-      expect(result.evidence.join(" ")).toContain("estimación de referencia");
-      expect(result.evidence.join(" ")).not.toContain("con NASA SRTM)");
-      expect(result.informationGaps.join(" ")).toContain("no son mediciones del lote");
+      expect(result.evidence.join(" ")).toContain("NASA SRTM, punto piloto más cercano");
+      expect(result.evidence.join(" ")).not.toContain("estimación de referencia");
+      expect(result.informationGaps.join(" ")).toContain("punto piloto más cercano");
+      expect(result.informationGaps.join(" ")).toContain("no del lote");
+      expect(result.informationGaps.join(" ")).not.toContain("no son mediciones del lote");
     }
   });
 

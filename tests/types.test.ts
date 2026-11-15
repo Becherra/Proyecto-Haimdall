@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisResponseSchema, climateRecordSchema, cropSchema, rotationResultSchema, userPrioritiesSchema } from "../src/types";
+import { analysisResponseSchema, climateRecordSchema, cropSchema, currentSeasonSchema, indicatorsSchema, rotationResultSchema, userPrioritiesSchema } from "../src/types";
 
 const rotation = { id: "base", name: "Actual", cropIds: ["maiz"], description: "Línea base" };
 
@@ -46,5 +46,23 @@ describe("cropSchema: cultivos permanentes", () => {
     expect(cropSchema.safeParse(base).success).toBe(true);
     expect(cropSchema.safeParse({ ...base, intercropsWith: [""] }).success).toBe(false);
     expect(cropSchema.safeParse({ ...base, perennial: "si" }).success).toBe(false);
+  });
+});
+
+describe("contratos de clima reciente y sequía", () => {
+  const season = { windowDays: 90, firstDate: "20260815", lastDate: "20261112", daysWithData: 90, rainMm: 120, normalRainMm: 300, rainPercentOfNormal: 40, status: "much-drier", temperatureAnomalyC: 0.8, currentDryStreakDays: 4, baselineYears: 14 };
+
+  it("acepta una temporada actual completa y rechaza un estado desconocido o fechas mal formadas", () => {
+    expect(currentSeasonSchema.safeParse(season).success).toBe(true);
+    expect(currentSeasonSchema.safeParse({ ...season, status: "raining" }).success).toBe(false);
+    expect(currentSeasonSchema.safeParse({ ...season, lastDate: "2026-11-12" }).success).toBe(false);
+    expect(currentSeasonSchema.safeParse({ ...season, rainPercentOfNormal: null, temperatureAnomalyC: null }).success).toBe(true);
+  });
+
+  it("los indicadores de sequía son opcionales para no romper respuestas anteriores", () => {
+    const base = { waterDeficitMm: 10, heatStressDays: 0, frostRiskDays: 0, extremeRainThresholdMm: 20, meanRootZoneWetness: 0.8, missingByParameter: {} };
+    expect(indicatorsSchema.safeParse(base).success).toBe(true);
+    expect(indicatorsSchema.safeParse({ ...base, longestDrySpellDays: 12, meanAnnualDrySpellDays: 7.5, worstYear: { year: 2016, waterBalanceMm: -20 } }).success).toBe(true);
+    expect(indicatorsSchema.safeParse({ ...base, longestDrySpellDays: -1 }).success).toBe(false);
   });
 });

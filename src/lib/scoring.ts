@@ -1,7 +1,7 @@
 import type { Crop, Indicators, Rotation, RotationCalendar, RotationResult, UserPriorities } from "../types";
 import { buildRotationCalendar, calendarEvidence, calendarGap, calendarRisks } from "./calendar";
 import {
-  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
+  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, DRY_DAY_RAIN_MM, DRY_SPELL_ALERT_DAYS, MIN_YEARS_FOR_WORST_YEAR, WORST_YEAR_DROUGHT_WEIGHT, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
   MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY, MAX_SLOPE_EROSION_PENALTY, MAX_TEMPERATURE_PENALTY, MAX_WATER_SCARCITY_PENALTY, SLOPE_CAUTION_THRESHOLD_PERCENT, WATER_AVAILABILITY_DROUGHT_FACTOR,
 } from "./config";
 import { formatTemperatureRange, frostExposure, frostUnprotected, temperatureMismatch, temperatureSuitability } from "./climateFit";
@@ -50,9 +50,17 @@ function resolveCrops(rotation: Rotation, catalog: readonly Crop[]): Crop[] {
  * dividido por `DRYNESS_REFERENCE_MM`. Balance positivo o sin dato cuenta como 0.
  */
 export function drynessFactor(indicators: Indicators): number {
-  const balance = indicators.waterDeficitMm;
-  if (balance === null || balance >= 0) return 0;
+  return drynessOfBalance(indicators.waterDeficitMm);
+}
+
+function drynessOfBalance(balance: number | null | undefined): number {
+  if (balance === null || balance === undefined || balance >= 0) return 0;
   return Math.min(-balance / DRYNESS_REFERENCE_MM, 1);
+}
+
+/** Qué tan seco fue el peor año de la serie (0–1, misma escala que `drynessFactor`); 0 si la serie no permite identificarlo. */
+function worstYearDryness({ worstYear }: Indicators): number {
+  return drynessOfBalance(worstYear?.waterBalanceMm);
 }
 
 /** Pesos de las prioridades normalizados para sumar 1; con todas en 0 se reparten por igual. */
@@ -86,6 +94,8 @@ function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: 
   const penalties: Penalty[] = [
     { kind: "heat", label: `calor (≈${heatPerYear.toFixed(0)} días al año sobre ${HEAT_STRESS_THRESHOLD_C} °C)`, value: heatShare * heatGap * MAX_RISK_PENALTY },
     { kind: "drought", label: "sequía (balance hídrico negativo)", value: dryness * droughtGap * MAX_RISK_PENALTY * waterFactor },
+    // Solo lo que el peor año agrega a la sequía del promedio, para no contarla dos veces.
+    { kind: "drought", label: `sequía en años malos (año más seco: ${indicators.worstYear?.year}, balance ${oneDecimal(indicators.worstYear?.waterBalanceMm ?? 0)} mm/mes)`, value: Math.max(worstYearDryness(indicators) - dryness, 0) * droughtGap * MAX_RISK_PENALTY * WORST_YEAR_DROUGHT_WEIGHT * waterFactor },
   ];
   return penalties.filter((penalty) => penalty.value > 0);
 }
@@ -205,7 +215,7 @@ function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMea
   const ranges = crops.flatMap((crop) => (crop.temperatureC ? [`${commonName(crop)} ${formatTemperatureRange(crop.temperatureC)}`] : []));
   const detail = ranges.length > 0 ? ` Rango en que crece bien según el catálogo: ${ranges.join("; ")}.` : "";
   const adjusted = cellMeanTemperatureC !== undefined && cellMeanTemperatureC !== null && cellElevationMeters !== undefined && siteElevationMeters !== undefined;
-  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "una estimación de referencia de la zona";
+  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "altitud leída de NASA SRTM en el punto piloto más cercano";
   const sourceNote = adjusted
     ? `(NASA POWER, T2M de ${cellMeanTemperatureC.toFixed(1)} °C en celda a ${cellElevationMeters.toFixed(0)} m, ajustada a ${siteElevationMeters.toFixed(0)} m con ${origin})`
     : "(NASA POWER, T2M)";
@@ -214,7 +224,7 @@ function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMea
 
 function terrainEvidence({ slopePercent, terrainSource }: Indicators): string[] {
   if (slopePercent === undefined) return [];
-  const origin = terrainSource === "user" ? "declarada por el agricultor" : "estimación de referencia de la zona";
+  const origin = terrainSource === "user" ? "declarada por el agricultor" : "NASA SRTM, punto piloto más cercano";
   return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (${origin}).`];
 }
 
@@ -225,12 +235,20 @@ function permanentEvidence({ crops, permanent }: Evaluation): string[] {
   return [`Cultivo permanente (${names}): ocupa el lote todo el año y no se rota; el catálogo solo propone asociarle cultivos anuales en las calles.`];
 }
 
+/** Racha seca más larga y año más seco de la serie, con su dato de NASA POWER. */
+function droughtHistoryEvidence({ longestDrySpellDays, meanAnnualDrySpellDays, worstYear, waterDeficitMm }: Indicators): string[] {
+  const spell = longestDrySpellDays === undefined ? [] : [`Racha seca más larga: ${longestDrySpellDays} días seguidos con menos de ${DRY_DAY_RAIN_MM} mm de lluvia${meanAnnualDrySpellDays === null || meanAnnualDrySpellDays === undefined ? "" : ` (la racha máxima de cada año promedia ${oneDecimal(meanAnnualDrySpellDays)} días)`} (NASA POWER, PRECTOTCORR).`];
+  const worst = worstYear === undefined ? [] : [`Año más seco de la serie: ${worstYear.year}, con un balance hídrico de ${oneDecimal(worstYear.waterBalanceMm)} mm/mes${waterDeficitMm === null ? "" : ` frente a ${oneDecimal(waterDeficitMm)} mm/mes del promedio`} (NASA POWER).`];
+  return [...spell, ...worst];
+}
+
 function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[] {
   const { criteria, crops, sowing, years, waterAvailability } = evaluation;
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
   return [
     ...(balance === null ? [] : [balanceEvidence(balance, indicators)]),
     `Días con T2M_MAX > ${HEAT_STRESS_THRESHOLD_C} °C: ${daysPerYearText(heatStressDays, years)}; días con T2M_MIN < ${FROST_THRESHOLD_C} °C: ${daysPerYearText(frostRiskDays, years)} (NASA POWER${isElevationAdjusted(indicators) ? ", temperaturas ajustadas a la altitud del lote" : ""}).`,
+    ...droughtHistoryEvidence(indicators),
     ...(rain === null ? [] : [`Lluvia diaria extrema (percentil 95): ${oneDecimal(rain)} mm/día (NASA POWER, PRECTOTCORR).`]),
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
@@ -293,6 +311,8 @@ function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   if (low((crop) => crop.heatTolerance)) risks.push("Baja tolerancia al calor según el catálogo.");
   if (low((crop) => crop.droughtTolerance) && drynessFactor(indicators) > 0) risks.push("Baja tolerancia a sequía en un sitio donde la evaporación supera a la lluvia.");
   if (average(crops, (crop) => crop.waterUse) >= HIGH_ATTRIBUTE_THRESHOLD && drynessFactor(indicators) > 0) risks.push("Alto uso de agua en un sitio con déficit hídrico.");
+  if (low((crop) => crop.droughtTolerance) && (indicators.longestDrySpellDays ?? 0) >= DRY_SPELL_ALERT_DAYS) risks.push(`Racha seca de hasta ${indicators.longestDrySpellDays} días en la serie: con baja tolerancia a sequía, el cultivo puede sufrir en ese tramo.`);
+  if (low((crop) => crop.droughtTolerance) && worstYearDryness(indicators) > drynessFactor(indicators)) risks.push(`En el año más seco (${indicators.worstYear?.year}) el balance hídrico fue de ${oneDecimal(indicators.worstYear?.waterBalanceMm ?? 0)} mm/mes: un año así pondría a prueba a un cultivo de baja tolerancia a sequía.`);
   risks.push(...temperatureRisks(crops, indicators), ...frostRisks(crops, indicators, years));
   if (indicators.slopePercent !== undefined && indicators.slopePercent > SLOPE_CAUTION_THRESHOLD_PERCENT && average(crops, (crop) => crop.erosionReduction) < HIGH_ATTRIBUTE_THRESHOLD) {
     risks.push(`Lote en ladera (${indicators.slopePercent.toFixed(0)} % de pendiente) con cobertura insuficiente frente a aguaceros fuertes.`);
@@ -340,21 +360,26 @@ function isElevationAdjusted({ cellElevationMeters, siteElevationMeters }: Indic
 }
 
 /**
- * Las muestras de terreno precargadas son cifras de referencia de la zona: aún no se leyeron del ráster de NASA SRTM.
+ * Las muestras de terreno precargadas son lecturas reales de NASA SRTM, pero de un punto piloto (hasta ~9 km del lote), no del lote.
  * Y la corrección por altitud usa un gradiente promedio también para mínimas, máximas y evaporación: es un supuesto.
  */
 function terrainGaps(indicators: Indicators): string[] {
   return [
-    ...(indicators.terrainSource === "srtm-sample" ? ["La altitud y la pendiente son estimaciones de referencia de la zona: no son mediciones del lote ni lecturas verificadas de NASA SRTM."] : []),
+    ...(indicators.terrainSource === "srtm-sample" ? ["La altitud y la pendiente son lecturas de NASA SRTM (~30 m) en el punto piloto más cercano de la zona, no del lote: si tu lote está en otra ladera pueden diferir."] : []),
     ...(isElevationAdjusted(indicators) ? ["La corrección por altitud aplica el mismo gradiente andino promedio (~0,6 °C por cada 100 m) a la media, las mínimas y las máximas, y de ahí sale la evaporación estimada: es un supuesto, no una medición en el lote."] : []),
   ];
 }
 
-function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar, permanent }: Evaluation): string[] {
+function seriesLengthGap(years: number): string[] {
+  return years < MIN_YEARS_FOR_WORST_YEAR ? [`La serie climática cubre solo ${years} ${years === 1 ? "año" : "años"}: no alcanza para ver cómo cambia la lluvia de un año a otro ni identificar el año más seco.`] : [];
+}
+
+function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar, years, permanent }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
     "Los datos de NASA POWER son de malla y no miden el lote específico.",
+    ...seriesLengthGap(years),
     ...temperatureGaps(crops, indicators),
     ...terrainGaps(indicators),
     ...sowingGaps(sowing),

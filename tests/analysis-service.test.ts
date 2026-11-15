@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mockAnalysisResponse } from "../src/mocks";
-import { buildAnalysisRequest, isAnalysisMockMode, runAnalysis } from "../src/services/analysis";
+import { analysisPeriod, buildAnalysisRequest, isAnalysisMockMode, runAnalysis } from "../src/services/analysis";
 import type { Farm, UserPriorities } from "../src/types";
 
 const farm: Farm = {
@@ -17,8 +17,13 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe("analysis service", () => {
   it("builds a request with the farm centroid, goals and lean-response defaults", () => {
     expect(buildAnalysisRequest(farm, priorities)).toEqual({
-      lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022, farm, priorities,
+      lat: 4.8133, lon: -75.6961, ...analysisPeriod(), farm, priorities,
     });
+  });
+
+  it("analyzes the last 15 complete years, so the baseline includes El Niño and La Niña years", () => {
+    expect(analysisPeriod(new Date("2026-11-15T12:00:00Z"))).toEqual({ startYear: 2011, endYear: 2025 });
+    expect(analysisPeriod(new Date("2027-01-02T12:00:00Z"))).toEqual({ startYear: 2012, endYear: 2026 });
   });
 
   it("adds an optional climate scenario without changing farm or priorities", () => {

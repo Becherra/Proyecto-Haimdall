@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearClimateCache, fetchDailyClimate, InvalidClimateRequestError } from "../src/lib/nasaPower";
+import { clearClimateCache, fetchDailyClimate, fetchRecentClimate, InvalidClimateRequestError } from "../src/lib/nasaPower";
 
 const fixture = JSON.parse(readFileSync("tests/fixtures/power-pereira.json", "utf8")) as unknown;
 const request = { lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022 };
@@ -94,5 +94,62 @@ describe("fetchDailyClimate", () => {
     const failure = await fetchDailyClimate(request).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(Error);
     expect(failure).not.toBeInstanceOf(InvalidClimateRequestError);
+  });
+});
+
+describe("respaldo precargado", () => {
+  beforeEach(() => { clearClimateCache(); vi.restoreAllMocks(); });
+
+  it("cubre los 15 años 2011–2025 completos y sin días faltantes cuando NASA POWER no responde", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
+    const result = await fetchDailyClimate({ lat: 4.8133, lon: -75.6961, startYear: 2011, endYear: 2025 });
+    expect(result.source).toBe("sample");
+    expect(result.records).toHaveLength(5479);
+    expect(result.records[0].date).toBe("20110101");
+    expect(result.records.at(-1)?.date).toBe("20251231");
+    expect(Object.values(result.missingByParameter).every((count) => count === 0)).toBe(true);
+  });
+});
+
+describe("fetchRecentClimate", () => {
+  const NOW = new Date("2026-11-15T12:00:00Z");
+  const payload = (dates: Record<string, number>) => ({ properties: { parameter: Object.fromEntries(["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT", "ALLSKY_SFC_SW_DWN"].map((name) => [name, dates])) } });
+  beforeEach(() => { clearClimateCache(); vi.restoreAllMocks(); });
+
+  it("pide los últimos días hasta hoy con fechas completas, sin filtrar por año", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload({ "20261112": 4.2 })), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, NOW);
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get("start")).toBe("20261106");
+    expect(url.searchParams.get("end")).toBe("20261115");
+    expect(url.searchParams.get("community")).toBe("AG");
+    expect(result.records).toEqual([{ date: "20261112", T2M: 4.2, T2M_MIN: 4.2, T2M_MAX: 4.2, PRECTOTCORR: 4.2, EVLAND: 4.2, GWETROOT: 4.2, ALLSKY_SFC_SW_DWN: 4.2 }]);
+  });
+
+  it("convierte -999 de los días que NASA aún no publica en dato faltante", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(payload({ "20261113": -999 })), { status: 200 })));
+    const result = await fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, NOW);
+    expect(result.records[0].PRECTOTCORR).toBeNull();
+    expect(result.missingByParameter.PRECTOTCORR).toBe(1);
+  });
+
+  it("no repite la llamada idéntica el mismo día", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload({ "20261112": 1 })), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, NOW);
+    const again = await fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, NOW);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(again.source).toBe("cache");
+  });
+
+  it("rechaza ventanas fuera de rango o coordenadas inválidas, igual que fetchDailyClimate", () => {
+    for (const days of [0, 91, 2.5]) expect(() => fetchRecentClimate({ lat: 4.8, lon: -75.7, days }, NOW)).toThrow(InvalidClimateRequestError);
+    expect(() => fetchRecentClimate({ lat: 95, lon: -75.7, days: 30 }, NOW)).toThrow(InvalidClimateRequestError);
+  });
+
+  it("no usa la muestra precargada como respaldo: si NASA falla, falla", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
+    await expect(fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, NOW)).rejects.toThrow("HTTP 503");
   });
 });

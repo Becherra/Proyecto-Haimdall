@@ -59,6 +59,12 @@ export const indicatorsSchema = z.object({
   slopePercent: z.number().finite().min(0).max(100).optional(),
   /** Origen de los datos de terreno del lote: muestra precargada de NASA SRTM ("srtm-sample") o declarados por el usuario ("user"). */
   terrainSource: z.enum(["srtm-sample", "user"]).optional(),
+  /** Racha más larga de días secos seguidos (lluvia menor que el umbral de día seco) en toda la serie. */
+  longestDrySpellDays: z.number().int().nonnegative().optional(),
+  /** Promedio, entre los años con dato suficiente, de la racha seca más larga de cada año (días). */
+  meanAnnualDrySpellDays: z.number().nonnegative().nullable().optional(),
+  /** Año de la serie con el balance hídrico medio mensual más bajo; ausente si la serie no tiene años completos suficientes. */
+  worstYear: z.object({ year: z.number().int().min(1981), waterBalanceMm: z.number() }).optional(),
 });
 export type Indicators = z.infer<typeof indicatorsSchema>;
 
@@ -245,12 +251,41 @@ export const dataSourceSchema = z.object({
 });
 export type DataSource = z.infer<typeof dataSourceSchema>;
 
+/** Cómo va la lluvia de la temporada actual frente a lo normal de esa misma época. */
+export const currentSeasonStatusSchema = z.enum(["much-drier", "drier", "normal", "wetter", "much-wetter"]);
+export type CurrentSeasonStatus = z.infer<typeof currentSeasonStatusSchema>;
+
+/**
+ * Los últimos días de NASA POWER comparados con el mismo tramo del calendario en la serie histórica.
+ * Es una lectura reciente y preliminar (NASA corrige datos recientes), no un pronóstico.
+ */
+export const currentSeasonSchema = z.object({
+  /** Días que abarca la ventana pedida (hasta `lastDate`). */
+  windowDays: z.number().int().positive(),
+  firstDate: z.string().regex(/^\d{8}$/), lastDate: z.string().regex(/^\d{8}$/),
+  /** Días de la ventana con dato de lluvia. */
+  daysWithData: z.number().int().positive(),
+  rainMm: z.number().nonnegative(), normalRainMm: z.number().nonnegative(),
+  /** Lluvia de la ventana como porcentaje de la normal; null si la normal es 0. */
+  rainPercentOfNormal: z.number().nonnegative().nullable(),
+  status: currentSeasonStatusSchema,
+  /** Diferencia de temperatura media frente a lo normal (°C); null si falta dato. */
+  temperatureAnomalyC: z.number().nullable(),
+  /** Días secos seguidos hasta `lastDate`. */
+  currentDryStreakDays: z.number().int().nonnegative(),
+  /** Años de la serie histórica con dato suficiente en esa misma época. */
+  baselineYears: z.number().int().positive(),
+});
+export type CurrentSeason = z.infer<typeof currentSeasonSchema>;
+
 export const analysisResponseSchema = z.object({
   climate: analysisClimateSchema, monthlyClimate: z.array(monthlyClimateSchema), indicators: indicatorsSchema, rotations: z.array(rotationResultSchema).min(3),
   /** Escenario aplicado, si se pidió: `monthlyClimate`, `indicators` y `rotations` lo reflejan; `climate` conserva los datos originales de NASA. */
   scenario: climateScenarioSchema.optional(),
   /** Datos usados en este análisis y para qué. Opcional para no romper consumidores previos; `buildAnalysis` siempre lo entrega. */
   dataSources: z.array(dataSourceSchema).optional(),
+  /** Temporada actual frente a lo normal; ausente si no se pudo consultar NASA POWER reciente o no hay línea base. */
+  currentSeason: currentSeasonSchema.optional(),
 });
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
 
