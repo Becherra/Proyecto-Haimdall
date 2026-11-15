@@ -5,8 +5,9 @@ import { useReveal } from "./motion";
 import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
+import { StarGlyphs } from "./StarGlyphs";
 import { useSpeaker } from "./useSpeaker";
-import { activeScenarioPreset, bestRotationIndex, cropLink, describeNasaSupport, describeSimpleSources, isCurrentRotation, MAX_STARS, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import { activeScenarioPreset, bestRotationIndex, cropLink, describeNasaSupport, describeSimpleSources, compareScores, isCurrentRotation, SCENARIO_PRESETS } from "../lib/ui/resultsCopy";
 import type { NasaSupportItemId, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, Farm, RotationResult } from "../types";
 
@@ -38,10 +39,7 @@ function PlaySmall({ playing, onClick }: { playing: boolean; onClick: () => void
 }
 
 function Stars({ score }: { score: number }) {
-  const full = scoreToStars(score);
-  return <span className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
-    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "" : "opacity-25"}><UiIcon name="star" className="h-6 w-6" /></span>)}
-  </span>;
+  return <StarGlyphs score={score} iconClassName="h-6 w-6" />;
 }
 
 /** Los ids de rotación son "ranuras" (p. ej. "legume"): con otro clima la misma ranura puede traer otro camino, así que también se comparan los cultivos. */
@@ -49,9 +47,9 @@ const sameRotation = (a: RotationResult, b: RotationResult) => a.rotation.id ===
 
 function changePhrase(current: number, base: number | undefined): { text: string; tone: string } {
   if (base === undefined) return { text: "Este camino aparece con este clima: no estaba entre los 3 con clima normal", tone: "text-cream" };
-  const diff = scoreToStars(current) - scoreToStars(base);
-  if (diff > 0) return { text: "Con este clima le va mejor que con el normal", tone: "text-olive-light" };
-  if (diff < 0) return { text: "Con este clima le va peor que con el normal", tone: "text-clay-light" };
+  const change = compareScores(current, base);
+  if (change === "better") return { text: "Con este clima le va mejor que con el normal", tone: "text-olive-light" };
+  if (change === "worse") return { text: "Con este clima le va peor que con el normal", tone: "text-clay-light" };
   return { text: "Con este clima le va igual que con el normal", tone: "text-silver-mist" };
 }
 

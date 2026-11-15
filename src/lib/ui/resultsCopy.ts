@@ -1,6 +1,6 @@
 import type { AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, Indicators, MonthlyClimate, RotationResult } from "../../types";
-import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C } from "../config";
-import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
+import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, ROOT_WETNESS_DRY_BELOW, ROOT_WETNESS_HUMID_FROM, SCORE_DIFFERENCE_NOTICE, WATER_SHORT_YEAR_SHARE } from "../config";
+import { summarizeMonthlyClimate, waterShortMonths } from "./monthlyClimateSummary";
 
 /** Un pedazo de texto para leer en voz alta; con `audioId` se usa la grabación `public/audio/<audioId>.mp3` si existe. */
 export type SpeechItem = { text: string; audioId?: string };
@@ -10,10 +10,27 @@ export const BASELINE_ROTATION_ID = "baseline";
 
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"] as const;
 
-/** El puntaje del motor va de 0 a 5: se muestra como estrellas llenas. */
-export function scoreToStars(score: number): number {
-  if (!Number.isFinite(score)) return 0;
-  return Math.min(MAX_STARS, Math.max(0, Math.round(score)));
+/** Medias estrellas (0–10) del puntaje: media estrella por cada 0,5 puntos, para que una diferencia chica no salte una estrella entera. */
+function halfSteps(score: number): number {
+  return Number.isFinite(score) ? Math.min(MAX_STARS * 2, Math.max(0, Math.round(score * 2))) : 0;
+}
+
+/** El puntaje del motor va de 0 a 5: cuánto se llena cada una de las 5 estrellas (0, media o llena). */
+export function starFills(score: number): Array<0 | 0.5 | 1> {
+  const halves = halfSteps(score);
+  return Array.from({ length: MAX_STARS }, (_, index) => (Math.min(2, Math.max(0, halves - 2 * index)) / 2) as 0 | 0.5 | 1);
+}
+
+/** Texto de las estrellas para lectores de pantalla, con las medias: "2,5 de 5". */
+export function starsLabel(score: number): string {
+  return `${fmt(halfSteps(score) / 2, 1)} de ${MAX_STARS}`;
+}
+
+/** ¿Es una opción mejor, peor o igual que otra? Compara los puntajes y no las estrellas, y solo habla de diferencia si llega a `SCORE_DIFFERENCE_NOTICE`. */
+export function compareScores(current: number, base: number): "better" | "worse" | "same" {
+  const difference = current - base;
+  if (difference >= SCORE_DIFFERENCE_NOTICE) return "better";
+  return difference <= -SCORE_DIFFERENCE_NOTICE ? "worse" : "same";
 }
 
 /** Posición de la rotación con mayor puntaje (la primera si empatan); -1 si no hay ninguna. */
@@ -51,29 +68,69 @@ export const CLIMATE_EXPLANATIONS: Record<ClimateTopicId, Pick<ClimateTopic, "si
 
 const daysPhrase = (count: number, singular: string, plural: string) => `${count} ${count === 1 ? singular : plural}`;
 
-function zoneSentence(id: ClimateTopicId, indicators: Indicators): string {
+/** Lo que se sabe de la serie mensual; sin ella las frases conservan su forma simple. `years` son los años de la serie; `shortMonths`, los meses con falta de agua frecuente (null = no se pudo evaluar). */
+type ZoneContext = { shortMonths: number[] | null; years: number | null };
+
+/** "cerca de 3 días al año" o "menos de 1 día al año": el total de la serie no dice nada si no se sabe de cuántos años es. */
+function perYearPhrase(total: number, years: number): string {
+  const perYear = total / years;
+  if (perYear < 1) return "menos de 1 día al año";
+  const rounded = Math.round(perYear);
+  return `cerca de ${rounded} ${rounded === 1 ? "día" : "días"} al año`;
+}
+
+function waterSentence(balance: number, { shortMonths }: ZoneContext): string {
+  const names = (shortMonths ?? []).map((month) => MONTH_NAMES[month - 1] as string);
+  if (balance < 0) {
+    const where = names.length === MONTH_NAMES.length ? " Y falta durante todo el año." : names.length > 0 ? ` Sobre todo en ${listWords(names)}.` : "";
+    return `Aquí se pierde más agua de la que cae: puede faltar agua.${where}`;
+  }
+  if (shortMonths === null) return "Aquí la lluvia alcanza: cae más agua de la que se pierde.";
+  if (names.length === 0) return "Aquí la lluvia alcanza: cae más agua de la que se pierde, también en los meses más secos.";
+  return `En promedio la lluvia alcanza, pero en ${listWords(names)} falta agua: en al menos 1 de cada ${Math.round(1 / WATER_SHORT_YEAR_SHARE)} años cayó menos de la que se pierde por el calor.`;
+}
+
+function rootsSentence(wetness: number): string {
+  const level = wetness < ROOT_WETNESS_DRY_BELOW ? "es bastante seca" : wetness < ROOT_WETNESS_HUMID_FROM ? "tiene humedad media" : "suele estar húmeda";
+  return `La tierra de tu zona ${level}: el índice de humedad es ${fmt(wetness, 2)} de 1, medido por satélite en una zona grande.`;
+}
+
+function zoneSentence(id: ClimateTopicId, indicators: Indicators, context: ZoneContext): string {
   switch (id) {
     case "water":
-      if (indicators.waterDeficitMm === null) return NO_DATA;
-      return indicators.waterDeficitMm >= 0 ? "Aquí la lluvia alcanza: cae más agua de la que se pierde." : "Aquí se pierde más agua de la que cae: puede faltar agua.";
-    case "heat":
-      return indicators.heatStressDays === 0 ? "En los años analizados no hubo días de calor fuerte." : `Hubo ${daysPhrase(indicators.heatStressDays, "día", "días")} de calor fuerte en los años analizados.`;
-    case "frost":
-      return indicators.frostRiskDays === 0 ? "En los años analizados no hubo riesgo de helada." : `Hubo ${daysPhrase(indicators.frostRiskDays, "día", "días")} con riesgo de helada en los años analizados.`;
+      return indicators.waterDeficitMm === null ? NO_DATA : waterSentence(indicators.waterDeficitMm, context);
+    case "heat": {
+      const limit = `más de ${HEAT_STRESS_THRESHOLD_C} °C`;
+      if (indicators.heatStressDays === 0) return `En los años analizados no hubo días de calor fuerte (${limit}).`;
+      return context.years === null ? `Hubo ${daysPhrase(indicators.heatStressDays, "día", "días")} de calor fuerte (${limit}) en los años analizados.`
+        : `Hubo ${perYearPhrase(indicators.heatStressDays, context.years)} de calor fuerte (${limit}): ${indicators.heatStressDays} en ${context.years} años.`;
+    }
+    case "frost": {
+      const limit = `menos de ${FROST_THRESHOLD_C} °C`;
+      if (indicators.frostRiskDays === 0) return `En los años analizados no hubo riesgo de helada (${limit}).`;
+      return context.years === null ? `Hubo ${daysPhrase(indicators.frostRiskDays, "día", "días")} con riesgo de helada (${limit}) en los años analizados.`
+        : `Hubo ${perYearPhrase(indicators.frostRiskDays, context.years)} con riesgo de helada (${limit}): ${indicators.frostRiskDays} en ${context.years} años.`;
+    }
     case "rain":
       return indicators.extremeRainThresholdMm === null ? NO_DATA : `Se considera lluvia muy fuerte la que pasa de ${fmt(indicators.extremeRainThresholdMm)} milímetros en un día.`;
     case "temperature":
       return indicators.meanTemperatureC === null || indicators.meanTemperatureC === undefined ? NO_DATA : `El promedio es de ${fmt(indicators.meanTemperatureC, 1)} grados.`;
     case "roots":
-      return indicators.meanRootZoneWetness === null ? NO_DATA : `La humedad promedio es del ${Math.round(indicators.meanRootZoneWetness * 100)} por ciento.`;
+      return indicators.meanRootZoneWetness === null ? NO_DATA : rootsSentence(indicators.meanRootZoneWetness);
   }
 }
 
 const CLIMATE_ORDER: readonly ClimateTopicId[] = ["water", "heat", "frost", "rain", "temperature", "roots"];
 
-/** Indicadores del análisis explicados con palabras simples: qué son y qué dicen en la zona. */
-export function describeClimate(indicators: Indicators): ClimateTopic[] {
-  return CLIMATE_ORDER.map((id) => ({ id, ...CLIMATE_EXPLANATIONS[id], explanationAudioId: `clima-${id}`, yourZone: zoneSentence(id, indicators) }));
+/**
+ * Indicadores del análisis explicados con palabras simples: qué son y qué dicen en la zona.
+ * Con `monthlyClimate` (la serie mensual del análisis) el agua nombra los meses en que falta con frecuencia y el calor y la helada
+ * se dicen por año; sin ella se conservan las frases simples.
+ */
+export function describeClimate(indicators: Indicators, monthlyClimate: readonly MonthlyClimate[] = []): ClimateTopic[] {
+  const years = new Set(monthlyClimate.map((row) => row.year)).size;
+  const context: ZoneContext = { shortMonths: waterShortMonths(monthlyClimate), years: years > 0 ? years : null };
+  return CLIMATE_ORDER.map((id) => ({ id, ...CLIMATE_EXPLANATIONS[id], explanationAudioId: `clima-${id}`, yourZone: zoneSentence(id, indicators, context) }));
 }
 
 export type RainMonth = { month: number; label: string; level: 1 | 2 | 3 | null };

@@ -98,3 +98,16 @@ export const CURRENT_SEASON_TEMPERATURE_NOTICE_C = 0.5;
 export const CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS = 10;
 /** Porcentaje de la lluvia normal con el que se llena la barra de comparación; si llovió más, la escala crece para que quepa. */
 export const CURRENT_SEASON_BAR_MAX_PERCENT = 150;
+
+/** Un mes cuenta como "de falta de agua" si, en al menos esta fracción de los años, la lluvia no cubrió lo que se pierde por evaporación: el promedio de un mes puede alcanzar y aun así faltar en 1 de cada 3 años. Heurística de diseño. */
+export const WATER_SHORT_YEAR_SHARE = 1 / 3;
+/** Años con dato que debe tener la serie (y cada mes) para hablar de con qué frecuencia falta agua; con menos, la frecuencia no dice nada. */
+export const MIN_YEARS_FOR_WATER_SHORT_MONTHS = 5;
+/**
+ * Cortes del índice de humedad de la zona de raíces (GWETROOT, 0–1) para describirlo con palabras. Es un índice de un modelo de unos 50 km,
+ * no un porcentaje de agua en el suelo; por eso se dice con palabras y con el índice, no como "por ciento". Heurística de diseño.
+ */
+export const ROOT_WETNESS_DRY_BELOW = 0.5;
+export const ROOT_WETNESS_HUMID_FROM = 0.75;
+/** Diferencia mínima de puntaje (escala 0–5) para decir que una opción es mejor o peor que otra; con menos se dice "igual". Heurística de diseño. */
+export const SCORE_DIFFERENCE_NOTICE = 0.25;
