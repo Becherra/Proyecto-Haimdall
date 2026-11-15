@@ -8,6 +8,10 @@ const textures = [
   ["earth-bluemarble-4k.jpg", "earth-bluemarble-4k-heimdall.webp"],
 ];
 
+// Colores de la paleta (src/app/globals.css): océano = spruce #243d47, tierra = olive #737f35.
+const OCEAN_TINT = [36, 61, 71];
+const LAND_TINT = [115, 127, 53];
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -19,10 +23,10 @@ function applyHeimdallPalette(pixels) {
     const blue = pixels[index + 2];
     const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
     const ocean = blue > red * 1.25 && blue > green * 1.2;
-    const tint = ocean ? [17, 9, 31] : [21, 132, 110];
+    const tint = ocean ? OCEAN_TINT : LAND_TINT;
     const shade = ocean
       ? 0.45 + clamp(luminance / 80, 0, 1) * 0.7
-      : 0.35 + (luminance / 255) * 0.8;
+      : 0.4 + (luminance / 255) * 0.9;
 
     pixels[index] = Math.round(tint[0] * shade);
     pixels[index + 1] = Math.round(tint[1] * shade);
