@@ -9,7 +9,7 @@ import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import { useSpeaker } from "./useSpeaker";
-import { bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToStars } from "../lib/ui/resultsCopy";
+import { bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToStars } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, CurrentSeasonTone, RotationSection } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, CurrentSeason, Farm, RotationResult } from "../types";
 
@@ -128,13 +128,13 @@ function RainCalendar({ response }: { response: AnalysisResponse }) {
   </article>;
 }
 
-const SEASON_TONE: Record<CurrentSeasonTone, { chip: string; bar: string }> = {
-  dry: { chip: "bg-clay/40 text-clay-light", bar: "bg-clay-light" },
-  normal: { chip: "bg-olive/40 text-olive-light", bar: "bg-olive-light" },
-  wet: { chip: "bg-cream/15 text-cream", bar: "bg-cream" },
+const SEASON_TONE: Record<CurrentSeasonTone, { chip: string; drops: string }> = {
+  dry: { chip: "bg-clay/40 text-clay-light", drops: "text-clay-light" },
+  normal: { chip: "bg-olive/40 text-olive-light", drops: "text-olive-light" },
+  wet: { chip: "bg-cream/15 text-cream", drops: "text-cream" },
 };
 
-/** Cómo va la lluvia reciente frente a lo normal de la misma época: dos barras con la misma escala y una frase simple. */
+/** Cómo va la lluvia reciente frente a lo normal de la misma época: gotas de agua comparativas y frases de campo. */
 function SeasonCard({ season }: { season: CurrentSeason }) {
   const { playingKey, play } = useSpeaker();
   const card = useMemo(() => describeCurrentSeason(season), [season]);
@@ -142,9 +142,9 @@ function SeasonCard({ season }: { season: CurrentSeason }) {
   const article = useRef<HTMLElement>(null);
   useGSAP(() => {
     if (prefersReducedMotion()) return;
-    gsap.from(".season-bar", { scaleX: 0, transformOrigin: "left center", duration: 0.9, ease: "power3.out", stagger: 0.12, delay: 0.3, clearProps: "transform" });
-  }, { scope: article, dependencies: [card.normalBar, card.currentBar] });
-  const bars = [["Lo normal", card.normalBar, "bg-silver-mist/60"], ["Este año", card.currentBar, tone.bar]] as const;
+    gsap.from(".season-drop-on", { scale: 0, duration: 0.45, ease: "back.out(2.2)", stagger: 0.07, delay: 0.25, clearProps: "transform" });
+  }, { scope: article, dependencies: [card.normalDrops, card.currentDrops] });
+  const rows = [["Lo normal", card.normalDrops, "text-silver-mist"], ["Este año", card.currentDrops, tone.drops]] as const;
   return <article ref={article} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 lg:col-span-3">
     <div className="flex items-center gap-3">
       <UiIcon name="rain" className="h-12 w-12 shrink-0 text-olive-light" />
@@ -153,14 +153,15 @@ function SeasonCard({ season }: { season: CurrentSeason }) {
     </div>
     <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-base font-bold ${tone.chip}`}>{card.statusLabel}</p>
     <p className="mt-2 text-lg font-semibold leading-7 text-olive-light">{card.headline}</p>
-    <ul className="mt-3 space-y-2" aria-label="Lluvia normal y de este año">
-      {bars.map(([label, width, color]) => <li key={label} className="flex items-center gap-3">
-        <span className="w-20 shrink-0 text-sm font-semibold text-silver-mist">{label}</span>
-        <span className="h-4 flex-1 overflow-hidden rounded-full bg-meadow/50"><span className={`season-bar block h-full rounded-full ${color}`} style={{ width: `${width}%` }} /></span>
+    <ul className="mt-3 space-y-2" aria-label="Gotas de lluvia normal y de este año">
+      {rows.map(([label, drops, color]) => <li key={label} className="flex items-center gap-3">
+        <span className="w-24 shrink-0 text-sm font-semibold text-silver-mist">{label}</span>
+        <span className={`flex gap-1.5 ${color}`} role="img" aria-label={`${drops} de ${MAX_SEASON_DROPS} gotas`}>
+          {Array.from({ length: MAX_SEASON_DROPS }, (_, index) => <span key={index} className={index < drops ? "season-drop-on" : "opacity-20"}><UiIcon name="dropFilled" className="h-6 w-6" /></span>)}
+        </span>
       </li>)}
     </ul>
-    <p className="mt-3 text-base leading-6 text-bone-white">{card.amount}</p>
-    {card.details.map((detail) => <p key={detail} className="mt-1 text-base leading-6 text-bone-white">{detail}</p>)}
+    {card.details.map((detail, index) => <p key={detail} className={`${index === 0 ? "mt-3" : "mt-1"} text-base leading-6 text-bone-white`}>{detail}</p>)}
     <p className="mt-2 text-sm leading-5 text-ash-gray">{card.note}</p>
     <p className="mt-2 text-base leading-6 text-silver-mist">{card.explanation}</p>
   </article>;

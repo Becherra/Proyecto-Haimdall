@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
 import type { CurrentSeason, Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
@@ -117,63 +117,63 @@ describe("describeCurrentSeason: cómo va la temporada", () => {
     expect(labelOf("much-wetter")).toEqual(["Muy lluviosa", "wet"]);
   });
 
-  it("dice con palabras simples si ha llovido menos, igual o más que lo normal", () => {
-    expect(describeCurrentSeason(season({ status: "much-drier" })).headline).toBe("Ha llovido mucho menos de lo normal.");
-    expect(describeCurrentSeason(season({ status: "drier" })).headline).toBe("Ha llovido menos de lo normal.");
-    expect(describeCurrentSeason(season({ status: "normal" })).headline).toBe("Ha llovido lo normal para esta época.");
-    expect(describeCurrentSeason(season({ status: "wetter" })).headline).toBe("Ha llovido más de lo normal.");
-    expect(describeCurrentSeason(season({ status: "much-wetter" })).headline).toBe("Ha llovido mucho más de lo normal.");
+  it("dice con palabras de campo si ha llovido menos, igual o más que de costumbre, sin usar milímetros ni porcentajes", () => {
+    expect(describeCurrentSeason(season({ status: "much-drier" })).headline).toBe("En estos últimos meses casi no ha llovido. La tierra está mucho más seca que en años normales.");
+    expect(describeCurrentSeason(season({ status: "drier" })).headline).toBe("En estos últimos meses ha llovido menos que en otros años para esta misma época.");
+    expect(describeCurrentSeason(season({ status: "normal" })).headline).toBe("En estos últimos meses ha llovido lo que suele llover todos los años en esta época.");
+    expect(describeCurrentSeason(season({ status: "wetter" })).headline).toBe("En estos últimos meses ha caído más agua que en otros años para esta época.");
+    expect(describeCurrentSeason(season({ status: "much-wetter" })).headline).toBe("En estos últimos meses ha caído mucha más agua que de costumbre. La tierra está bien mojada.");
   });
 
-  it("cuenta cuántos milímetros cayeron en los días de la ventana y cuántos son lo normal", () => {
-    expect(describeCurrentSeason(season()).amount).toBe("En los últimos 87 días cayeron 563 milímetros; lo normal en esa época son 507.");
-  });
-
-  it("habla de la temperatura solo si se aparta de lo normal y no inventa si falta el dato", () => {
+  it("habla del calor o fresco sin grados numéricos y no inventa si falta el dato", () => {
     const sentenceFor = (temperatureAnomalyC: number | null) => describeCurrentSeason(season({ temperatureAnomalyC })).details.join(" ");
-    expect(sentenceFor(1.4)).toContain("1,4 grados más calor de lo normal");
-    expect(sentenceFor(-0.8)).toContain("0,8 grados menos calor de lo normal");
-    expect(sentenceFor(0.2)).toContain("La temperatura ha sido normal");
-    expect(sentenceFor(null)).not.toContain("temperatura");
-    expect(sentenceFor(null)).not.toContain("calor");
+    expect(sentenceFor(1.4)).toContain("más calientes y bochornosos que de costumbre");
+    expect(sentenceFor(-0.8)).toContain("más frescos que de costumbre");
+    expect(sentenceFor(0.2)).toContain("El calor y el fresco han estado normales");
+    expect(sentenceFor(null)).not.toContain("calientes");
+    expect(sentenceFor(null)).not.toContain("frescos");
   });
 
-  it("avisa de los días seguidos casi sin lluvia solo si son varios", () => {
-    expect(describeCurrentSeason(season({ currentDryStreakDays: 12 })).details.join(" ")).toContain("12 días seguidos casi sin lluvia");
-    expect(describeCurrentSeason(season({ currentDryStreakDays: 3 })).details.join(" ")).not.toContain("sin lluvia");
-    expect(describeCurrentSeason(season({ currentDryStreakDays: 1 })).details.join(" ")).not.toContain("seguidos");
+  it("avisa de los días seguidos sin aguacero y da un consejo práctico para el lote según el clima", () => {
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 12 })).details.join(" ")).toContain("varios días seguidos sin que caiga un buen aguacero");
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 3 })).details.join(" ")).not.toContain("aguacero");
+    expect(describeCurrentSeason(season({ status: "much-drier" })).details.join(" ")).toContain("En tu lote: tapa el suelo con hojarasca o rastrojo");
+    expect(describeCurrentSeason(season({ status: "normal" })).details.join(" ")).toContain("En tu lote: la temporada va pareja");
+    expect(describeCurrentSeason(season({ status: "much-wetter" })).details.join(" ")).toContain("En tu lote: cuidado con los hongos en las hojas");
   });
 
-  it("aclara la fecha del dato y que es reciente y no un pronóstico", () => {
+  it("aclara hasta qué fecha se miraron las lluvias y que no adivina si mañana va a llover", () => {
     const { note } = describeCurrentSeason(season());
     expect(note).toContain("12 de noviembre");
-    expect(note).toContain("no es un pronóstico");
+    expect(note).toContain("no adivina si mañana va a llover");
   });
 
-  it("dibuja las barras de lluvia normal y reciente con la misma escala", () => {
-    const low = describeCurrentSeason(season({ rainPercentOfNormal: 40 }));
-    expect(low.normalBar).toBeCloseTo(66.67, 1);
-    expect(low.currentBar).toBeCloseTo(26.67, 1);
-    const high = describeCurrentSeason(season({ rainPercentOfNormal: 200 }));
-    expect(high.currentBar).toBe(100);
-    expect(high.normalBar).toBeCloseTo(50, 5);
+  it("compara con gotas de agua: 3 gotas para lo normal y de 1 a 5 gotas según qué tan seca o lluviosa va la temporada", () => {
+    const dropsOf = (status: CurrentSeason["status"]) => { const card = describeCurrentSeason(season({ status })); return [card.normalDrops, card.currentDrops]; };
+    expect(dropsOf("much-drier")).toEqual([NORMAL_SEASON_DROPS, 1]);
+    expect(dropsOf("drier")).toEqual([NORMAL_SEASON_DROPS, 2]);
+    expect(dropsOf("normal")).toEqual([NORMAL_SEASON_DROPS, 3]);
+    expect(dropsOf("wetter")).toEqual([NORMAL_SEASON_DROPS, 4]);
+    expect(dropsOf("much-wetter")).toEqual([NORMAL_SEASON_DROPS, MAX_SEASON_DROPS]);
   });
 
-  it("sin porcentaje (lo normal es 0 mm) no inventa barras de comparación", () => {
+  it("sin porcentaje (lo normal es 0 mm) no inventa gotas normales", () => {
     const card = describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 0, status: "normal" }));
-    expect(card.normalBar).toBe(0);
-    expect(card.currentBar).toBe(0);
-    expect(describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 12, status: "much-wetter" })).currentBar).toBe(100);
+    expect(card.normalDrops).toBe(0);
+    expect(card.currentDrops).toBe(0);
+    expect(describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 12, status: "much-wetter" })).currentDrops).toBe(MAX_SEASON_DROPS);
   });
 
-  it("para leer en voz alta: la explicación fija (grabable) y luego lo que dicen los datos", () => {
+  it("para leer en voz alta: la explicación fija (grabable) y luego lo que pasa en el campo, sin milímetros", () => {
     const [fixed, data] = currentSeasonSpeechItems(describeCurrentSeason(season({ status: "drier", currentDryStreakDays: 12 })));
     expect(fixed.audioId).toBe("clima-temporada");
     expect(fixed.text).toContain("¿Cómo va esta temporada?");
     expect(data.audioId).toBeUndefined();
-    expect(data.text).toContain("Ha llovido menos de lo normal");
-    expect(data.text).toContain("563 milímetros");
-    expect(data.text).toContain("no es un pronóstico");
+    expect(data.text).toContain("Más seca de lo normal");
+    expect(data.text).toContain("ha llovido menos que en otros años");
+    expect(data.text).toContain("En tu lote:");
+    expect(data.text).toContain("no adivina si mañana va a llover");
+    expect(data.text).not.toContain("milímetros");
   });
 });
 
