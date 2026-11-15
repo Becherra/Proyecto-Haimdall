@@ -62,3 +62,6 @@ export const STEEP_SLOPE_REFERENCE_PERCENT = 30;
 export const EROSIVE_RAIN_REFERENCE_MM = 25;
 /** Penalización máxima (escala 0–5) para una rotación sin cobertura en una ladera empinada con aguaceros fuertes. */
 export const MAX_SLOPE_EROSION_PENALTY = 0.75;
+
+/** Días por mes para pasar el ciclo de un cultivo (días) a meses de ocupación del lote en el calendario de la rotación. */
+export const CALENDAR_DAYS_PER_MONTH = 30;

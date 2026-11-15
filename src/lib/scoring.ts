@@ -1,4 +1,5 @@
-import type { Crop, Indicators, Rotation, RotationResult, UserPriorities } from "../types";
+import type { Crop, Indicators, Rotation, RotationCalendar, RotationResult, UserPriorities } from "../types";
+import { buildRotationCalendar, calendarEvidence, calendarGap, calendarRisks } from "./calendar";
 import {
   SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
   MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY, MAX_SLOPE_EROSION_PENALTY, MAX_TEMPERATURE_PENALTY, MAX_WATER_SCARCITY_PENALTY, SLOPE_CAUTION_THRESHOLD_PERCENT, WATER_AVAILABILITY_DROUGHT_FACTOR,
@@ -13,7 +14,7 @@ type Criterion = { key: CriterionKey; label: string; weight: number; value: numb
 type Penalty = { label: string; value: number };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
 /** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
-type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
+type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
 type WaterAvailability = NonNullable<UserPriorities["waterAvailability"]>;
 
 /**
@@ -131,6 +132,7 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const values = criterionValues(crops, dryness);
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
   const sowing = seasonality ? crops.map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
+  const calendar = seasonality ? buildRotationCalendar(crops, seasonality) : null;
   const familyBreak = familyBreakShare(crops);
   const { waterAvailability } = priorities;
   const waterFactor = WATER_AVAILABILITY_DROUGHT_FACTOR[waterAvailability ?? "medium"];
@@ -138,7 +140,7 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const penalties = [...riskPenalties(crops, indicators, dryness, years, waterFactor), ...climatePenalties(crops, indicators, years, waterAvailability), ...sowingRisk, ...pestCyclePenalties(familyBreak)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, criteria, penalties, sowing, years, familyBreak, waterAvailability, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, criteria, penalties, sowing, calendar, years, familyBreak, waterAvailability, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -224,6 +226,7 @@ function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[]
     ...terrainEvidence(indicators),
     ...(waterAvailability ? [`Disponibilidad de agua declarada por el agricultor: ${WATER_AVAILABILITY_LABELS[waterAvailability]}.`] : []),
     ...sowingEvidence(sowing, indicators),
+    ...(evaluation.calendar ? calendarEvidence(evaluation.calendar) : []),
     ...familyEvidence(evaluation),
     durationEvidence(crops),
     ...crops.map((crop) => `Atributos de ${crop.name}: ${crop.source}.`),
@@ -286,6 +289,7 @@ function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   for (const { crop, assessment } of sowing ?? []) {
     if (assessment.dryMonths.length > 0) risks.push(`Parte de los meses de siembra de ${crop.name} (${formatMonths(assessment.dryMonths)}) cae en época seca del sitio.`);
   }
+  if (evaluation.calendar) risks.push(...calendarRisks(evaluation.calendar, crops));
   risks.push(...familyRisks(evaluation));
   return [...risks, "El puntaje es una simplificación por reglas: no captura plagas, precios, costos ni manejo real."];
 }
@@ -319,7 +323,7 @@ function terrainGaps({ terrainSource }: Indicators): string[] {
     : [];
 }
 
-function buildGaps(indicators: Indicators, { crops, sowing, familyBreak }: Evaluation): string[] {
+function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
@@ -327,6 +331,7 @@ function buildGaps(indicators: Indicators, { crops, sowing, familyBreak }: Evalu
     ...temperatureGaps(crops, indicators),
     ...terrainGaps(indicators),
     ...sowingGaps(sowing),
+    ...(calendar ? [calendarGap()] : []),
     familyGap(familyBreak),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),
     ...missing,
@@ -346,6 +351,7 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
       `Variedades y fechas de siembra locales de ${evaluation.crops.map((crop) => crop.name).join(", ")}.`,
       "Confirmar con un agrónomo local los atributos del catálogo y su adecuación al sitio.",
     ],
+    ...(evaluation.calendar ? { calendar: evaluation.calendar } : {}),
   };
 }
 
