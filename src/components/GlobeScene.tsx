@@ -78,10 +78,10 @@ export default function GlobeScene({ location, active = true, introSpin = false 
 
   useEffect(() => {
     if (location && globeRef.current && size.width > 0) {
-      const view = calculateGlobeView(true, size.width);
+      const view = calculateGlobeView(true, size.width, reducedMotion);
       globeRef.current.pointOfView({ lat: location.lat, lng: location.lon, altitude: view.altitude }, view.transitionMs);
     }
-  }, [location, size.width]);
+  }, [location, reducedMotion, size.width]);
 
   useEffect(() => {
     if (!introSpin || !globeRef.current) return;
