@@ -47,9 +47,10 @@ function terrainSources({ cellElevationMeters, siteElevationMeters, slopePercent
  * Lista los datos que alimentan un análisis y para qué se usó cada uno, para que todo número mostrado se pueda rastrear
  * a un dato de NASA POWER, al catálogo de cultivos o a lo que declaró el agricultor.
  */
-export function listDataSources(indicators: Indicators): DataSource[] {
+export function listDataSources(indicators: Indicators, { currentSeason = false }: { currentSeason?: boolean } = {}): DataSource[] {
   return [
     ...powerSources(indicators),
+    ...(currentSeason ? [{ id: "power-recent", name: "Clima de los últimos días", provider: POWER_PROVIDER, use: "Comparar la lluvia de la temporada actual con lo normal de esa misma época (lectura reciente y preliminar, no un pronóstico).", url: POWER_URL }] : []),
     ...terrainSources(indicators),
     {
       id: "crops-catalog", name: "Catálogo de cultivos (data/crops.json)", provider: "Equipo Heimdall, con fuente por cultivo en docs/crops-rubric.md",

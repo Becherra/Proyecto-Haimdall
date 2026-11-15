@@ -1,6 +1,6 @@
 import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, type MonthlyWaterDeficit, type MonthlyWetnessAnomaly } from "../types";
 import { dayOfYear, extraterrestrialRadiation, hargreavesDailyPet } from "./evapotranspiration";
-import { EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_YEARS_FOR_ANOMALY_BASELINE } from "./config";
+import { DRY_DAY_RAIN_MM, EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_MONTHS_FOR_WORST_YEAR, MIN_YEAR_COVERAGE, MIN_YEARS_FOR_ANOMALY_BASELINE, MIN_YEARS_FOR_WORST_YEAR } from "./config";
 import { adjustRecordsForElevation } from "./terrain";
 
 export type TerrainIndicatorsInput = {
@@ -148,6 +148,49 @@ export function extremeRainThreshold(records: readonly ClimateRecord[]): Indicat
   return { value: percentile(value, EXTREME_RAIN_PERCENTILE), missing };
 }
 
+/**
+ * Racha más larga de días seguidos con lluvia menor que `DRY_DAY_RAIN_MM`, tomando los registros en el orden recibido.
+ * Un día sin dato corta la racha: no se supone que siguió seco.
+ */
+export function longestDrySpell(records: readonly ClimateRecord[]): number {
+  let longest = 0;
+  let current = 0;
+  for (const { PRECTOTCORR: rain } of records) {
+    current = rain !== null && rain < DRY_DAY_RAIN_MM ? current + 1 : 0;
+    longest = Math.max(longest, current);
+  }
+  return longest;
+}
+
+/** Racha seca más larga de cada año con al menos `MIN_YEAR_COVERAGE` de días con dato de lluvia; una racha no cruza de un año al siguiente. */
+export function annualDrySpells(records: readonly ClimateRecord[]): Array<{ year: number; days: number }> {
+  const byYear = new Map<number, ClimateRecord[]>();
+  for (const record of records) {
+    const year = Number(record.date.slice(0, 4));
+    byYear.set(year, [...(byYear.get(year) ?? []), record]);
+  }
+  return [...byYear]
+    .filter(([, days]) => validValues(days, "PRECTOTCORR").value.length / days.length >= MIN_YEAR_COVERAGE)
+    .map(([year, days]) => ({ year, days: longestDrySpell(days) }))
+    .sort((a, b) => a.year - b.year);
+}
+
+/**
+ * Año con el balance hídrico medio mensual más bajo (lluvia − demanda de agua). Solo cuentan los años con al menos
+ * `MIN_MONTHS_FOR_WORST_YEAR` meses con balance, y solo se declara con `MIN_YEARS_FOR_WORST_YEAR` años o más.
+ * En empate gana el año más antiguo.
+ */
+export function worstYearWaterBalance(monthly: readonly MonthlyClimate[]): { year: number; waterBalanceMm: number } | undefined {
+  const byYear = new Map<number, number[]>();
+  for (const entry of monthly) {
+    const balance = monthlyWaterBalance(entry);
+    if (balance !== null) byYear.set(entry.year, [...(byYear.get(entry.year) ?? []), balance]);
+  }
+  const years = [...byYear].filter(([, balances]) => balances.length >= MIN_MONTHS_FOR_WORST_YEAR).map(([year, balances]) => ({ year, waterBalanceMm: mean(balances) as number }));
+  if (years.length < MIN_YEARS_FOR_WORST_YEAR) return undefined;
+  return years.reduce((worst, candidate) => (candidate.waterBalanceMm < worst.waterBalanceMm ? candidate : worst));
+}
+
 function historicalWetnessByMonth(monthly: readonly MonthlyClimate[]): Map<number, number | null> {
   const byMonth = new Map<number, number[]>();
   for (const { month, rootZoneWetness } of monthly) {
@@ -193,7 +236,10 @@ export function computeWetnessAnomalies(monthly: readonly MonthlyClimate[]): Mon
  */
 export function computeIndicators(rawRecords: readonly ClimateRecord[], latitude?: number, terrain?: TerrainIndicatorsInput): Indicators {
   const records = adjustRecordsForElevation(rawRecords, terrain?.cellElevationMeters, terrain?.siteElevationMeters);
-  const monthlyBalances = computeMonthlyWaterDeficit(aggregateMonthly(records, latitude)).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
+  const monthly = aggregateMonthly(records, latitude);
+  const annualSpells = annualDrySpells(records);
+  const worstYear = worstYearWaterBalance(monthly);
+  const monthlyBalances = computeMonthlyWaterDeficit(monthly).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
   const cellMeanC = mean(validValues(rawRecords, "T2M").value);
   const meanTemperatureC = mean(validValues(records, "T2M").value);
   const canAdjust = cellMeanC !== null && terrain?.cellElevationMeters !== undefined && terrain?.siteElevationMeters !== undefined;
@@ -204,6 +250,9 @@ export function computeIndicators(rawRecords: readonly ClimateRecord[], latitude
     extremeRainThresholdMm: extremeRainThreshold(records).value,
     meanRootZoneWetness: mean(validValues(records, "GWETROOT").value),
     meanTemperatureC,
+    longestDrySpellDays: longestDrySpell(records),
+    meanAnnualDrySpellDays: mean(annualSpells.map(({ days }) => days)),
+    ...(worstYear ? { worstYear } : {}),
     ...(canAdjust ? { cellMeanTemperatureC: cellMeanC } : {}),
     ...(terrain?.cellElevationMeters === undefined ? {} : { cellElevationMeters: terrain.cellElevationMeters }),
     ...(terrain?.siteElevationMeters === undefined ? {} : { siteElevationMeters: terrain.siteElevationMeters }),

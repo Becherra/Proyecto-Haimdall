@@ -2,12 +2,19 @@ import { analysisRequestSchema, analysisResponseSchema } from "../types";
 import type { AnalysisRequest, AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "../types";
 import { mockAnalysisResponse } from "../mocks";
 
-const ANALYSIS_PERIOD = { startYear: 2020, endYear: 2022 } as const;
+/** Años de clima que se analizan: los últimos 15 completos (el máximo que acepta el cliente de NASA POWER), para que la línea base incluya años de El Niño y de La Niña. */
+const ANALYSIS_YEARS = 15;
+
+/** Periodo de clima del análisis: termina en el último año completo. `now` se inyecta para poder probarlo. */
+export function analysisPeriod(now: Date = new Date()): { startYear: number; endYear: number } {
+  const endYear = now.getFullYear() - 1;
+  return { startYear: endYear - ANALYSIS_YEARS + 1, endYear };
+}
 
 /** Builds the shared API contract from the confirmed farm and the farmer's priorities. */
 export function buildAnalysisRequest(farm: Farm, priorities: UserPriorities, scenario?: ClimateScenario): AnalysisRequest {
   return analysisRequestSchema.parse({
-    lat: farm.centroid.lat, lon: farm.centroid.lon, ...ANALYSIS_PERIOD, priorities, farm,
+    lat: farm.centroid.lat, lon: farm.centroid.lon, ...analysisPeriod(), priorities, farm,
     ...(scenario ? { scenario } : {}),
   });
 }

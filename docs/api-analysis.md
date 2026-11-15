@@ -27,7 +27,7 @@ La herramienta es **apoyo a la decisión**: cada rotación trae por qué se sugi
 | Campo | Obligatorio | Detalle |
 | --- | --- | --- |
 | `lat`, `lon` | Sí | Se usan solo si no llega `farm`. |
-| `startYear`, `endYear` | Sí | Desde 1981 hasta el año pasado; máximo 15 años. |
+| `startYear`, `endYear` | Sí | Desde 1981 hasta el año pasado; máximo 15 años. La interfaz pide los últimos 15 años completos (hoy 2011–2025): una serie corta no muestra cómo cambia la lluvia de un año a otro. |
 | `priorities` | Sí | Cinco valores de 0 a 5: `waterSaving`, `extraIncome`, `soilImprovement`, `erosionReduction`, `lowRisk`. |
 | `priorities.currentCropId` | No | Cultivo actual. Por defecto `maiz`. Ids válidos: `maiz`, `frijol`, `soya`, `arveja`, `mucuna`, `crotalaria`, `yuca`, `papa`, `avena`, `repollo`. |
 | `priorities.waterAvailability` | No | `low`, `medium` o `high`. |
@@ -61,6 +61,8 @@ Las cifras del ejemplo salen de una respuesta real para Pereira 2020–2022 sin 
 - **`indicators`**: `waterDeficitMm` es lluvia − evaporación media mensual (negativo = déficit). `heatStressDays` y `frostRiskDays` son totales de la serie, no por año. `meanTemperatureC` ya viene corregida por altitud cuando se conoce la del lote; `cellMeanTemperatureC` es la de la celda sin corregir.
 - **`rotations`**: siempre tres y en este orden: `baseline` (el cultivo actual solo), `legume` (con una leguminosa) y `cover-drought` (cobertura + cultivo tolerante a sequía). `score` va de 0 a 5.
 - **`rotations[].calendar`**: un ciclo completo de la rotación mes a mes; puede durar más de 12 meses. `cropId: null` es campo vacío. `risk` es `bare-soil-rain` (campo vacío en mes lluvioso), `water-stress` (cultivo poco tolerante a sequía en mes seco) o `null`. Solo llega dentro del Eje Cafetero, donde vale el calendario de siembra del catálogo.
+- **`indicators` de sequía**: `longestDrySpellDays` es la racha más larga de días seguidos con menos de 1 mm de lluvia; `meanAnnualDrySpellDays` es el promedio de la racha máxima de cada año; `worstYear` es el año con el balance hídrico medio mensual más bajo (solo con 5 años completos o más). El peor año agrega una penalización pequeña a los cultivos de baja tolerancia a sequía, solo por lo que se suma a la sequía del promedio.
+- **`currentSeason`**: los últimos días (hasta 90) de NASA POWER frente al mismo tramo del calendario en la serie. NASA publica con unos días de retraso, así que `lastDate` queda unos días antes de hoy. `status` es `much-drier`, `drier`, `normal`, `wetter` o `much-wetter` según el % de la lluvia normal (cortes en `config.ts`, heurística de diseño). Es una lectura reciente y **preliminar**, no un pronóstico. Falta si NASA no entregó los últimos días, si hay menos de 80 % de días con dato o si la serie no tiene 5 años con dato en esa época; en el primer caso cada rotación lo declara como vacío.
 - **`dataSources`**: qué dato se usó, de quién es y para qué.
 - **`scenario`**: solo si se pidió. `monthlyClimate`, `indicators` y `rotations` ya lo reflejan.
 
@@ -94,7 +96,7 @@ Lo que **no** es dato de la NASA POWER: el catálogo de cultivos (`data/crops.js
 
 ### Muestras precargadas
 
-Si NASA POWER no responde, hay respaldo para Pereira (cubre también Santa Rosa de Cabal), Manizales y Armenia, con los años 2020–2022. Son respuestas reales de la API guardadas sin modificar en `data/samples/`.
+Si NASA POWER no responde, hay respaldo para Pereira (cubre también Santa Rosa de Cabal), Manizales y Armenia, con los años 2011–2025. Son respuestas reales de la API guardadas sin modificar en `data/samples/`; se regeneran con `node scripts/build-power-samples.mjs`. Si se piden más años de los que tiene la muestra, la respuesta lo declara como vacío ("Se pidieron N años de clima y la serie trae M"), igual que declara que los datos son una muestra guardada.
 
 ## Límites conocidos
 
@@ -103,6 +105,7 @@ Si NASA POWER no responde, hay respaldo para Pereira (cubre también Santa Rosa 
 - **Catálogo.** Diez cultivos anuales; no hay perennes (café, plátano, pastos). Los puntajes 0–5 son preliminares y no los ha validado un agrónomo. Los meses de siembra son los mismos para todos los cultivos y no tienen fuente propia para papa, avena y repollo.
 - **Calendario.** Es ilustrativo: usa meses de siembra y ciclos típicos, no las fechas reales del agricultor.
 - **Escenarios.** Son un cambio uniforme sobre la serie histórica, no una proyección climática; la humedad del suelo no se recalcula.
+- **Clima reciente.** Solo lluvia y temperatura de NASA POWER de los últimos días; no hay pronóstico. IMERG, SMAP y NDVI recientes no están integrados.
 - **Sin datos de suelo, plagas, precios ni costos.** Tampoco se integraron NDVI, SMAP ni GAEZ.
 
 ## Uso de inteligencia artificial

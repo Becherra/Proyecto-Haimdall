@@ -65,3 +65,29 @@ export const MAX_SLOPE_EROSION_PENALTY = 0.75;
 
 /** Días por mes para pasar el ciclo de un cultivo (días) a meses de ocupación del lote en el calendario de la rotación. */
 export const CALENDAR_DAYS_PER_MONTH = 30;
+
+/** Lluvia diaria (mm) por debajo de la cual el día cuenta como seco al medir rachas secas. Convención habitual en climatología (1 mm). */
+export const DRY_DAY_RAIN_MM = 1;
+/** Fracción mínima de días con dato de lluvia para que un año entre en las estadísticas anuales (racha seca, peor año). */
+export const MIN_YEAR_COVERAGE = 0.8;
+/** Años completos mínimos para llamar "peor año" a uno de la serie; con menos, el peor año no dice nada. */
+export const MIN_YEARS_FOR_WORST_YEAR = 5;
+/** Meses con balance hídrico que debe tener un año para promediarlo y compararlo como "peor año". */
+export const MIN_MONTHS_FOR_WORST_YEAR = 10;
+/**
+ * Cuánto pesa la sequía del peor año, frente a la del promedio, en la penalización por sequía:
+ * 0 la ignora y 1 la trata igual que al promedio. Heurística de diseño, no un dato; validar con un agrónomo local.
+ */
+export const WORST_YEAR_DROUGHT_WEIGHT = 0.5;
+/** Racha seca (días seguidos) desde la cual se avisa a los cultivos de baja tolerancia a sequía. Heurística de diseño; validar con un agrónomo local. */
+export const DRY_SPELL_ALERT_DAYS = 20;
+
+/** Días de NASA POWER reciente que se comparan con lo normal para describir la temporada actual. */
+export const CURRENT_SEASON_DAYS = 90;
+/** Años mínimos de la serie histórica con dato suficiente en la misma época para que "lo normal" sirva de comparación. */
+export const MIN_YEARS_FOR_CURRENT_SEASON = 5;
+/**
+ * Cortes de la lluvia reciente como % de la normal para decir si la temporada va muy seca, seca, normal, húmeda o muy húmeda.
+ * Heurística de diseño, no un dato oficial; validar con un agrónomo local.
+ */
+export const CURRENT_SEASON_PERCENT = { muchDrier: 50, drier: 80, wetter: 120, muchWetter: 150 } as const;
