@@ -4,6 +4,10 @@ import { POST } from "../src/app/api/analysis/route";
 import { clearClimateCache } from "../src/lib/nasaPower";
 import { analysisResponseSchema } from "../src/types";
 
+
+// El terreno en vivo llama a otro servicio con el mismo fetch global: aquí se apaga para que estos tests solo cuenten las llamadas a NASA POWER.
+vi.mock("../src/lib/terrainLive", () => ({ fetchLiveTerrain: vi.fn().mockResolvedValue(null), clearLiveTerrainCache: vi.fn() }));
+
 const fixture = readFileSync("tests/fixtures/power-pereira.json", "utf8");
 const priorities = { waterSaving: 4, extraIncome: 2, soilImprovement: 3, erosionReduction: 3, lowRisk: 2 };
 const pereira = { lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022, priorities };

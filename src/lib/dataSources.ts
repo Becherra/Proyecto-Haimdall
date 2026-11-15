@@ -34,6 +34,9 @@ function terrainSources({ cellElevationMeters, siteElevationMeters, slopePercent
   if (cellElevationMeters !== undefined && siteElevationMeters !== undefined) {
     sources.push({ id: "power-cell-elevation", name: "Altitud media de la celda", provider: POWER_PROVIDER, use: "Corregir la temperatura de la celda a la altitud del lote.", url: POWER_URL });
   }
+  if (hasSiteTerrain && terrainSource === "srtm-live") {
+    sources.push({ id: "terrain-srtm-live", name: "Altitud y pendiente del lote (medidas en vivo)", provider: "NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC), consultado vía OpenTopoData", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera.", url: SRTM_URL });
+  }
   if (hasSiteTerrain && terrainSource === "srtm-sample") {
     sources.push({ id: "terrain-srtm", name: "Altitud y pendiente del punto piloto más cercano", provider: "NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC)", use: "Ajuste de temperatura por altitud y riesgo de erosión en ladera.", url: SRTM_URL });
   }

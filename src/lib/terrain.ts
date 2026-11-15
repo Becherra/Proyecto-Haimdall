@@ -2,6 +2,7 @@ import { z } from "zod";
 import srtmSamplesData from "../../data/samples/srtm-eje-cafetero.json";
 import { terrainSampleSchema, type ClimateRecord, type Crop, type TerrainSample, type UserPriorities } from "../types";
 import { EROSIVE_RAIN_REFERENCE_MM, SLOPE_CAUTION_THRESHOLD_PERCENT, STEEP_SLOPE_REFERENCE_PERCENT, TEMPERATURE_LAPSE_RATE_C_PER_METER } from "./config";
+import type { LiveTerrain } from "./terrainGrid";
 
 const MAX_SCORE = 5;
 
@@ -14,7 +15,10 @@ export const TERRAIN_SAMPLES: readonly TerrainSample[] = z.array(terrainSampleSc
 export type ResolvedTerrain = {
   elevationMeters?: number;
   slopePercent?: number;
-  source: "srtm-sample" | "user";
+  source: "srtm-live" | "srtm-sample" | "user";
+  /** Solo con `srtm-live`: menor y mayor pendiente entre las celdas medidas y el lado de la celda (m). */
+  slopeRangePercent?: [number, number];
+  cellMeters?: number;
 };
 
 function distanceSquared(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -31,20 +35,26 @@ export function findTerrainSample(lat: number, lon: number, samples: readonly Te
 }
 
 /**
- * Resuelve la altitud y pendiente del lote: prioriza lo que declara el agricultor y, cuando `useSampleFallback` es verdadero,
- * completa con la muestra de terreno precargada de la zona piloto.
+ * Resuelve la altitud y pendiente del lote. Prioridad: lo que declara el agricultor, luego la medición en vivo de NASA SRTM sobre el lote
+ * (`liveTerrain`) y, por último, la muestra precargada del punto piloto más cercano. Lo medido (en vivo o muestra) solo se usa cuando
+ * `useSampleFallback` es verdadero o el agricultor declaró algo, y completa lo que el agricultor no declaró.
  */
 export function resolveTerrain(
   location: { lat: number; lon: number },
   priorities?: Pick<UserPriorities, "elevationMeters" | "slopePercent">,
   useSampleFallback = false,
   samples: readonly TerrainSample[] = TERRAIN_SAMPLES,
+  liveTerrain: LiveTerrain | null = null,
 ): ResolvedTerrain | null {
   const hasUserTerrain = priorities?.elevationMeters !== undefined || priorities?.slopePercent !== undefined;
-  const sample = (hasUserTerrain || useSampleFallback) ? findTerrainSample(location.lat, location.lon, samples) : null;
+  const useMeasured = hasUserTerrain || useSampleFallback;
+  const live = useMeasured ? liveTerrain : null;
+  const sample = useMeasured && !live ? findTerrainSample(location.lat, location.lon, samples) : null;
+  const measured = live ?? sample;
   if (hasUserTerrain) {
-    return { elevationMeters: priorities?.elevationMeters ?? sample?.elevationMeters, slopePercent: priorities?.slopePercent ?? sample?.slopePercent, source: "user" };
+    return { elevationMeters: priorities?.elevationMeters ?? measured?.elevationMeters, slopePercent: priorities?.slopePercent ?? measured?.slopePercent, source: "user" };
   }
+  if (live) return { elevationMeters: live.elevationMeters, slopePercent: live.slopePercent, source: "srtm-live", slopeRangePercent: live.slopeRangePercent, cellMeters: live.cellMeters };
   return sample ? { elevationMeters: sample.elevationMeters, slopePercent: sample.slopePercent, source: "srtm-sample" } : null;
 }
 
