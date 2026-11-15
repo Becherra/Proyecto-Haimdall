@@ -1,7 +1,7 @@
 import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, type MonthlyWaterDeficit, type MonthlyWetnessAnomaly } from "../types";
 import { dayOfYear, extraterrestrialRadiation, hargreavesDailyPet } from "./evapotranspiration";
 import { EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_YEARS_FOR_ANOMALY_BASELINE } from "./config";
-import { adjustTemperatureForElevation } from "./terrain";
+import { adjustRecordsForElevation } from "./terrain";
 
 export type TerrainIndicatorsInput = {
   cellElevationMeters?: number;
@@ -185,15 +185,18 @@ export function computeWetnessAnomalies(monthly: readonly MonthlyClimate[]): Mon
  * - `heatStressDays` / `frostRiskDays`: total de días de toda la serie (no promedio anual).
  * - `extremeRainThresholdMm`: percentil 95 de lluvia diaria.
  * - `meanRootZoneWetness`: promedio de los días con dato de GWETROOT.
- * - `meanTemperatureC`: promedio de T2M de los días con dato (temperatura de la celda de NASA POWER, no del lote).
+ * - Con las altitudes de la celda y del lote (`terrain`), todas las temperaturas (media, mínima y máxima) se llevan a la altitud del lote
+ *   antes de calcular evaporación potencial, días de calor, de helada y media. Sin ellas se usa la temperatura de la celda.
+ * - `meanTemperatureC`: promedio de T2M de los días con dato (del lote si hay altitudes; `cellMeanTemperatureC` guarda la de la celda).
  * - `missingByParameter`: días sin dato por cada uno de los parámetros NASA.
  * Un indicador sin datos suficientes queda en null (o 0 en los conteos de días).
  */
-export function computeIndicators(records: readonly ClimateRecord[], latitude?: number, terrain?: TerrainIndicatorsInput): Indicators {
+export function computeIndicators(rawRecords: readonly ClimateRecord[], latitude?: number, terrain?: TerrainIndicatorsInput): Indicators {
+  const records = adjustRecordsForElevation(rawRecords, terrain?.cellElevationMeters, terrain?.siteElevationMeters);
   const monthlyBalances = computeMonthlyWaterDeficit(aggregateMonthly(records, latitude)).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
-  const cellMeanC = mean(validValues(records, "T2M").value);
+  const cellMeanC = mean(validValues(rawRecords, "T2M").value);
+  const meanTemperatureC = mean(validValues(records, "T2M").value);
   const canAdjust = cellMeanC !== null && terrain?.cellElevationMeters !== undefined && terrain?.siteElevationMeters !== undefined;
-  const meanTemperatureC = canAdjust ? adjustTemperatureForElevation(cellMeanC, terrain.cellElevationMeters!, terrain.siteElevationMeters!) : cellMeanC;
   return {
     waterDeficitMm: mean(monthlyBalances),
     heatStressDays: countHeatStressDays(records).value,

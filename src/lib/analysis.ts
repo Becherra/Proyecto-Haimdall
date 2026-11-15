@@ -6,7 +6,7 @@ import { baselineRotation, candidateRotations, pickBest } from "./rotations";
 import { applyScenario, isNeutralScenario, scenarioGap } from "./scenario";
 import { scoreRotations } from "./scoring";
 import { computeSeasonality } from "./seasonality";
-import { resolveTerrain } from "./terrain";
+import { adjustRecordsForElevation, resolveTerrain } from "./terrain";
 
 /** Error causado por datos de entrada inválidos (el cliente puede corregirlos), a diferencia de un fallo interno. */
 export class AnalysisInputError extends Error {}
@@ -67,7 +67,7 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const records = applied ? applyScenario(climate.records, applied) : climate.records;
   const extraGaps = applied ? [...siteGaps, scenarioGap(applied)] : siteGaps;
   const indicators = computeIndicators(records, location.lat, terrainInput);
-  const monthlyClimate = aggregateMonthly(records, location.lat);
+  const monthlyClimate = aggregateMonthly(adjustRecordsForElevation(records, terrainInput?.cellElevationMeters, terrainInput?.siteElevationMeters), location.lat);
   const seasonality = isInSowingCalendarRegion(location.lat, location.lon) ? computeSeasonality(monthlyClimate) : undefined;
   const yearsAnalyzed = countYears(records);
   const score = (rotations: readonly Rotation[]) => scoreRotations({ rotations, crops, indicators, priorities, seasonality, yearsAnalyzed });

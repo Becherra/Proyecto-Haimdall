@@ -218,7 +218,7 @@ function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[]
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
   return [
     ...(balance === null ? [] : [balanceEvidence(balance, indicators)]),
-    `Días con T2M_MAX > ${HEAT_STRESS_THRESHOLD_C} °C: ${daysPerYearText(heatStressDays, years)}; días con T2M_MIN < ${FROST_THRESHOLD_C} °C: ${daysPerYearText(frostRiskDays, years)} (NASA POWER).`,
+    `Días con T2M_MAX > ${HEAT_STRESS_THRESHOLD_C} °C: ${daysPerYearText(heatStressDays, years)}; días con T2M_MIN < ${FROST_THRESHOLD_C} °C: ${daysPerYearText(frostRiskDays, years)} (NASA POWER${isElevationAdjusted(indicators) ? ", temperaturas ajustadas a la altitud del lote" : ""}).`,
     ...(rain === null ? [] : [`Lluvia diaria extrema (percentil 95): ${oneDecimal(rain)} mm/día (NASA POWER, PRECTOTCORR).`]),
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
@@ -316,11 +316,20 @@ function temperatureGaps(crops: readonly Crop[], { meanTemperatureC }: Indicator
   ];
 }
 
-/** Las muestras de terreno precargadas son cifras de referencia de la zona: aún no se leyeron del ráster de NASA SRTM. */
-function terrainGaps({ terrainSource }: Indicators): string[] {
-  return terrainSource === "srtm-sample"
-    ? ["La altitud y la pendiente son estimaciones de referencia de la zona: no son mediciones del lote ni lecturas verificadas de NASA SRTM."]
-    : [];
+/** ¿Se llevaron las temperaturas de la celda de NASA POWER a la altitud del lote? */
+function isElevationAdjusted({ cellElevationMeters, siteElevationMeters }: Indicators): boolean {
+  return cellElevationMeters !== undefined && siteElevationMeters !== undefined;
+}
+
+/**
+ * Las muestras de terreno precargadas son cifras de referencia de la zona: aún no se leyeron del ráster de NASA SRTM.
+ * Y la corrección por altitud usa un gradiente promedio también para mínimas, máximas y evaporación: es un supuesto.
+ */
+function terrainGaps(indicators: Indicators): string[] {
+  return [
+    ...(indicators.terrainSource === "srtm-sample" ? ["La altitud y la pendiente son estimaciones de referencia de la zona: no son mediciones del lote ni lecturas verificadas de NASA SRTM."] : []),
+    ...(isElevationAdjusted(indicators) ? ["La corrección por altitud aplica el mismo gradiente andino promedio (~0,6 °C por cada 100 m) a la media, las mínimas y las máximas, y de ahí sale la evaporación estimada: es un supuesto, no una medición en el lote."] : []),
+  ];
 }
 
 function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar }: Evaluation): string[] {
