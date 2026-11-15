@@ -1,0 +1,50 @@
+import { analysisRequestSchema, analysisResponseSchema } from "../types";
+import type { AnalysisRequest, AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "../types";
+import { mockAnalysisResponse } from "../mocks";
+
+const ANALYSIS_PERIOD = { startYear: 2020, endYear: 2022 } as const;
+
+/** Builds the shared API contract from the confirmed farm and the farmer's priorities. */
+export function buildAnalysisRequest(farm: Farm, priorities: UserPriorities, scenario?: ClimateScenario): AnalysisRequest {
+  return analysisRequestSchema.parse({
+    lat: farm.centroid.lat, lon: farm.centroid.lon, ...ANALYSIS_PERIOD, priorities, farm,
+    ...(scenario ? { scenario } : {}),
+  });
+}
+
+export function isAnalysisMockMode(): boolean {
+  return process.env.NEXT_PUBLIC_USE_MOCKS === "true";
+}
+
+/** Calls the analysis API and validates its response before it reaches the UI. */
+export async function runAnalysis(request: AnalysisRequest): Promise<AnalysisResponse> {
+  const parsedRequest = analysisRequestSchema.parse(request);
+  if (isAnalysisMockMode()) {
+    if (hasActiveScenario(parsedRequest.scenario)) throw new Error("Los escenarios requieren el backend real; desactiva NEXT_PUBLIC_USE_MOCKS.");
+    return analysisResponseSchema.parse(mockAnalysisResponse);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch("/api/analysis", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedRequest),
+    });
+  } catch {
+    throw new Error("No pudimos conectar con el análisis. Revisa tu conexión e inténtalo de nuevo.");
+  }
+
+  const payload = await response.json().catch(() => null) as unknown;
+  if (!response.ok) throw new Error(getApiError(payload) ?? `El análisis respondió con HTTP ${response.status}.`);
+  const parsedResponse = analysisResponseSchema.safeParse(payload);
+  if (!parsedResponse.success) throw new Error("La respuesta del análisis no coincide con el contrato esperado.");
+  return parsedResponse.data;
+}
+
+function hasActiveScenario(scenario: ClimateScenario | undefined): boolean {
+  return scenario !== undefined && (scenario.tempDeltaC ?? 0) !== 0 || scenario !== undefined && (scenario.rainFactor ?? 1) !== 1;
+}
+
+function getApiError(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null || !("error" in payload)) return null;
+  return typeof payload.error === "string" ? payload.error : null;
+}
