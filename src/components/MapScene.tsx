@@ -14,7 +14,8 @@ import type { Farm, LocationResult } from "../types";
 type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onBack: () => void; onFarmConfirmed: (farm: Farm) => void };
 
 const satelliteAttribution = "© Esri · OpenStreetMap";
-const TUTORIAL_MS = 6000;
+const TUTORIAL_MS = 6400;
+const TUTORIAL_STEP_MS = 3000;
 const MIN_STEP_PX = 3;
 
 const pinIcon = L.divIcon({ className: "heimdall-pin", html: '<span aria-hidden="true"></span>', iconSize: [24, 24], iconAnchor: [12, 12] });
@@ -53,6 +54,7 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
     const pointers = new Set<number>();
     let stroke: PixelPoint[] = [];
     let drawingId: number | null = null;
+    let panning: { id: number; x: number; y: number } | null = null;
     map.dragging.disable();
     container.style.touchAction = "none";
 
@@ -63,12 +65,19 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
       pointers.add(event.pointerId);
       if (pointers.size > 1) { cancel(); return; }
       const target = event.target as HTMLElement;
+      if (event.pointerType === "mouse" && event.button === 2) { panning = { id: event.pointerId, x: event.clientX, y: event.clientY }; return; }
       if (event.button !== 0 || target.closest(".leaflet-marker-icon, .leaflet-control")) return;
       drawingId = event.pointerId;
       stroke = [toPixel(event)];
       callbacks.current.onStart();
     };
     const onMove = (event: PointerEvent) => {
+      // Computador: clic derecho sostenido arrastra el mapa.
+      if (panning && event.pointerId === panning.id) {
+        map.panBy([panning.x - event.clientX, panning.y - event.clientY], { animate: false });
+        panning = { id: panning.id, x: event.clientX, y: event.clientY };
+        return;
+      }
       if (event.pointerId !== drawingId) return;
       const point = toPixel(event);
       const last = stroke[stroke.length - 1] as PixelPoint;
@@ -78,17 +87,21 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
     };
     const onUp = (event: PointerEvent) => {
       pointers.delete(event.pointerId);
+      if (panning && event.pointerId === panning.id) { panning = null; return; }
       if (event.pointerId !== drawingId) return;
       const polygon = buildLassoPolygon(stroke);
       cancel();
       callbacks.current.onComplete(polygon ? polygon.map(([x, y]) => { const latLng = map.containerPointToLatLng([x, y]); return [latLng.lat, latLng.lng] as [number, number]; }) : null);
     };
 
+    const onContextMenu = (event: Event) => event.preventDefault();
+    container.addEventListener("contextmenu", onContextMenu);
     container.addEventListener("pointerdown", onDown);
     container.addEventListener("pointermove", onMove);
     container.addEventListener("pointerup", onUp);
     container.addEventListener("pointercancel", onUp);
     return () => {
+      container.removeEventListener("contextmenu", onContextMenu);
       container.removeEventListener("pointerdown", onDown);
       container.removeEventListener("pointermove", onMove);
       container.removeEventListener("pointerup", onUp);
@@ -100,18 +113,34 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
   return trail.length > 1 ? <Polyline positions={trail} pathOptions={{ color: "#EAD39D", weight: 5, opacity: 0.95 }} /> : null;
 }
 
-/** Tutorial solo visual: un dedo recorre un lazo alrededor de un terreno. */
+/** Tutorial solo visual, en dos pasos: 1) un dedo rodea el terreno; 2) dos dedos mueven el mapa. */
 function LassoTutorial() {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStep(1), TUTORIAL_STEP_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
   const loop = "M 28 58 C 22 34, 52 20, 72 32 C 90 44, 80 74, 56 78 C 38 81, 30 70, 28 58 Z";
+  const drag = "M 38 62 L 66 38";
   return <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-meadow/35" aria-hidden="true">
     <svg viewBox="0 0 100 100" className="h-3/4 max-h-80 w-3/4 max-w-80">
-      <path d={loop} fill="none" stroke="rgb(234 211 157 / 0.25)" strokeWidth="2" strokeDasharray="1 3" strokeLinecap="round" />
-      <path className="lasso-tutorial-stroke" d={loop} fill="rgb(234 211 157 / 0.18)" stroke="#EAD39D" strokeWidth="3" strokeLinecap="round" pathLength="1" />
-      <g className="lasso-tutorial-finger">
-        <circle r="7" fill="#EAD39D" opacity="0.35" />
-        <circle r="3.5" fill="#EAD39D" />
-        <animateMotion dur="2.6s" repeatCount="indefinite" path={loop} />
-      </g>
+      {step === 0 ? <g key="lasso">
+        <path d={loop} fill="none" stroke="rgb(234 211 157 / 0.25)" strokeWidth="2" strokeDasharray="1 3" strokeLinecap="round" />
+        <path className="lasso-tutorial-stroke" d={loop} fill="rgb(234 211 157 / 0.18)" stroke="#EAD39D" strokeWidth="3" strokeLinecap="round" pathLength="1" />
+        <g className="lasso-tutorial-finger">
+          <circle r="7" fill="#EAD39D" opacity="0.35" />
+          <circle r="3.5" fill="#EAD39D" />
+          <animateMotion dur="2.6s" repeatCount="indefinite" path={loop} />
+        </g>
+      </g> : <g key="pan">
+        <path d={drag} fill="none" stroke="rgb(234 211 157 / 0.5)" strokeWidth="2.5" strokeDasharray="1 4" strokeLinecap="round" />
+        <path d="M 60 36 L 68 36 L 68 44" fill="none" stroke="#EAD39D" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <g className="lasso-tutorial-finger">
+          <g><circle r="7" fill="#EAD39D" opacity="0.35" /><circle r="3.5" fill="#EAD39D" /></g>
+          <g transform="translate(15 6)"><circle r="7" fill="#EAD39D" opacity="0.35" /><circle r="3.5" fill="#EAD39D" /></g>
+          <animateMotion dur="1.5s" repeatCount="indefinite" path={drag} />
+        </g>
+      </g>}
     </svg>
   </div>;
 }
