@@ -10,7 +10,9 @@ const mockResponse = {
     missingByParameter: { T2M: 0, T2M_MIN: 0, T2M_MAX: 0, PRECTOTCORR: 0, EVLAND: 0, GWETROOT: 0, ALLSKY_SFC_SW_DWN: 0 },
   },
   monthlyClimate: [{ year: 2020, month: 1, meanTemperatureC: 16.8, precipitationMm: 125.4, evaporationMm: 87.2, rootZoneWetness: 0.82, missingByParameter: {} }],
-  indicators: { waterDeficitMm: 38.2, heatStressDays: 0, frostRiskDays: 0, extremeRainThresholdMm: 24.6, meanRootZoneWetness: 0.82, missingByParameter: {} },
+  indicators: { waterDeficitMm: 38.2, heatStressDays: 0, frostRiskDays: 0, extremeRainThresholdMm: 24.6, meanRootZoneWetness: 0.82, missingByParameter: {}, longestDrySpellDays: 15, meanAnnualDrySpellDays: 9.2, worstYear: { year: 2021, waterBalanceMm: -12.2 } },
+  // Temporada reciente de ejemplo (lluvia 111 % de lo normal), igual que una consulta real a NASA POWER en noviembre de 2026.
+  currentSeason: { windowDays: 87, firstDate: "20260818", lastDate: "20261112", daysWithData: 87, rainMm: 563.27, normalRainMm: 507.42, rainPercentOfNormal: 111, status: "normal", temperatureAnomalyC: 1.4, currentDryStreakDays: 0, baselineYears: 15 },
   rotations: [
     {
       rotation: { id: "baseline", name: "Actual: maíz–descanso", cropIds: ["maiz"], description: "Mantiene la práctica declarada como línea base de comparación." },

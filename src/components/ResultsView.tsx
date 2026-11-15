@@ -9,9 +9,9 @@ import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import { useSpeaker } from "./useSpeaker";
-import { bestRotationIndex, climateTopicSpeechItems, describeClimate, isCurrentRotation, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToStars } from "../lib/ui/resultsCopy";
-import type { ClimateTopicId, RotationSection } from "../lib/ui/resultsCopy";
-import type { AnalysisResponse, Farm, RotationResult } from "../types";
+import { bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToStars } from "../lib/ui/resultsCopy";
+import type { ClimateTopicId, CurrentSeasonTone, RotationSection } from "../lib/ui/resultsCopy";
+import type { AnalysisResponse, CurrentSeason, Farm, RotationResult } from "../types";
 
 const FarmMiniMap = dynamic(() => import("./FarmMiniMap"), { ssr: false, loading: () => <div className="h-full w-full bg-moss" aria-hidden="true" /> });
 
@@ -41,9 +41,9 @@ function Stars({ score, className = "h-7 w-7" }: { score: number; className?: st
   </span>;
 }
 
-function CropChain({ cropIds, className = "h-14 w-14" }: { cropIds: readonly string[]; className?: string }) {
+function CropChain({ cropIds, link = "then", className = "h-14 w-14" }: { cropIds: readonly string[]; link?: "then" | "with"; className?: string }) {
   return <span className="flex items-center gap-1 text-olive-light" aria-hidden="true">
-    {cropIds.map((id, index) => <Fragment key={`${id}-${index}`}>{index > 0 && <UiIcon name="arrow" className="h-6 w-6 text-olive-light/50" />}<CropIcon id={id} className={className} /></Fragment>)}
+    {cropIds.map((id, index) => <Fragment key={`${id}-${index}`}>{index > 0 && <UiIcon name={link === "with" ? "plus" : "arrow"} className="h-6 w-6 text-olive-light/50" />}<CropIcon id={id} className={className} /></Fragment>)}
   </span>;
 }
 
@@ -58,7 +58,7 @@ function Badges({ result, best }: { result: RotationResult; best: boolean }) {
 function RotationCard({ result, best, onOpen }: { result: RotationResult; best: boolean; onOpen: () => void }) {
   return <button type="button" data-reveal onClick={onOpen} className={`flex w-full flex-col gap-3 rounded-3xl border-2 bg-moss card-surface p-4 text-left transition-colors hover:border-cream focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 ${best ? "border-cream" : "border-olive/50"}`}>
     <div className="flex items-start justify-between gap-2"><Badges result={result} best={best} /><UiIcon name="arrow" className="h-7 w-7 shrink-0 text-cream" /></div>
-    <CropChain cropIds={result.rotation.cropIds} />
+    <CropChain cropIds={result.rotation.cropIds} link={cropLink(result.rotation)} />
     <p className="text-lg font-bold text-bone-white">{result.rotation.name}</p>
     <Stars score={result.score} />
   </button>;
@@ -90,7 +90,7 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
       <div data-reveal><PlayButton size="big" playing={playingKey === key} onClick={() => play(key, rotationSpeechItems(result))} /></div>
       <div data-reveal className="flex flex-col gap-3 rounded-3xl border-2 border-olive/50 bg-moss card-surface p-4">
         <Badges result={result} best={best} />
-        <CropChain cropIds={result.rotation.cropIds} />
+        <CropChain cropIds={result.rotation.cropIds} link={cropLink(result.rotation)} />
         <p className="text-xl font-bold text-bone-white">{result.rotation.name}</p>
         <Stars score={result.score} />
       </div>
@@ -128,6 +128,44 @@ function RainCalendar({ response }: { response: AnalysisResponse }) {
   </article>;
 }
 
+const SEASON_TONE: Record<CurrentSeasonTone, { chip: string; bar: string }> = {
+  dry: { chip: "bg-clay/40 text-clay-light", bar: "bg-clay-light" },
+  normal: { chip: "bg-olive/40 text-olive-light", bar: "bg-olive-light" },
+  wet: { chip: "bg-cream/15 text-cream", bar: "bg-cream" },
+};
+
+/** Cómo va la lluvia reciente frente a lo normal de la misma época: dos barras con la misma escala y una frase simple. */
+function SeasonCard({ season }: { season: CurrentSeason }) {
+  const { playingKey, play } = useSpeaker();
+  const card = useMemo(() => describeCurrentSeason(season), [season]);
+  const tone = SEASON_TONE[card.tone];
+  const article = useRef<HTMLElement>(null);
+  useGSAP(() => {
+    if (prefersReducedMotion()) return;
+    gsap.from(".season-bar", { scaleX: 0, transformOrigin: "left center", duration: 0.9, ease: "power3.out", stagger: 0.12, delay: 0.3, clearProps: "transform" });
+  }, { scope: article, dependencies: [card.normalBar, card.currentBar] });
+  const bars = [["Lo normal", card.normalBar, "bg-silver-mist/60"], ["Este año", card.currentBar, tone.bar]] as const;
+  return <article ref={article} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+    <div className="flex items-center gap-3">
+      <UiIcon name="rain" className="h-12 w-12 shrink-0 text-olive-light" />
+      <div className="min-w-0 flex-1"><h3 className="text-xl font-bold leading-6 text-bone-white">{card.title}</h3><p className="text-xs uppercase tracking-wider text-ash-gray">{card.technicalName}</p></div>
+      <PlayButton playing={playingKey === "season"} onClick={() => play("season", currentSeasonSpeechItems(card))} />
+    </div>
+    <p className={`mt-3 inline-flex rounded-full px-3 py-1 text-base font-bold ${tone.chip}`}>{card.statusLabel}</p>
+    <p className="mt-2 text-lg font-semibold leading-7 text-olive-light">{card.headline}</p>
+    <ul className="mt-3 space-y-2" aria-label="Lluvia normal y de este año">
+      {bars.map(([label, width, color]) => <li key={label} className="flex items-center gap-3">
+        <span className="w-20 shrink-0 text-sm font-semibold text-silver-mist">{label}</span>
+        <span className="h-4 flex-1 overflow-hidden rounded-full bg-meadow/50"><span className={`season-bar block h-full rounded-full ${color}`} style={{ width: `${width}%` }} /></span>
+      </li>)}
+    </ul>
+    <p className="mt-3 text-base leading-6 text-bone-white">{card.amount}</p>
+    {card.details.map((detail) => <p key={detail} className="mt-1 text-base leading-6 text-bone-white">{detail}</p>)}
+    <p className="mt-2 text-sm leading-5 text-ash-gray">{card.note}</p>
+    <p className="mt-2 text-base leading-6 text-silver-mist">{card.explanation}</p>
+  </article>;
+}
+
 function ClimateList({ response }: { response: AnalysisResponse }) {
   const { playingKey, play } = useSpeaker();
   const topics = useMemo(() => describeClimate(response.indicators), [response.indicators]);
@@ -161,6 +199,7 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
       {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} onOpen={() => setOpenIndex(index)} />)}
 
       <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
+      {response.currentSeason && <SeasonCard season={response.currentSeason} />}
       <ClimateList response={response} />
       <RainCalendar response={response} />
 

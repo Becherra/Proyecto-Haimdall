@@ -105,6 +105,22 @@ function RotationCard({ result, baseline, index }: { result: RotationResult; bas
   </article>;
 }
 
+/** Temporada actual frente a lo normal, rachas secas y año más seco: lo que el análisis sabe de la sequía, con su fuente y sus límites. */
+function DroughtIndicators({ response }: { response: AnalysisResponse }) {
+  const { currentSeason: season, indicators } = response;
+  const hasDrought = indicators.longestDrySpellDays !== undefined || indicators.worstYear !== undefined;
+  if (!season && !hasDrought) return null;
+  return <div data-reveal className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {season && <>
+      <Indicator title="Lluvia de la temporada actual" value={number(season.rainPercentOfNormal, 0)} unit="% de lo normal" note={`${number(season.rainMm, 0)} mm de ${monthDate(season.firstDate)} a ${monthDate(season.lastDate)} frente a ${number(season.normalRainMm, 0)} mm normales en esa época (${season.baselineYears} años). Lectura reciente y preliminar de NASA POWER; no es un pronóstico.`} />
+      <Indicator title="Temperatura frente a lo normal" value={season.temperatureAnomalyC === null ? "Sin dato" : `${season.temperatureAnomalyC > 0 ? "+" : ""}${number(season.temperatureAnomalyC, 1)}`} unit="°C" note="Diferencia de la temperatura media de la ventana reciente con la de la misma época en la serie histórica." />
+      <Indicator title="Días seguidos casi sin lluvia" value={number(season.currentDryStreakDays, 0)} unit="días" note="Hasta el último día con dato; cuenta como seco un día con menos de 1 mm." />
+    </>}
+    {indicators.longestDrySpellDays !== undefined && <Indicator title="Racha seca más larga" value={number(indicators.longestDrySpellDays, 0)} unit="días" note={`Días seguidos con menos de 1 mm de lluvia en toda la serie${indicators.meanAnnualDrySpellDays === null || indicators.meanAnnualDrySpellDays === undefined ? "" : `; la racha máxima de cada año promedia ${number(indicators.meanAnnualDrySpellDays, 1)} días`}.`} />}
+    {indicators.worstYear && <Indicator title="Año más seco de la serie" value={String(indicators.worstYear.year)} note={`Balance hídrico de ${number(indicators.worstYear.waterBalanceMm, 1)} mm/mes${indicators.waterDeficitMm === null ? "" : ` frente a ${number(indicators.waterDeficitMm, 1)} mm/mes del promedio`}.`} />}
+  </div>;
+}
+
 export default function AnalysisDashboard({ farm, response, baseline, scenarioDraft, mockMode, applyingScenario, scenarioError, onScenarioChange, onApplyScenario, onShowBaseline, onEditPriorities, onChangeFarm, onBackToSimple }: AnalysisDashboardProps) {
   const source = mockMode ? "Datos de demostración · no son datos para decisiones" : sourceLabel[response.climate.source];
   const dates = [monthDate(response.climate.firstDate), monthDate(response.climate.lastDate)].filter(Boolean).join(" – ");
@@ -150,6 +166,8 @@ export default function AnalysisDashboard({ farm, response, baseline, scenarioDr
       <Indicator title="Datos diarios faltantes" value={number(totalMissing, 0)} unit="valores" note="Suma de faltantes reportados por parámetro." />
       <Indicator title="Cobertura temporal" value={number(response.climate.daysAnalyzed, 0)} unit="días" note={`${monthDate(response.climate.firstDate) ?? "Inicio sin dato"} a ${monthDate(response.climate.lastDate) ?? "fin sin dato"}.`} />
     </div>
+
+    <DroughtIndicators response={response} />
 
     <div data-reveal className="mb-8"><ClimateChart response={response} /></div>
 

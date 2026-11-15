@@ -24,7 +24,7 @@ type PrioritiesSlidesProps = {
 type Water = NonNullable<UserPriorities["waterAvailability"]>;
 
 const CROPS = [
-  ["maiz", "Maíz"], ["frijol", "Fríjol"], ["soya", "Soya"], ["arveja", "Arveja"],
+  ["cafe", "Café"], ["platano", "Plátano"], ["maiz", "Maíz"], ["frijol", "Fríjol"], ["soya", "Soya"], ["arveja", "Arveja"],
   ["mucuna", "Mucuna"], ["crotalaria", "Crotalaria"], ["yuca", "Yuca"], ["papa", "Papa"],
   ["avena", "Avena"], ["repollo", "Repollo"], [NO_CROP, "Ninguno"],
 ] as const;
