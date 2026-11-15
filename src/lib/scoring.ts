@@ -356,7 +356,7 @@ function terrainGaps(indicators: Indicators): string[] {
 }
 
 function seriesLengthGap(years: number): string[] {
-  return years < MIN_YEARS_FOR_WORST_YEAR ? [`La serie climática cubre solo ${years} ${years === 1 ? "año" : "años"}: no alcanza para ver años secos de El Niño ni identificar el peor año.`] : [];
+  return years < MIN_YEARS_FOR_WORST_YEAR ? [`La serie climática cubre solo ${years} ${years === 1 ? "año" : "años"}: no alcanza para ver cómo cambia la lluvia de un año a otro ni identificar el año más seco.`] : [];
 }
 
 function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar, years }: Evaluation): string[] {

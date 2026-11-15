@@ -62,10 +62,10 @@ describe("rachas secas y peor año en el texto", () => {
     expect(scoreOf("thirsty", { ...spell, longestDrySpellDays: DRY_SPELL_ALERT_DAYS - 1 }).risks.join(" ")).not.toContain("Racha seca");
   });
 
-  it("explica en los vacíos que una serie corta no permite ver años secos de El Niño", () => {
+  it("explica en los vacíos que una serie corta no permite ver cómo cambia la lluvia de un año a otro", () => {
     const short = scoreOf("thirsty", WET, MIN_YEARS_FOR_WORST_YEAR - 1).informationGaps.join(" ");
     expect(short).toContain(`La serie climática cubre solo ${MIN_YEARS_FOR_WORST_YEAR - 1} años`);
-    expect(short).toContain("El Niño");
+    expect(short).toContain("de un año a otro");
     expect(scoreOf("thirsty", WET, MIN_YEARS_FOR_WORST_YEAR).informationGaps.join(" ")).not.toContain("La serie climática cubre solo");
   });
 
