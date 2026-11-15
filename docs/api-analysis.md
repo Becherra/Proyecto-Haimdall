@@ -31,7 +31,7 @@ La herramienta es **apoyo a la decisión**: cada rotación trae por qué se sugi
 | `priorities` | Sí | Cinco valores de 0 a 5: `waterSaving`, `extraIncome`, `soilImprovement`, `erosionReduction`, `lowRisk`. |
 | `priorities.currentCropId` | No | Cultivo actual. Por defecto `maiz`. Ids válidos: `maiz`, `frijol`, `soya`, `arveja`, `mucuna`, `crotalaria`, `yuca`, `papa`, `avena`, `repollo`. |
 | `priorities.waterAvailability` | No | `low`, `medium` o `high`. |
-| `priorities.elevationMeters`, `priorities.slopePercent` | No | Altitud (m s. n. m.) y pendiente (%) que declara el agricultor. Tienen prioridad sobre la estimación precargada. |
+| `priorities.elevationMeters`, `priorities.slopePercent` | No | Altitud (m s. n. m.) y pendiente (%) que declara el agricultor. Tienen prioridad sobre la lectura SRTM precargada. |
 | `farm` | No | Contrato de `docs/farm-contract.md`. Se valida de nuevo en el servidor, el área del polígono se recalcula y el clima se consulta en `farm.centroid`. |
 | `scenario` | No | Escenario "¿y si…?": `tempDeltaC` entre −2 y 5 °C, `rainFactor` entre 0.5 y 1.5 (0.8 = 20 % menos lluvia). |
 | `includeDailyRecords` | No | `true` para recibir los registros diarios en `climate.records`. Por defecto no se envían. |
@@ -90,7 +90,7 @@ Todo el clima viene de **NASA POWER**, API diaria por punto (`https://power.larc
 | `ALLSKY_SFC_SW_DWN` | Se descarga, pero todavía no interviene en indicadores ni puntajes. |
 | Altitud de la celda | Corregir la temperatura de la celda a la altitud del lote. |
 
-Lo que **no** es dato de la NASA: el catálogo de cultivos (`data/crops.json`, con sus fuentes en `docs/crops-rubric.md`) y las altitudes y pendientes precargadas (`data/samples/srtm-eje-cafetero.json`), que son estimaciones de referencia sin verificar contra el modelo de elevación SRTM.
+Lo que **no** es dato de la NASA POWER: el catálogo de cultivos (`data/crops.json`, con sus fuentes en `docs/crops-rubric.md`). Las altitudes y pendientes precargadas (`data/samples/srtm-eje-cafetero.json`) son lecturas del ráster NASA SRTMGL1 v003 en cinco puntos piloto (ver `docs/srtm-samples.md`): valen para el punto, no para todo el lote.
 
 ### Muestras precargadas
 
@@ -99,7 +99,7 @@ Si NASA POWER no responde, hay respaldo para Pereira (cubre también Santa Rosa 
 ## Límites conocidos
 
 - **Resolución del clima.** Pereira, Manizales y Santa Rosa de Cabal caen en la misma celda de NASA POWER y reciben temperatura y lluvia idénticas; entre esos sitios solo cambia la corrección por altitud. Dibujar el lote no mejora esa resolución.
-- **Terreno.** Solo cinco puntos del Eje Cafetero tienen altitud y pendiente precargadas, y son estimaciones. Fuera de ellos no hay corrección por altitud salvo que el agricultor la declare.
+- **Terreno.** Solo cinco puntos del Eje Cafetero tienen altitud y pendiente precargadas (lecturas SRTM del punto, no del lote). Fuera de ellos no hay corrección por altitud salvo que el agricultor la declare.
 - **Catálogo.** Diez cultivos anuales; no hay perennes (café, plátano, pastos). Los puntajes 0–5 son preliminares y no los ha validado un agrónomo. Los meses de siembra son los mismos para todos los cultivos y no tienen fuente propia para papa, avena y repollo.
 - **Calendario.** Es ilustrativo: usa meses de siembra y ciclos típicos, no las fechas reales del agricultor.
 - **Escenarios.** Son un cambio uniforme sobre la serie histórica, no una proyección climática; la humedad del suelo no se recalcula.

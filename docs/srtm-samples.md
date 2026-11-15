@@ -1,6 +1,6 @@
 # Altitud y pendiente reales (SRTM) para la zona piloto
 
-`data/samples/srtm-eje-cafetero.json` guarda la altitud y la pendiente de los 5 puntos piloto del Eje Cafetero. Mientras no se regenere con tiles SRTM, sus valores son **estimaciones de referencia** y la app lo dice en la evidencia y en los vacíos de información. Este documento explica cómo reemplazarlas por lecturas del ráster.
+`data/samples/srtm-eje-cafetero.json` guarda la altitud y la pendiente de los 5 puntos piloto del Eje Cafetero, leídas del ráster NASA SRTMGL1 versión 003. Valen para el **punto**, no para todo el lote: la app usa la muestra más cercana dentro de ±0,08° (unos 9 km) y lo dice en la evidencia y en los vacíos de información. Este documento explica cómo regenerarlas.
 
 ## Qué tiles hacen falta
 
