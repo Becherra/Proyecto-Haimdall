@@ -185,6 +185,72 @@ export const rotationPlainSchema = z.object({
 });
 export type RotationPlain = z.infer<typeof rotationPlainSchema>;
 
+/**
+ * Origen de un dato que respalda una acción: medición ("observed"), estimación modelada ("estimated"), lo que declaró el agricultor
+ * ("declared"), dato regional que no es del lote, p. ej. NASA POWER ("regional"), o práctica técnica publicada ("published-practice").
+ */
+export const evidenceTypeSchema = z.enum(["observed", "estimated", "declared", "regional", "published-practice"]);
+export type EvidenceType = z.infer<typeof evidenceTypeSchema>;
+
+/** Un dato o publicación que respalda una acción del plan, con su fuente, escala y fecha para que se pueda rastrear. */
+export const evidenceSchema = z.object({
+  id: z.string().min(1), type: evidenceTypeSchema, source: z.string().min(1), sourceUrl: z.string().url().optional(),
+  /** Resolución o escala del dato (p. ej. "malla de ~0.5°", "250 m"); ausente si no aplica o no se conoce. */
+  scale: z.string().min(1).optional(), date: z.string().min(1).optional(),
+  /** Qué dice el dato en este caso, en una frase. */
+  detail: z.string().min(1),
+});
+export type Evidence = z.infer<typeof evidenceSchema>;
+
+export const PLAN_STAGES = ["understand", "prepare", "monitor", "review"] as const;
+/** Etapas del plan: entender la finca, preparar el cambio, hacer seguimiento y revisar antes de continuar. */
+export const planStageSchema = z.enum(PLAN_STAGES);
+export type PlanStage = z.infer<typeof planStageSchema>;
+
+/** "ready": hay datos y fuente; "missing-data": falta un dato de la finca; "insufficient-evidence": no hay respaldo documentado. */
+export const planActionStatusSchema = z.enum(["ready", "missing-data", "insufficient-evidence"]);
+export type PlanActionStatus = z.infer<typeof planActionStatusSchema>;
+
+/** Una acción del plan: solo es "ready" si trae evidencia y ningún dato pendiente; si no, dice qué falta en vez de dar una instrucción. */
+export const planActionSchema = z.object({
+  id: z.string().min(1), stage: planStageSchema, status: planActionStatusSchema,
+  what: z.string().min(1), why: z.string().min(1),
+  /** Cuándo aplica: etapa del cultivo o ventana regional documentada, no un mes genérico. */
+  appliesWhen: z.string().min(1),
+  prerequisites: z.array(z.string().min(1)), missingData: z.array(z.string().min(1)),
+  /** Cómo comprobar o registrar el resultado. */
+  verification: z.string().min(1), evidence: z.array(evidenceSchema),
+}).superRefine((action, ctx) => {
+  if (action.status === "ready" && action.evidence.length === 0) ctx.addIssue({ code: "custom", path: ["evidence"], message: "Una acción lista necesita evidencia" });
+  if (action.status === "ready" && action.missingData.length > 0) ctx.addIssue({ code: "custom", path: ["missingData"], message: "Una acción lista no puede tener datos pendientes" });
+  if (action.status !== "ready" && action.missingData.length === 0) ctx.addIssue({ code: "custom", path: ["missingData"], message: "Indica qué dato falta" });
+});
+export type PlanAction = z.infer<typeof planActionSchema>;
+
+export const planStageGroupSchema = z.object({ stage: planStageSchema, actions: z.array(planActionSchema) });
+export type PlanStageGroup = z.infer<typeof planStageGroupSchema>;
+
+/**
+ * Plan orientativo de transición hacia una rotación, armado con reglas documentadas. "insufficient" significa que no hay respaldo
+ * para este cultivo o zona: no puede traer acciones listas y debe explicar sus vacíos.
+ */
+export const actionPlanSchema = z.object({
+  status: z.enum(["ready", "partial", "insufficient"]), stages: z.array(planStageGroupSchema),
+  gaps: z.array(z.string().min(1)), disclaimer: z.string().min(1),
+}).superRefine((plan, ctx) => {
+  const seen = new Set<string>();
+  plan.stages.forEach((group, index) => {
+    if (seen.has(group.stage)) ctx.addIssue({ code: "custom", path: ["stages", index, "stage"], message: "Etapa repetida" });
+    seen.add(group.stage);
+    if (group.actions.some((action) => action.stage !== group.stage)) ctx.addIssue({ code: "custom", path: ["stages", index, "actions"], message: "Hay acciones en una etapa distinta a la de su grupo" });
+  });
+  if (plan.status === "insufficient" && plan.stages.some((group) => group.actions.some((action) => action.status === "ready"))) {
+    ctx.addIssue({ code: "custom", path: ["stages"], message: "Un plan con información insuficiente no puede traer acciones listas" });
+  }
+  if (plan.status === "insufficient" && plan.gaps.length === 0) ctx.addIssue({ code: "custom", path: ["gaps"], message: "Explica los vacíos de información" });
+});
+export type ActionPlan = z.infer<typeof actionPlanSchema>;
+
 export const rotationResultSchema = z.object({
   rotation: rotationSchema, score: z.number(), whySuggested: z.string().min(1), evidence: z.array(z.string().min(1)).min(1),
   benefits: z.array(z.string().min(1)).min(1), informationGaps: z.array(z.string().min(1)).min(1),
@@ -193,6 +259,8 @@ export const rotationResultSchema = z.object({
   calendar: rotationCalendarSchema.optional(),
   /** Mismos temas en palabras simples (sin cifras técnicas). Ausente en respuestas antiguas: la interfaz usa entonces los textos técnicos. */
   plain: rotationPlainSchema.optional(),
+  /** Plan orientativo para pasar de la finca actual a esta alternativa; ausente hasta que el backend lo genere. */
+  actionPlan: actionPlanSchema.optional(),
 });
 export type RotationResult = z.infer<typeof rotationResultSchema>;
 
