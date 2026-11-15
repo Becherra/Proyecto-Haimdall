@@ -82,7 +82,7 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
   const close = () => { stop(); onClose(); };
   const reveal = useReveal<HTMLElement>();
   return <section ref={reveal} className="fixed inset-0 z-50 overflow-y-auto bg-scene" aria-label={result.rotation.name}>
-    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-10 pt-4">
+    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-10 pt-4 lg:max-w-3xl lg:pt-8">
       <div className="flex items-center justify-between">
         <button type="button" onClick={close} aria-label="Volver" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><UiIcon name="back" className="h-8 w-8" /></button>
         <Logo variant="mark" size={44} />
@@ -114,9 +114,9 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
 function RainCalendar({ response }: { response: AnalysisResponse }) {
   const { playingKey, play } = useSpeaker();
   const calendar = useMemo(() => rainCalendar(response.monthlyClimate), [response.monthlyClimate]);
-  return <article data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+  return <article data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 lg:col-span-3">
     <div className="mb-3 flex items-center gap-3"><UiIcon name="calendar" className="h-10 w-10 shrink-0 text-olive-light" /><h3 className="flex-1 text-xl font-bold text-bone-white">{RAIN_CALENDAR_INTRO.title}</h3><PlayButton playing={playingKey === "rain-calendar"} onClick={() => play("rain-calendar", rainCalendarSpeechItems(calendar))} /></div>
-    <ol className="grid grid-cols-6 gap-x-1 gap-y-3 text-center" aria-label={RAIN_CALENDAR_INTRO.title}>
+    <ol className="grid grid-cols-6 gap-x-1 gap-y-3 text-center lg:grid-cols-12" aria-label={RAIN_CALENDAR_INTRO.title}>
       {calendar.map((month) => <li key={month.month} className="flex flex-col items-center gap-1">
         <span className="text-xs font-semibold uppercase text-silver-mist">{month.label}</span>
         <span className="flex h-12 flex-col items-center justify-end gap-0.5 text-olive-light" role="img" aria-label={month.level === null ? "Sin dato" : `${month.level} de 3`}>
@@ -145,7 +145,7 @@ function SeasonCard({ season }: { season: CurrentSeason }) {
     gsap.from(".season-bar", { scaleX: 0, transformOrigin: "left center", duration: 0.9, ease: "power3.out", stagger: 0.12, delay: 0.3, clearProps: "transform" });
   }, { scope: article, dependencies: [card.normalBar, card.currentBar] });
   const bars = [["Lo normal", card.normalBar, "bg-silver-mist/60"], ["Este año", card.currentBar, tone.bar]] as const;
-  return <article ref={article} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+  return <article ref={article} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 lg:col-span-3">
     <div className="flex items-center gap-3">
       <UiIcon name="rain" className="h-12 w-12 shrink-0 text-olive-light" />
       <div className="min-w-0 flex-1"><h3 className="text-xl font-bold leading-6 text-bone-white">{card.title}</h3><p className="text-xs uppercase tracking-wider text-ash-gray">{card.technicalName}</p></div>
@@ -189,27 +189,27 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
 
   const reveal = useReveal<HTMLElement>();
   return <main ref={reveal} className="fixed inset-0 z-40 overflow-y-auto bg-scene">
-    <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4">
-      <header data-reveal className="flex items-center justify-between gap-3">
+    <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4 lg:grid lg:max-w-6xl lg:grid-cols-3 lg:gap-5 lg:px-8 lg:pt-8">
+      <header data-reveal className="flex items-center justify-between gap-3 lg:col-span-3">
         <Logo variant="horizontal" size={36} />
         <div className="relative isolate z-0 h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-cream/60 shadow-lg" role="img" aria-label={`Mapa de ${farm.placeLabel ?? "tu finca"}`}><FarmMiniMap farm={farm} /></div>
       </header>
 
-      <h2 data-reveal className="flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-olive-light" />Tus 3 caminos</h2>
+      <h2 data-reveal className="flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-olive-light" />Tus 3 caminos</h2>
       {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} onOpen={() => setOpenIndex(index)} />)}
 
-      <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
+      <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
       {response.currentSeason && <SeasonCard season={response.currentSeason} />}
       <ClimateList response={response} />
       <RainCalendar response={response} />
 
-      <p className="mt-2 rounded-2xl bg-moss/60 p-4 text-center text-sm leading-6 text-silver-mist">Esto es una ayuda para decidir. No reemplaza tu experiencia ni a un técnico de tu zona. Datos del clima: NASA POWER.</p>
-      <nav className="flex items-start justify-center gap-6" aria-label="Más opciones">
+      <p className="mt-2 rounded-2xl bg-moss/60 p-4 text-center text-sm leading-6 text-silver-mist lg:col-span-3">Esto es una ayuda para decidir. No reemplaza tu experiencia ni a un técnico de tu zona. Datos del clima: NASA POWER.</p>
+      <nav className="flex items-start justify-center gap-6 lg:col-span-3" aria-label="Más opciones">
         <button type="button" onClick={onEditPriorities} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="back" className="h-8 w-8" /></span>Preguntas</button>
         <button type="button" onClick={onChangeFarm} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="pin" className="h-8 w-8" /></span>Otra finca</button>
         <button type="button" onClick={onShowTechnical} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="sliders" className="h-8 w-8" /></span>Datos técnicos</button>
       </nav>
-      <p className="text-center text-[10px] text-ash-gray">Imágenes: © Esri · OpenStreetMap</p>
+      <p className="text-center text-[10px] text-ash-gray lg:col-span-3">Imágenes: © Esri · OpenStreetMap</p>
     </div>
     {open && <RotationDetail result={open} best={openIndex === bestIndex} onClose={() => setOpenIndex(null)} />}
   </main>;

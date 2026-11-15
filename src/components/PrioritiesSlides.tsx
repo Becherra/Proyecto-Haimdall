@@ -99,11 +99,11 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
       </ol>
     </header>
 
-    <div className="relative mx-auto mb-12 mt-5 w-full max-w-md flex-1 px-4">
+    <div className="relative mx-auto mb-12 mt-5 w-full max-w-md flex-1 px-4 lg:max-w-3xl">
       <div className="relative h-full">
         <StackCard offset={0 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[0]}</h2>
-          <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 grid-cols-3 content-start gap-2.5">
+          <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 grid-cols-3 content-start gap-2.5 lg:grid-cols-4 lg:gap-4">
             {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} data-option onClick={(event) => { popElement(event.currentTarget); setCrop(id); }} className={`${optionBase} min-h-[5.5rem] flex-col justify-center gap-1 ${crop === id ? optionOn : optionOff}`}>
               <CropIcon id={id} /><span className="text-sm font-semibold">{name}</span>
             </button>)}
@@ -122,7 +122,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
 
         <StackCard offset={2 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[2]}</h2>
-          <div role="group" aria-label={TITLES[2]} className="grid flex-1 grid-cols-2 content-start gap-2.5">
+          <div role="group" aria-label={TITLES[2]} className="grid flex-1 grid-cols-2 content-start gap-2.5 lg:grid-cols-3 lg:gap-4">
             {GOALS.map(([key, name], index) => {
               const on = goals.includes(key);
               return <button key={key} type="button" aria-pressed={on} data-option onClick={(event) => { popElement(event.currentTarget); toggleGoal(key); }} className={`${optionBase} relative min-h-28 flex-col justify-center gap-1.5 ${index === GOALS.length - 1 ? "col-span-2" : ""} ${on ? optionOn : optionOff}`}>
@@ -136,9 +136,9 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
     </div>
 
     {error && <p className="mx-4 mb-2 rounded-2xl bg-clay/40 px-4 py-3 text-center text-sm text-clay-light" role="alert">{error}</p>}
-    <div className="flex items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <button type="button" onClick={onBack} disabled={submitting} aria-label={step === 0 ? "Volver al mapa" : "Pregunta anterior"} className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:opacity-40"><ArrowLeft /></button>
-      <button type="button" onClick={onNext} disabled={submitting || unanswered} aria-label={step === last ? "Ver resultados" : "Siguiente"} className={`flex h-20 min-w-0 flex-1 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 ${submitting ? "cursor-wait opacity-70" : "disabled:cursor-not-allowed disabled:opacity-40"}`}>
+    <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:max-w-3xl">
+      <button type="button" onClick={onBack} disabled={submitting} aria-label={step === 0 ? "Volver al mapa" : "Pregunta anterior"} className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:opacity-40"><ArrowLeft /></button>
+      <button type="button" onClick={onNext} disabled={submitting || unanswered} aria-label={step === last ? "Ver resultados" : "Siguiente"} className={`flex h-20 min-w-0 flex-1 lg:h-16 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 ${submitting ? "cursor-wait opacity-70" : "disabled:cursor-not-allowed disabled:opacity-40"}`}>
         {submitting ? <Spinner /> : step === last ? <Check /> : <ArrowRight />}
       </button>
     </div>
