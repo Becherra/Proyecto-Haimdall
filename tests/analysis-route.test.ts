@@ -57,6 +57,35 @@ describe("POST /api/analysis", () => {
     expect((await response.json()).error).toContain("cafe");
   });
 
+  it("con Farm consulta NASA POWER en farm.centroid y declara los vacíos del lote en cada rotación", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(fixture, { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const farm = { centroid: { lat: 4.5339, lon: -75.6811 }, locationSource: "search", terrain: { kind: "point" } };
+    const response = await POST(post({ ...pereira, farm }));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    const url = String(fetchSpy.mock.calls[0]?.[0]);
+    expect(url).toContain("latitude=4.5339");
+    expect(url).toContain("longitude=-75.6811");
+    for (const rotation of body.rotations) expect(rotation.informationGaps.join(" ")).toContain("límites");
+  });
+
+  it("devuelve 400 con el motivo si el Farm no pasa la validación geográfica, sin llamar a NASA POWER", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const ring = [[-75.6965507452, 4.8128508444], [-75.6956492548, 4.8128508444], [-75.6956492548, 4.8137491556], [-75.6965507452, 4.8137491556], [-75.6965507452, 4.8128508444]];
+    const farm = { centroid: { lat: 4.8133, lon: -75.6961 }, locationSource: "map", terrain: { kind: "polygon", areaHa: 9, ring } };
+    const response = await POST(post({ ...pereira, farm }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("1 %");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("devuelve 400 si el Farm no cumple el esquema", async () => {
+    const response = await POST(post({ ...pereira, farm: { centroid: { lat: 4.8, lon: -75.7 }, locationSource: "gps", terrain: { kind: "circle" } } }));
+    expect(response.status).toBe(400);
+  });
+
   it("usa la muestra precargada cuando NASA POWER no responde para Pereira", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     const response = await POST(post(pereira));
