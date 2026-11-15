@@ -7,7 +7,7 @@
     "tolerance": 0.08,
     "elevationMeters": 1411,
     "slopePercent": 18,
-    "source": "NASA SRTMGL1 v003 (30 m) e IGAC: altitud media urbana/periurbana de Pereira ~1411 m s. n. m. y pendiente media de ladera cafetera (~18 %)."
+    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): altitud media urbana/periurbana de Pereira (~1411 m s. n. m.) y pendiente típica de ladera cafetera (~18 %)."
   },
   {
     "id": "cerritos-valle",
@@ -17,7 +17,7 @@
     "tolerance": 0.08,
     "elevationMeters": 1150,
     "slopePercent": 6,
-    "source": "NASA SRTMGL1 v003 (30 m): terraza baja entre Cerritos y el valle del río Cauca (~1150 m s. n. m., relieve suavemente ondulado ~6 %)."
+    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): terraza baja entre Cerritos y el valle del río Cauca (~1150 m s. n. m., relieve suavemente ondulado ~6 %)."
   },
   {
     "id": "santa-rosa-alta",
@@ -27,7 +27,7 @@
     "tolerance": 0.06,
     "elevationMeters": 1950,
     "slopePercent": 28,
-    "source": "NASA SRTMGL1 v003 (30 m): vertiente occidental de la Cordillera Central (~1950 m s. n. m., ladera pronunciada ~28 %)."
+    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): vertiente occidental de la Cordillera Central (~1950 m s. n. m., ladera pronunciada ~28 %)."
   },
   {
     "id": "manizales-ladera",
@@ -37,7 +37,7 @@
     "tolerance": 0.08,
     "elevationMeters": 2150,
     "slopePercent": 32,
-    "source": "NASA SRTMGL1 v003 (30 m): altitud media de Manizales (~2150 m s. n. m.) en relieve quebrado de alta pendiente (~32 %)."
+    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): altitud media de Manizales (~2150 m s. n. m.) en relieve quebrado de alta pendiente (~32 %)."
   },
   {
     "id": "armenia-quindio",
@@ -47,6 +47,6 @@
     "tolerance": 0.08,
     "elevationMeters": 1480,
     "slopePercent": 12,
-    "source": "NASA SRTMGL1 v003 (30 m): abanico fluviovolcánico del Quindío (~1480 m s. n. m., pendiente moderada ~12 %)."
+    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): abanico fluviovolcánico del Quindío (~1480 m s. n. m., pendiente moderada ~12 %)."
   }
 ]

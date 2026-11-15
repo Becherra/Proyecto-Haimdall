@@ -192,13 +192,13 @@ function durationEvidence(crops: readonly Crop[]): string {
 
 const WATER_AVAILABILITY_LABELS: Record<WaterAvailability, string> = { low: "baja", medium: "media", high: "alta" };
 
-/** Temperatura media del sitio y rango de cada cultivo; incluye el ajuste por altitud SRTM/declarada cuando se aplicó. */
+/** Temperatura media del sitio y rango de cada cultivo; incluye el ajuste por altitud (estimada o declarada) cuando se aplicó. */
 function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMeanTemperatureC, cellElevationMeters, siteElevationMeters, terrainSource }: Indicators): string[] {
   if (meanTemperatureC === undefined || meanTemperatureC === null) return [];
   const ranges = crops.flatMap((crop) => (crop.temperatureC ? [`${commonName(crop)} ${formatTemperatureRange(crop.temperatureC)}`] : []));
   const detail = ranges.length > 0 ? ` Rango en que crece bien según el catálogo: ${ranges.join("; ")}.` : "";
   const adjusted = cellMeanTemperatureC !== undefined && cellMeanTemperatureC !== null && cellElevationMeters !== undefined && siteElevationMeters !== undefined;
-  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "NASA SRTM";
+  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "una estimación de referencia de la zona";
   const sourceNote = adjusted
     ? `(NASA POWER, T2M de ${cellMeanTemperatureC.toFixed(1)} °C en celda a ${cellElevationMeters.toFixed(0)} m, ajustada a ${siteElevationMeters.toFixed(0)} m con ${origin})`
     : "(NASA POWER, T2M)";
@@ -207,7 +207,7 @@ function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMea
 
 function terrainEvidence({ slopePercent, terrainSource }: Indicators): string[] {
   if (slopePercent === undefined) return [];
-  const origin = terrainSource === "user" ? "declarada por el agricultor" : "NASA SRTM";
+  const origin = terrainSource === "user" ? "declarada por el agricultor" : "estimación de referencia de la zona";
   return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (${origin}).`];
 }
 
@@ -312,12 +312,20 @@ function temperatureGaps(crops: readonly Crop[], { meanTemperatureC }: Indicator
   ];
 }
 
+/** Las muestras de terreno precargadas son cifras de referencia de la zona: aún no se leyeron del ráster de NASA SRTM. */
+function terrainGaps({ terrainSource }: Indicators): string[] {
+  return terrainSource === "srtm-sample"
+    ? ["La altitud y la pendiente son estimaciones de referencia de la zona: no son mediciones del lote ni lecturas verificadas de NASA SRTM."]
+    : [];
+}
+
 function buildGaps(indicators: Indicators, { crops, sowing, familyBreak }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
     "Los datos de NASA POWER son de malla y no miden el lote específico.",
     ...temperatureGaps(crops, indicators),
+    ...terrainGaps(indicators),
     ...sowingGaps(sowing),
     familyGap(familyBreak),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),
