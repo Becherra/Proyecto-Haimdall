@@ -204,13 +204,34 @@ export const analysisRequestSchema = z.object({
   // Climate should use farm.centroid when a Farm is supplied; lat/lon remain for older clients.
   farm: farmSchema.optional(),
   scenario: climateScenarioSchema.optional(),
+  /** Pide incluir los registros diarios en `climate.records` (miles de filas). Por defecto no se envían. */
+  includeDailyRecords: z.boolean().optional(),
 }).refine((value) => value.startYear <= value.endYear, "startYear debe ser menor o igual que endYear");
 export type AnalysisRequest = z.infer<typeof analysisRequestSchema>;
 
+/**
+ * Clima dentro de la respuesta de análisis: el resumen de la serie y, solo si se pidieron, los registros diarios.
+ * `daysAnalyzed`, `firstDate` y `lastDate` son opcionales para no romper consumidores previos; `buildAnalysis` siempre los entrega.
+ */
+export const analysisClimateSchema = climateResultSchema.omit({ records: true }).extend({
+  records: z.array(climateRecordSchema).optional(),
+  daysAnalyzed: z.number().int().nonnegative().optional(),
+  firstDate: z.string().regex(/^\d{8}$/).optional(), lastDate: z.string().regex(/^\d{8}$/).optional(),
+});
+export type AnalysisClimate = z.infer<typeof analysisClimateSchema>;
+
+/** Un dato usado en el análisis, con su proveedor y para qué se usó (trazabilidad de cada número mostrado). */
+export const dataSourceSchema = z.object({
+  id: z.string().min(1), name: z.string().min(1), provider: z.string().min(1), use: z.string().min(1), url: z.string().url().optional(),
+});
+export type DataSource = z.infer<typeof dataSourceSchema>;
+
 export const analysisResponseSchema = z.object({
-  climate: climateResultSchema, monthlyClimate: z.array(monthlyClimateSchema), indicators: indicatorsSchema, rotations: z.array(rotationResultSchema).min(3),
+  climate: analysisClimateSchema, monthlyClimate: z.array(monthlyClimateSchema), indicators: indicatorsSchema, rotations: z.array(rotationResultSchema).min(3),
   /** Escenario aplicado, si se pidió: `monthlyClimate`, `indicators` y `rotations` lo reflejan; `climate` conserva los datos originales de NASA. */
   scenario: climateScenarioSchema.optional(),
+  /** Datos usados en este análisis y para qué. Opcional para no romper consumidores previos; `buildAnalysis` siempre lo entrega. */
+  dataSources: z.array(dataSourceSchema).optional(),
 });
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
 
