@@ -75,6 +75,13 @@ export const cropSchema = z.object({
   temperatureC: z.object({ goodMin: z.number(), goodMax: z.number().optional(), limitMin: z.number().optional(), limitMax: z.number().optional() }).optional(),
   /** Helada corta más fría (°C) que el cultivo soporta según su fuente. Ausente = sin tolerancia documentada. */
   frostToleranceC: z.number().optional(),
+  /**
+   * Cultivo permanente (café, plátano): ocupa el lote todo el año y no se rota. Solo se ofrece como cultivo actual del agricultor,
+   * nunca como sugerencia. Sus `sowingMonths` van vacíos porque no se siembra cada año.
+   */
+  perennial: z.boolean().optional(),
+  /** Ids de cultivos permanentes con los que este cultivo anual se puede asociar (en las calles, mientras el permanente es joven), según su fuente. */
+  intercropsWith: z.array(z.string().min(1)).optional(),
 });
 export type Crop = z.infer<typeof cropSchema>;
 export type CropTemperatureRange = NonNullable<Crop["temperatureC"]>;
