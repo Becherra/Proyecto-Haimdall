@@ -91,3 +91,10 @@ export const MIN_YEARS_FOR_CURRENT_SEASON = 5;
  * Heurística de diseño, no un dato oficial; validar con un agrónomo local.
  */
 export const CURRENT_SEASON_PERCENT = { muchDrier: 50, drier: 80, wetter: 120, muchWetter: 150 } as const;
+
+/** Desde cuántos grados de diferencia frente a lo normal la pantalla del agricultor habla de "más calor" o "menos calor". */
+export const CURRENT_SEASON_TEMPERATURE_NOTICE_C = 0.5;
+/** Desde cuántos días seguidos casi sin lluvia la pantalla del agricultor lo avisa. */
+export const CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS = 10;
+/** Porcentaje de la lluvia normal con el que se llena la barra de comparación; si llovió más, la escala crece para que quepa. */
+export const CURRENT_SEASON_BAR_MAX_PERCENT = 150;

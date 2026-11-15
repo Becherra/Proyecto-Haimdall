@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, bestRotationIndex, climateTopicSpeechItems, describeClimate, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
-import type { Indicators, MonthlyClimate, RotationResult } from "../src/types";
+import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, SCENARIO_PRESETS, activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, describeNasaSupport, describeSimpleSources, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import type { CurrentSeason, Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
 const rotation = (score: number, id = "x"): RotationResult => ({ rotation: { id, name: id, cropIds: ["maiz"], description: "d" }, score, whySuggested: "Porque sí.", evidence: ["Dato A"], benefits: ["Beneficio 1", "Beneficio 2."], informationGaps: ["Vacío"], risks: ["Riesgo"], validateWithLocalExpert: ["Validar"] });
@@ -99,5 +99,143 @@ describe("rotationSections con texto simple", () => {
     const sections = rotationSections(rotation(3));
     expect(sections.find((section) => section.id === "evidence")?.texts).toEqual(["Dato A"]);
     expect(sections.find((section) => section.id === "why")?.texts).toEqual(["Porque sí."]);
+  });
+});
+
+describe("describeCurrentSeason: cómo va la temporada", () => {
+  const season = (overrides: Partial<CurrentSeason> = {}): CurrentSeason => ({
+    windowDays: 87, firstDate: "20260818", lastDate: "20261112", daysWithData: 87, rainMm: 563.27, normalRainMm: 507.42, rainPercentOfNormal: 111,
+    status: "normal", temperatureAnomalyC: 1.4, currentDryStreakDays: 0, baselineYears: 15, ...overrides,
+  });
+
+  it("traduce cada estado a una etiqueta simple y a un tono", () => {
+    const labelOf = (status: CurrentSeason["status"]) => { const card = describeCurrentSeason(season({ status })); return [card.statusLabel, card.tone]; };
+    expect(labelOf("much-drier")).toEqual(["Muy seca", "dry"]);
+    expect(labelOf("drier")).toEqual(["Más seca de lo normal", "dry"]);
+    expect(labelOf("normal")).toEqual(["Normal", "normal"]);
+    expect(labelOf("wetter")).toEqual(["Más lluviosa de lo normal", "wet"]);
+    expect(labelOf("much-wetter")).toEqual(["Muy lluviosa", "wet"]);
+  });
+
+  it("dice con palabras de campo si ha llovido menos, igual o más que de costumbre, sin usar milímetros ni porcentajes", () => {
+    expect(describeCurrentSeason(season({ status: "much-drier" })).headline).toBe("En estos últimos meses casi no ha llovido. La tierra está mucho más seca que en años normales.");
+    expect(describeCurrentSeason(season({ status: "drier" })).headline).toBe("En estos últimos meses ha llovido menos que en otros años para esta misma época.");
+    expect(describeCurrentSeason(season({ status: "normal" })).headline).toBe("En estos últimos meses ha llovido lo que suele llover todos los años en esta época.");
+    expect(describeCurrentSeason(season({ status: "wetter" })).headline).toBe("En estos últimos meses ha caído más agua que en otros años para esta época.");
+    expect(describeCurrentSeason(season({ status: "much-wetter" })).headline).toBe("En estos últimos meses ha caído mucha más agua que de costumbre. La tierra está bien mojada.");
+  });
+
+  it("habla del calor o fresco sin grados numéricos y no inventa si falta el dato", () => {
+    const sentenceFor = (temperatureAnomalyC: number | null) => describeCurrentSeason(season({ temperatureAnomalyC })).details.join(" ");
+    expect(sentenceFor(1.4)).toContain("más calientes y bochornosos que de costumbre");
+    expect(sentenceFor(-0.8)).toContain("más frescos que de costumbre");
+    expect(sentenceFor(0.2)).toContain("El calor y el fresco han estado normales");
+    expect(sentenceFor(null)).not.toContain("calientes");
+    expect(sentenceFor(null)).not.toContain("frescos");
+  });
+
+  it("avisa de los días seguidos sin aguacero y da un consejo práctico para el lote según el clima", () => {
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 12 })).details.join(" ")).toContain("varios días seguidos sin que caiga un buen aguacero");
+    expect(describeCurrentSeason(season({ currentDryStreakDays: 3 })).details.join(" ")).not.toContain("aguacero");
+    expect(describeCurrentSeason(season({ status: "much-drier" })).details.join(" ")).toContain("En tu lote: tapa el suelo con hojarasca o rastrojo");
+    expect(describeCurrentSeason(season({ status: "normal" })).details.join(" ")).toContain("En tu lote: la temporada va pareja");
+    expect(describeCurrentSeason(season({ status: "much-wetter" })).details.join(" ")).toContain("En tu lote: cuidado con los hongos en las hojas");
+  });
+
+  it("aclara hasta qué fecha se miraron las lluvias y que no adivina si mañana va a llover", () => {
+    const { note } = describeCurrentSeason(season());
+    expect(note).toContain("12 de noviembre");
+    expect(note).toContain("no adivina si mañana va a llover");
+  });
+
+  it("compara con gotas de agua: 3 gotas para lo normal y de 1 a 5 gotas según qué tan seca o lluviosa va la temporada", () => {
+    const dropsOf = (status: CurrentSeason["status"]) => { const card = describeCurrentSeason(season({ status })); return [card.normalDrops, card.currentDrops]; };
+    expect(dropsOf("much-drier")).toEqual([NORMAL_SEASON_DROPS, 1]);
+    expect(dropsOf("drier")).toEqual([NORMAL_SEASON_DROPS, 2]);
+    expect(dropsOf("normal")).toEqual([NORMAL_SEASON_DROPS, 3]);
+    expect(dropsOf("wetter")).toEqual([NORMAL_SEASON_DROPS, 4]);
+    expect(dropsOf("much-wetter")).toEqual([NORMAL_SEASON_DROPS, MAX_SEASON_DROPS]);
+  });
+
+  it("sin porcentaje (lo normal es 0 mm) no inventa gotas normales", () => {
+    const card = describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 0, status: "normal" }));
+    expect(card.normalDrops).toBe(0);
+    expect(card.currentDrops).toBe(0);
+    expect(describeCurrentSeason(season({ rainPercentOfNormal: null, normalRainMm: 0, rainMm: 12, status: "much-wetter" })).currentDrops).toBe(MAX_SEASON_DROPS);
+  });
+
+  it("para leer en voz alta: la explicación fija (grabable) y luego lo que pasa en el campo, sin milímetros", () => {
+    const [fixed, data] = currentSeasonSpeechItems(describeCurrentSeason(season({ status: "drier", currentDryStreakDays: 12 })));
+    expect(fixed.audioId).toBe("clima-temporada");
+    expect(fixed.text).toContain("¿Cómo va esta temporada?");
+    expect(data.audioId).toBeUndefined();
+    expect(data.text).toContain("Más seca de lo normal");
+    expect(data.text).toContain("ha llovido menos que en otros años");
+    expect(data.text).toContain("En tu lote:");
+    expect(data.text).toContain("no adivina si mañana va a llover");
+    expect(data.text).not.toContain("milímetros");
+  });
+});
+
+describe("cropLink: cómo se unen los cultivos de una opción", () => {
+  it("una rotación se lee como relevo (flecha) y una asociación con un cultivo permanente como mezcla (+)", () => {
+    expect(cropLink({ name: "Maíz → Soya" })).toBe("then");
+    expect(cropLink({ name: "Maíz → Crotalaria → Yuca" })).toBe("then");
+    expect(cropLink({ name: "Café + Fríjol" })).toBe("with");
+    expect(cropLink({ name: "Plátano + Maíz" })).toBe("with");
+  });
+
+  it("un solo cultivo no tiene unión, y se queda en relevo por defecto", () => {
+    expect(cropLink({ name: "Actual: Café (Coffea arabica)" })).toBe("then");
+  });
+});
+
+describe("activeScenarioPreset y describeNasaSupport: simulador simple y respaldo sin jerga", () => {
+  it("reconoce cuál botón de clima está activo o vuelve al clima normal por defecto", () => {
+    expect(activeScenarioPreset(undefined).id).toBe("normal");
+    expect(activeScenarioPreset({ tempDeltaC: 0, rainFactor: 1 }).id).toBe("normal");
+    for (const preset of SCENARIO_PRESETS) {
+      expect(activeScenarioPreset(preset.scenario).id).toBe(preset.id);
+    }
+  });
+
+  it("traduce la sequía histórica, el peor año y la loma del lote a frases de campo sin siglas raras", () => {
+    const items = describeNasaSupport({
+      indicators: { ...indicators, longestDrySpellDays: 22, worstYear: { year: 2015, waterBalanceMm: -40 }, slopePercent: 25, siteElevationMeters: 1850 },
+    });
+    expect(items.map((item) => item.id)).toEqual(["history", "drought", "worstYear", "terrain"]);
+    expect(items.find((item) => item.id === "drought")?.body).toContain("varias semanas seguidas sin un buen aguacero");
+    expect(items.find((item) => item.id === "worstYear")?.title).toContain("2015");
+    expect(items.find((item) => item.id === "terrain")?.body).toContain("loma fuerte");
+  });
+
+  it("omite tarjetas opcionales si no hay datos de racha seca, peor año ni terreno, y adapta pendientes suaves", () => {
+    const minimal = describeNasaSupport({ indicators });
+    expect(minimal.map((item) => item.id)).toEqual(["history"]);
+    const gentle = describeNasaSupport({ indicators: { ...indicators, longestDrySpellDays: 8, slopePercent: 4 } });
+    expect(gentle.find((item) => item.id === "drought")?.body).toContain("no suelen pasar demasiados días");
+    expect(gentle.find((item) => item.id === "terrain")?.body).toContain("bastante parejo");
+  });
+
+  it("explica las fuentes reales de la NASA con palabras sencillas y sin siglas", () => {
+    const source = (id: string, name: string) => ({ id, name, provider: "NASA POWER", use: "Uso técnico" });
+    const sources = describeSimpleSources([
+      source("power-t2m", "Temperatura media a 2 m (T2M)"), source("power-t2m_min", "Temperatura mínima a 2 m (T2M_MIN)"), source("power-t2m_max", "Temperatura máxima a 2 m (T2M_MAX)"),
+      source("power-prectotcorr", "Precipitación corregida (PRECTOTCORR)"), source("power-evland", "Evaporación terrestre (EVLAND)"), source("power-gwetroot", "Humedad de la zona de raíces (GWETROOT)"),
+      source("power-allsky_sfc_sw_dwn", "Radiación solar en superficie (ALLSKY_SFC_SW_DWN)"), source("power-recent", "Clima de los últimos días"),
+      source("power-cell-elevation", "Altitud media de la celda"), source("terrain-srtm", "Altitud y pendiente del punto piloto más cercano"), source("crops-catalog", "Catálogo de cultivos (data/crops.json)"),
+    ]);
+    expect(sources.map((item) => item.id)).toEqual(["temperature", "rain", "evaporation", "roots", "recent", "terrain", "crops"]);
+    expect(sources.map((item) => `${item.title} ${item.body}`).join(" ")).not.toMatch(/T2M|PRECTOTCORR|EVLAND|GWETROOT|ALLSKY|SRTM|\.json/);
+  });
+
+  it("usa la tarjeta de terreno declarado y conserva el nombre de una fuente desconocida", () => {
+    const sources = describeSimpleSources([
+      { id: "terrain-user", name: "Altitud y pendiente del lote", provider: "Agricultor", use: "Ajuste por altitud" },
+      { id: "otra-fuente", name: "Fuente nueva", provider: "X", use: "Uso nuevo" },
+    ]);
+    expect(sources.map((item) => item.id)).toEqual(["terrainUser", "otra-fuente"]);
+    expect(sources[1]).toMatchObject({ title: "Fuente nueva", body: "Uso nuevo" });
+    expect(describeSimpleSources()).toEqual([]);
   });
 });

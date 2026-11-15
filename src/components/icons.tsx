@@ -16,6 +16,8 @@ const CROP_ICONS: Record<string, ReactNode> = {
   papa: <><path d="M12 18C12 8 23 4 31 6c5 2 6 7 7 12 3 6 6 10 4 17-2 7-9 10-18 10C13 45 7 40 7 31c0-6 5-8 5-13Z" /><path d="M15 17c-3 7-3 15 0 22" strokeWidth="2" /><path d="M27 15h4M20 33h4" strokeWidth="2" /><path d="M26 24h.01M34 30h.01M28 40h.01" strokeWidth="3.400" /></>,
   avena: <><path d="M24 45V8" /><ellipse cx="17" cy="15" rx="3.6" ry="6.5" transform="rotate(-30 17 15)" /><ellipse cx="31" cy="15" rx="3.6" ry="6.5" transform="rotate(30 31 15)" /><ellipse cx="17" cy="26" rx="3.6" ry="6.5" transform="rotate(-30 17 26)" /><ellipse cx="31" cy="26" rx="3.6" ry="6.5" transform="rotate(30 31 26)" /><ellipse cx="24" cy="6" rx="3" ry="4.5" /></>,
   repollo: <><path d="M24.0 7.0 A 6.6 6.6 0 0 1 34.9 11.0 A 6.6 6.6 0 0 1 40.7 21.0 A 6.6 6.6 0 0 1 38.7 32.5 A 6.6 6.6 0 0 1 29.8 40.0 A 6.6 6.6 0 0 1 18.2 40.0 A 6.6 6.6 0 0 1 9.3 32.5 A 6.6 6.6 0 0 1 7.3 21.0 A 6.6 6.6 0 0 1 13.1 11.0 A 6.6 6.6 0 0 1 24.0 7.0 Z" /><path d="M24 42C24 32 24 22 24 12M24 42C19 34 15 27 14 19M24 42C29 34 33 27 34 19" strokeWidth="2" /></>,
+  cafe: <><ellipse cx="24" cy="24" rx="12" ry="18" transform="rotate(30 24 24)" /><path d="M32 9c-7 7 3 11-2 17s-9 8-14 13" /></>,
+  platano: <><path d="M7 15C7 33 22 43 40 39c4-1 5-5 1-5-13 0-21-8-21-21 0-5-13-5-13 2Z" /><path d="M10 9l1-5h6l1 5" /><path d="M14 17c0 11 8 17 20 18" strokeWidth="1.8" /></>,
   generic: <><path d="M24 44V22" /><path d="M24 26C14 26 8 20 8 11c10 0 16 5 16 15ZM24 22c0-9 6-14 16-14 0 9-6 14-16 14Z" /></>,
   none: <><circle cx="24" cy="24" r="16" /><path d="M13 35 35 13" /></>,
 };
@@ -46,6 +48,7 @@ const UI_ICONS = {
   down: <path d="M10 18l14 14 14-14" />,
   up: <path d="M10 30l14-14 14 14" />,
   arrow: <path d="M6 24h32M28 14l10 10-10 10" />,
+  plus: <path d="M24 8v32M8 24h32" />,
   back: <path d="M42 24H10M20 14 10 24l10 10" />,
   field: <><path d="M4 38 14 16h20l10 22Z" /><path d="M9 28h30M12 22h24" strokeWidth="1.800" /></>,
   sun: <><circle cx="24" cy="24" r="8" /><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4" /></>,

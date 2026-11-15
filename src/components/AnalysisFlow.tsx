@@ -43,18 +43,28 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     }
   }
 
-  async function applyScenario() {
-    if (!baseResponse || mockMode) return;
+  async function selectScenario(nextScenario: ClimateScenario) {
+    if (!baseResponse) return;
+    if ((nextScenario.tempDeltaC ?? 0) === 0 && (nextScenario.rainFactor ?? 1) === 1) {
+      showBaseline();
+      return;
+    }
+    if (mockMode) return;
     setPending(true);
     setError(null);
+    setScenarioDraft(nextScenario);
     try {
-      const result = await runAnalysis(buildAnalysisRequest(farm, priorities, scenarioDraft));
+      const result = await runAnalysis(buildAnalysisRequest(farm, priorities, nextScenario));
       setResponse(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No se pudo calcular el escenario.");
+      setError(cause instanceof Error ? cause.message : "No se pudo calcular ese clima.");
     } finally {
       setPending(false);
     }
+  }
+
+  async function applyScenario() {
+    await selectScenario(scenarioDraft);
   }
 
   function showBaseline() {
@@ -68,7 +78,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     return <PrioritiesSlides farm={farm} initialValues={priorities} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />;
   }
 
-  if (!technical) return <ResultsView farm={farm} response={response} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;
+  if (!technical) return <ResultsView farm={farm} response={response} applyingScenario={pending} scenarioError={error} mockMode={mockMode} onSelectScenario={selectScenario} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;
 
   return <AnalysisDashboard
     onBackToSimple={() => setTechnical(false)}
@@ -79,6 +89,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     mockMode={mockMode}
     applyingScenario={pending}
     scenarioError={error}
+    onSelectScenario={selectScenario}
     onScenarioChange={setScenarioDraft}
     onApplyScenario={applyScenario}
     onShowBaseline={showBaseline}

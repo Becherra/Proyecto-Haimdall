@@ -1,4 +1,5 @@
-import type { Indicators, MonthlyClimate, RotationResult } from "../../types";
+import type { AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, Indicators, MonthlyClimate, RotationResult } from "../../types";
+import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C } from "../config";
 import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
 
 /** Un pedazo de texto para leer en voz alta; con `audioId` se usa la grabación `public/audio/<audioId>.mp3` si existe. */
@@ -144,4 +145,186 @@ export const RAIN_CALENDAR_INTRO = { title: "Calendario de lluvia", explanation:
 export function rainCalendarSpeechItems(calendar: readonly RainMonth[]): SpeechItem[] {
   const sentence = rainCalendarSentence(calendar);
   return [{ text: `${RAIN_CALENDAR_INTRO.title}. ${RAIN_CALENDAR_INTRO.explanation}`, audioId: RAIN_CALENDAR_INTRO.audioId }, ...(sentence ? [{ text: sentence }] : [])];
+}
+
+export const MAX_SEASON_DROPS = 5;
+export const NORMAL_SEASON_DROPS = 3;
+
+export type CurrentSeasonTone = "dry" | "normal" | "wet";
+export type CurrentSeasonCard = {
+  title: string;
+  technicalName: string;
+  /** Qué significa: texto fijo, se puede grabar con la voz propia (`explanationAudioId`). */
+  explanation: string;
+  explanationAudioId: string;
+  statusLabel: string;
+  tone: CurrentSeasonTone;
+  /** Resumen en lenguaje de campo de cómo va la lluvia en estos meses. */
+  headline: string;
+  /** Calor o fresco reciente, sequía seguida y consejo práctico para el lote. */
+  details: string[];
+  /** Fecha del dato y que cuenta lo que ya pasó, no un pronóstico. */
+  note: string;
+  /** Gotas de agua (0 a `MAX_SEASON_DROPS`) para comparar lo normal con este año sin usar gráficas ni porcentajes. */
+  normalDrops: number;
+  currentDrops: number;
+};
+
+export const CURRENT_SEASON_EXPLANATION = {
+  title: "¿Cómo va esta temporada?",
+  technicalName: "Lluvia reciente frente a lo normal",
+  explanation: "Compara la lluvia de los últimos meses con la que suele caer en esa misma época. Sirve para saber si este año va más seco o más lluvioso que de costumbre.",
+  audioId: "clima-temporada",
+} as const;
+
+const SEASON_STATUS: Record<CurrentSeasonStatus, { label: string; tone: CurrentSeasonTone; drops: number; headline: string }> = {
+  "much-drier": { label: "Muy seca", tone: "dry", drops: 1, headline: "En estos últimos meses casi no ha llovido. La tierra está mucho más seca que en años normales." },
+  drier: { label: "Más seca de lo normal", tone: "dry", drops: 2, headline: "En estos últimos meses ha llovido menos que en otros años para esta misma época." },
+  normal: { label: "Normal", tone: "normal", drops: 3, headline: "En estos últimos meses ha llovido lo que suele llover todos los años en esta época." },
+  wetter: { label: "Más lluviosa de lo normal", tone: "wet", drops: 4, headline: "En estos últimos meses ha caído más agua que en otros años para esta época." },
+  "much-wetter": { label: "Muy lluviosa", tone: "wet", drops: 5, headline: "En estos últimos meses ha caído mucha más agua que de costumbre. La tierra está bien mojada." },
+};
+
+const SEASON_ADVICE: Record<CurrentSeasonTone, string> = {
+  dry: "En tu lote: tapa el suelo con hojarasca o rastrojo para guardar la poca humedad que queda.",
+  normal: "En tu lote: la temporada va pareja; aprovecha los días húmedos para sembrar o abonar.",
+  wet: "En tu lote: cuidado con los hongos en las hojas, los charcos y que el agua no te lave la tierra ni el abono.",
+};
+
+/** "20261112" → "12 de noviembre". */
+const dayAndMonth = (date: string) => `${Number(date.slice(6, 8))} de ${MONTH_NAMES[Number(date.slice(4, 6)) - 1]}`;
+
+function temperatureSentence(anomalyC: number | null): string[] {
+  if (anomalyC === null) return [];
+  if (Math.abs(anomalyC) < CURRENT_SEASON_TEMPERATURE_NOTICE_C) return ["El calor y el fresco han estado normales para esta época."];
+  return [anomalyC > 0 ? "Además, los días han estado más calientes y bochornosos que de costumbre." : "Además, los días han estado más frescos que de costumbre."];
+}
+
+/** Gotas de lluvia normal (3 de 5) y de este año (1 a 5 según el estado); sin base histórica normal, no inventa gotas normales. */
+function seasonDrops({ status, rainPercentOfNormal, rainMm }: Pick<CurrentSeason, "status" | "rainPercentOfNormal" | "rainMm">): { normalDrops: number; currentDrops: number } {
+  if (rainPercentOfNormal === null) return { normalDrops: 0, currentDrops: rainMm > 0 ? MAX_SEASON_DROPS : 0 };
+  return { normalDrops: NORMAL_SEASON_DROPS, currentDrops: SEASON_STATUS[status].drops };
+}
+
+/** La temporada actual explicada con palabras de campo y gotas de agua: sin milímetros, porcentajes ni gráficas. */
+export function describeCurrentSeason(season: CurrentSeason): CurrentSeasonCard {
+  const status = SEASON_STATUS[season.status];
+  return {
+    ...CURRENT_SEASON_EXPLANATION, explanationAudioId: CURRENT_SEASON_EXPLANATION.audioId,
+    statusLabel: status.label, tone: status.tone, headline: status.headline,
+    details: [
+      ...temperatureSentence(season.temperatureAnomalyC),
+      ...(season.currentDryStreakDays >= CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS ? ["Llevas varios días seguidos sin que caiga un buen aguacero."] : []),
+      SEASON_ADVICE[status.tone],
+    ],
+    note: `Miramos las lluvias hasta el ${dayAndMonth(season.lastDate)}. Esto cuenta lo que ya pasó en estos meses; no adivina si mañana va a llover.`,
+    ...seasonDrops(season),
+  };
+}
+
+/** La temporada actual para leer en voz alta: la explicación fija (grabable) y luego lo que pasa en el campo. */
+export function currentSeasonSpeechItems(card: CurrentSeasonCard): SpeechItem[] {
+  return [{ text: `${card.title} ${card.explanation}`, audioId: card.explanationAudioId }, { text: sentences([card.statusLabel, card.headline, ...card.details, card.note]) }];
+}
+
+/**
+ * Cómo se unen los cultivos de una opción en pantalla: "then" (flecha) para una rotación, "with" (+) para un cultivo anual
+ * asociado en las calles de uno permanente. El motor nombra las asociaciones "Café + Fríjol" y las rotaciones "Maíz → Soya".
+ */
+export function cropLink(rotation: Pick<RotationResult["rotation"], "name">): "then" | "with" {
+  return rotation.name.includes(" + ") ? "with" : "then";
+}
+
+export type ScenarioPresetId = "normal" | "drought" | "wet" | "heat";
+export type ScenarioPreset = {
+  id: ScenarioPresetId;
+  label: string;
+  subtitle: string;
+  scenario: ClimateScenario;
+  notice: string;
+};
+
+/** Botones simples para que el agricultor pruebe qué pasa con sus cultivos si cambia el tiempo, sin usar porcentajes ni grados. */
+export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
+  { id: "normal", label: "Clima normal", subtitle: "Como suele ser aquí", scenario: { tempDeltaC: 0, rainFactor: 1 }, notice: "Estás viendo tus cultivos con el clima habitual de tu zona." },
+  { id: "drought", label: "Si viene sequía", subtitle: "Poca agua y más sol", scenario: { tempDeltaC: 1, rainFactor: 0.7 }, notice: "Estás probando qué pasaría en un año seco. Mira cómo cambian las estrellas de cada camino." },
+  { id: "wet", label: "Si llueve mucho", subtitle: "Temporada de mucha agua", scenario: { tempDeltaC: 0, rainFactor: 1.35 }, notice: "Estás probando qué pasaría en un año de mucha agua. Mira qué cultivos aguantan mejor." },
+  { id: "heat", label: "Si hace más calor", subtitle: "Días más bochornosos", scenario: { tempDeltaC: 2, rainFactor: 1 }, notice: "Estás probando qué pasaría si los días se ponen más calientes que de costumbre." },
+] as const;
+
+/** Identifica cuál botón de clima está activo; si no hay escenario o vuelve a 0/1, es "normal". */
+export function activeScenarioPreset(scenario: ClimateScenario | undefined): ScenarioPreset {
+  const temp = scenario?.tempDeltaC ?? 0;
+  const rain = scenario?.rainFactor ?? 1;
+  return SCENARIO_PRESETS.find((preset) => preset.scenario.tempDeltaC === temp && preset.scenario.rainFactor === rain) ?? SCENARIO_PRESETS[0]!;
+}
+
+export type NasaSupportItemId = "history" | "drought" | "worstYear" | "terrain";
+export type NasaSupportItem = { id: NasaSupportItemId; title: string; body: string };
+
+function terrainSupportText(indicators: Indicators): string | null {
+  if (indicators.slopePercent === undefined && indicators.siteElevationMeters === undefined) return null;
+  if ((indicators.slopePercent ?? 0) >= 20) return "Tu terreno tiene loma fuerte. Cuando llueve duro el agua corre rápido y puede llevarse la tierra buena y el abono.";
+  if ((indicators.slopePercent ?? 0) >= 8) return "Tu terreno tiene algo de falda o inclinación. Sembrar atravesado a la loma y tapar el suelo ayuda a que el agua no arrastre la tierra.";
+  return "Tu terreno es bastante parejo, así que el agua de lluvia se aprovecha mejor y casi no arrastra la tierra.";
+}
+
+/** Traduce el respaldo del análisis a tarjetas simples sin números raros ni jerga estadística. */
+export function describeNasaSupport({ indicators }: Pick<AnalysisResponse, "indicators">): NasaSupportItem[] {
+  const drySpell = indicators.longestDrySpellDays;
+  const terrain = terrainSupportText(indicators);
+  return [
+    { id: "history", title: "Muchos años de memoria", body: "Miramos las lluvias, el calor y la humedad de muchos años hacia atrás con satélites de la NASA, para no guiarnos por un solo año bueno o malo." },
+    ...(drySpell === undefined ? [] : [{
+      id: "drought" as const,
+      title: "Cuando aprieta el verano",
+      body: drySpell >= 15
+        ? "En los años difíciles han pasado varias semanas seguidas sin un buen aguacero. Por eso ayuda tener cultivos que tapen y guarden la humedad de la tierra."
+        : "Incluso en épocas secas, en esta zona no suelen pasar demasiados días seguidos sin que caiga algo de agua.",
+    }]),
+    ...(indicators.worstYear ? [{
+      id: "worstYear" as const,
+      title: `El año más duro fue ${indicators.worstYear.year}`,
+      body: `Ese año faltó más agua que en cualquier otro de los que revisamos. Las opciones con más estrellas buscan defenderte mejor si se repite un año parecido.`,
+    }] : []),
+    ...(terrain ? [{ id: "terrain" as const, title: "Cómo es la loma de tu lote", body: terrain }] : []),
+  ];
+}
+
+type SimpleSourceCard = { title: string; body: string };
+
+/** Tarjetas sencillas por tema. Varias fuentes técnicas (p. ej. T2M, T2M_MIN, T2M_MAX) se cuentan como una sola tarjeta. */
+const SIMPLE_SOURCE_CARDS = {
+  temperature: { title: "Calor y frío de tu región", body: "Satélites de la NASA que anotan todos los días qué tan caliente y qué tan frío estuvo, para saber si hay riesgo de heladas o de calor fuerte." },
+  rain: { title: "Lluvias de tu región", body: "Satélites de la NASA que anotan todos los días cuánto llovió en tu zona, para saber en qué meses cae más agua." },
+  evaporation: { title: "Agua que se pierde por el sol", body: "Calculamos cuánta agua se evapora con el calor para saber si la lluvia alcanza para los cultivos." },
+  roots: { title: "Humedad de la tierra", body: "Medida desde el espacio de qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
+  recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
+  terrain: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu zona y si tiene mucha pendiente. Es de un punto cercano, no de tu lote exacto." },
+  terrainUser: { title: "Altura y loma que tú contaste", body: "La altura y la inclinación de tu lote vienen de lo que tú nos dijiste." },
+  crops: { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo. Son datos de partida: conviene revisarlos con un técnico de tu zona." },
+} as const satisfies Record<string, SimpleSourceCard>;
+
+type SimpleSourceCardId = keyof typeof SIMPLE_SOURCE_CARDS;
+
+/** Id de la fuente técnica (ver `listDataSources`) → tarjeta sencilla. La radiación solar no se muestra: todavía no interviene en los puntajes. */
+const SOURCE_TO_CARD: Record<string, SimpleSourceCardId | null> = {
+  "power-t2m": "temperature", "power-t2m_min": "temperature", "power-t2m_max": "temperature",
+  "power-prectotcorr": "rain", "power-evland": "evaporation", "power-gwetroot": "roots",
+  "power-allsky_sfc_sw_dwn": null,
+  "power-recent": "recent", "power-cell-elevation": "terrain", "terrain-srtm": "terrain", "terrain-user": "terrainUser",
+  "crops-catalog": "crops",
+};
+
+/** Explica cada fuente de datos sin siglas ni palabras de ingeniero; las fuentes desconocidas conservan su nombre y uso originales. */
+export function describeSimpleSources(sources: readonly DataSource[] = []): { id: string; title: string; body: string }[] {
+  const seen = new Set<string>();
+  return sources.flatMap((source) => {
+    const cardId = SOURCE_TO_CARD[source.id];
+    if (cardId === null) return [];
+    const id = cardId ?? source.id;
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, ...(cardId ? SIMPLE_SOURCE_CARDS[cardId] : { title: source.name, body: source.use }) }];
+  });
 }
