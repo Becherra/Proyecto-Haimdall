@@ -3,6 +3,7 @@
 import L from "leaflet";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { MapContainer, Marker, Polygon, Polyline, TileLayer, useMap } from "react-leaflet";
+import Logo from "./Logo";
 import { buildLassoPolygon, convertCoordinateOrder } from "../lib/geo";
 import type { PixelPoint } from "../lib/geo";
 import { validateMapLocation } from "../lib/ui/coordinates";
@@ -148,7 +149,7 @@ function LassoTutorial() {
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const ArrowLeft = () => <svg {...iconProps} className="h-8 w-8"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>;
 const Restart = () => <svg {...iconProps} className="h-8 w-8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>;
-const ArrowRight = () => <svg {...iconProps} className="h-12 w-12" strokeWidth={3}><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
+const ArrowRight = () => <svg {...iconProps} className="h-10 w-10" strokeWidth={3}><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
 
 export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmConfirmed }: MapSceneProps) {
   const [initialEditor] = useState(() => createTerrainEditor(location, gpsAccuracyMeters === undefined ? "search" : "gps", gpsAccuracyMeters));
@@ -187,13 +188,14 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
         {isPolygon && editor.vertices.length >= 3 && <Polygon positions={editor.vertices.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#EAD39D", weight: 4, fillColor: "#EAD39D", fillOpacity: 0.25 }} />}
         <Marker position={[draft.lat, draft.lon]} icon={pinIcon} draggable={!isPolygon} eventHandlers={{ dragend: (event) => { const point = (event.target as L.Marker).getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draft.label), locationSource: "map" }); } }} title="Tu finca" />
       </MapContainer>
+      <div className="pointer-events-none absolute left-3 top-3 z-[600] rounded-full bg-meadow/85 px-3 py-1.5 backdrop-blur"><Logo variant="horizontal" className="h-7 w-auto" /></div>
       {showTutorial && <LassoTutorial />}
-      {shownMessage && <p className="pointer-events-none absolute inset-x-4 top-4 z-[600] rounded-2xl bg-meadow/90 px-4 py-3 text-center text-base font-semibold text-cream" role="status">{shownMessage}</p>}
+      {shownMessage && <p className="pointer-events-none absolute inset-x-4 top-16 z-[600] rounded-2xl bg-meadow/90 px-4 py-3 text-center text-base font-semibold text-cream" role="status">{shownMessage}</p>}
     </div>
-    <div className="flex flex-1 items-center justify-center gap-6 px-6 pb-[env(safe-area-inset-bottom)]">
-      <button type="button" onClick={onBack} aria-label="Volver al inicio" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><ArrowLeft /></button>
-      <button type="button" onClick={reset} aria-label="Borrar y dibujar de nuevo" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><Restart /></button>
-      <button type="button" onClick={confirm} disabled={!status.canConfirm} aria-label="Siguiente" className="flex h-24 w-24 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 disabled:opacity-40"><ArrowRight /></button>
+    <div className="flex flex-1 items-center gap-3 px-4 pb-[env(safe-area-inset-bottom)]">
+      <button type="button" onClick={onBack} aria-label="Volver al inicio" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><ArrowLeft /></button>
+      <button type="button" onClick={reset} aria-label="Borrar y dibujar de nuevo" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><Restart /></button>
+      <button type="button" onClick={confirm} disabled={!status.canConfirm} aria-label="Siguiente" className="flex h-20 min-w-0 flex-1 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 disabled:opacity-40"><ArrowRight /></button>
     </div>
   </section>;
 }
