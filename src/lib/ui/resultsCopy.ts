@@ -186,9 +186,9 @@ const SEASON_STATUS: Record<CurrentSeasonStatus, { label: string; tone: CurrentS
 };
 
 const SEASON_ADVICE: Record<CurrentSeasonTone, string> = {
-  dry: "En tu lote: tapa el suelo con hojarasca o rastrojo para guardar la poca humedad que queda.",
-  normal: "En tu lote: la temporada va pareja; aprovecha los días húmedos para sembrar o abonar.",
-  wet: "En tu lote: cuidado con los hongos en las hojas, los charcos y que el agua no te lave la tierra ni el abono.",
+  dry: "Qué vigilar: revisa la humedad del suelo y señales de marchitez; el efecto depende del cultivo, su etapa y si tienes riego.",
+  normal: "Qué vigilar: la lluvia normal no garantiza humedad suficiente en el suelo. Revisa el terreno antes de decidir labores.",
+  wet: "Qué vigilar: observa charcos, escorrentía y manchas en las hojas; el riesgo depende del drenaje, la pendiente y el cultivo.",
 };
 
 /** "20261112" → "12 de noviembre". */

@@ -137,9 +137,9 @@ describe("describeCurrentSeason: cómo va la temporada", () => {
   it("avisa de los días seguidos sin aguacero y da un consejo práctico para el lote según el clima", () => {
     expect(describeCurrentSeason(season({ currentDryStreakDays: 12 })).details.join(" ")).toContain("varios días seguidos sin que caiga un buen aguacero");
     expect(describeCurrentSeason(season({ currentDryStreakDays: 3 })).details.join(" ")).not.toContain("aguacero");
-    expect(describeCurrentSeason(season({ status: "much-drier" })).details.join(" ")).toContain("En tu lote: tapa el suelo con hojarasca o rastrojo");
-    expect(describeCurrentSeason(season({ status: "normal" })).details.join(" ")).toContain("En tu lote: la temporada va pareja");
-    expect(describeCurrentSeason(season({ status: "much-wetter" })).details.join(" ")).toContain("En tu lote: cuidado con los hongos en las hojas");
+    expect(describeCurrentSeason(season({ status: "much-drier" })).details.join(" ")).toContain("Qué vigilar: revisa la humedad del suelo");
+    expect(describeCurrentSeason(season({ status: "normal" })).details.join(" ")).toContain("la lluvia normal no garantiza humedad suficiente");
+    expect(describeCurrentSeason(season({ status: "much-wetter" })).details.join(" ")).toContain("observa charcos, escorrentía y manchas en las hojas");
   });
 
   it("aclara hasta qué fecha se miraron las lluvias y que no adivina si mañana va a llover", () => {
@@ -171,7 +171,7 @@ describe("describeCurrentSeason: cómo va la temporada", () => {
     expect(data.audioId).toBeUndefined();
     expect(data.text).toContain("Más seca de lo normal");
     expect(data.text).toContain("ha llovido menos que en otros años");
-    expect(data.text).toContain("En tu lote:");
+    expect(data.text).toContain("Qué vigilar:");
     expect(data.text).toContain("no adivina si mañana va a llover");
     expect(data.text).not.toContain("milímetros");
   });

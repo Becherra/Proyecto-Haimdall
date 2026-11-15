@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./drought";
+
 export const CLIMATE_PARAMETERS = ["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT", "ALLSKY_SFC_SW_DWN"] as const;
 const score = z.number().min(0).max(5);
 
