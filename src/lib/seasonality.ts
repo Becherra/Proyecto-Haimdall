@@ -1,9 +1,15 @@
 import type { MonthlyClimate } from "../types";
-import { SEASON_DRY_RAIN_RATIO } from "./config";
+import { SEASON_DRY_RAIN_RATIO, SEASON_DRY_SOIL_RATIO } from "./config";
 import { monthlyWaterBalance } from "./indicators";
 
 /** Clima típico de un mes calendario (enero a diciembre) promediado sobre todos los años de la serie. */
-export type MonthSeason = { month: number; meanRainMm: number | null; meanBalanceMm: number | null; dry: boolean };
+export type MonthSeason = {
+  month: number; meanRainMm: number | null; meanBalanceMm: number | null; dry: boolean;
+  /** Humedad media de la zona radicular (GWETROOT, 0–1) del mes; null sin dato. Es un proxy de NASA, no una medición del lote. */
+  meanWetness?: number | null;
+  /** El suelo está más seco de lo normal en ese mes (ver `SEASON_DRY_SOIL_RATIO`). Es un dato extra: no cambia `dry`. */
+  soilDry?: boolean;
+};
 
 /** Cómo caen los meses de siembra de un cultivo en las épocas seca y no seca del sitio. */
 export type SowingAssessment = { dryMonths: number[]; wetMonths: number[]; unknownMonths: number[] };
@@ -32,10 +38,14 @@ function meanBalance(monthly: readonly MonthlyClimate[], month: number): number 
 export function computeSeasonality(monthly: readonly MonthlyClimate[]): MonthSeason[] {
   const rain = Array.from({ length: MONTHS_IN_YEAR }, (_, index) => mean(valuesForMonth(monthly, index + 1, (entry) => entry.precipitationMm)));
   const siteMean = mean(rain.flatMap((value) => value ?? []));
+  const wetness = Array.from({ length: MONTHS_IN_YEAR }, (_, index) => mean(valuesForMonth(monthly, index + 1, (entry) => entry.rootZoneWetness)));
+  const siteWetness = mean(wetness.flatMap((value) => value ?? []));
   return rain.map((meanRainMm, index) => {
     const meanBalanceMm = meanBalance(monthly, index + 1);
     const isDrier = meanRainMm !== null && siteMean !== null && meanRainMm < SEASON_DRY_RAIN_RATIO * siteMean;
-    return { month: index + 1, meanRainMm, meanBalanceMm, dry: isDrier || (meanBalanceMm !== null && meanBalanceMm < 0) };
+    const meanWetness = wetness[index];
+    const soilDry = meanWetness !== null && siteWetness !== null && meanWetness < SEASON_DRY_SOIL_RATIO * siteWetness;
+    return { month: index + 1, meanRainMm, meanBalanceMm, dry: isDrier || (meanBalanceMm !== null && meanBalanceMm < 0), meanWetness, soilDry };
   });
 }
 
@@ -50,6 +60,19 @@ export function assessSowing(sowingMonths: readonly number[], seasonality: reado
     else assessment.wetMonths.push(month);
   }
   return assessment;
+}
+
+/** Humedad del suelo en los meses de siembra de un cultivo: cuáles tienen el suelo más seco de lo normal y el rango de humedad. */
+export type SowingSoil = { soilDryMonths: number[]; wetness: { min: number; max: number } | null };
+
+/** Cruza los meses de siembra con la humedad de zona radicular de NASA (proxy). Ignora meses fuera de 1–12 y los que no tienen dato. */
+export function assessSowingSoil(sowingMonths: readonly number[], seasonality: readonly MonthSeason[]): SowingSoil {
+  const seasons = sowingMonths.flatMap((month) => seasonality.find((entry) => entry.month === month) ?? []);
+  const values = seasons.flatMap((season) => season.meanWetness ?? []);
+  return {
+    soilDryMonths: seasons.filter((season) => season.soilDry === true).map((season) => season.month),
+    wetness: values.length === 0 ? null : { min: Math.min(...values), max: Math.max(...values) },
+  };
 }
 
 /** Meses en español abreviado y en orden, p. ej. "mar, abr, sep, oct"; "ninguno" si no hay. */

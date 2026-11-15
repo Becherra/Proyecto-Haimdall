@@ -18,7 +18,7 @@ const POWER_PARAMETERS: Record<ClimateParameter, ParameterUse> = {
       ? "Resumen mensual de evaporación; el balance hídrico usa en su lugar la evaporación potencial estimada con Hargreaves–Samani."
       : "Balance hídrico (lluvia − evaporación)."),
   },
-  GWETROOT: { label: "Humedad de la zona de raíces", use: () => "Humedad media del suelo; se muestra como evidencia y no cambia el puntaje." },
+  GWETROOT: { label: "Humedad de la zona de raíces", use: () => "Humedad media del suelo y su rango en los meses de siembra de cada cultivo; se muestra como evidencia y aviso, y no cambia el puntaje." },
   ALLSKY_SFC_SW_DWN: { label: "Radiación solar en superficie", use: () => "Luz que llega al sitio y nubosidad (índice de claridad); se muestra como evidencia y no cambia el puntaje." },
 };
 
