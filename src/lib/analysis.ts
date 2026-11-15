@@ -1,5 +1,6 @@
-import type { AnalysisResponse, ClimateResult, ClimateScenario, Crop, Rotation, RotationResult, UserPriorities } from "../types";
+import type { AnalysisClimate, AnalysisResponse, ClimateResult, ClimateScenario, Crop, Rotation, RotationResult, UserPriorities } from "../types";
 import { DEFAULT_CURRENT_CROP_ID, SOWING_CALENDAR_REGION } from "./config";
+import { listDataSources } from "./dataSources";
 import { aggregateMonthly, computeIndicators, countYears } from "./indicators";
 import { baselineRotation, candidateRotations, pickBest } from "./rotations";
 import { applyScenario, isNeutralScenario, scenarioGap } from "./scenario";
@@ -30,7 +31,15 @@ export type AnalysisInput = {
   siteGaps?: readonly string[];
   /** Escenario "¿y si…?" (más calor, menos lluvia) que se aplica a la serie antes de calcular indicadores y puntajes. */
   scenario?: ClimateScenario;
+  /** Incluye los registros diarios originales en la respuesta; por defecto solo va el resumen de la serie. */
+  includeDailyRecords?: boolean;
 };
+
+/** Resumen de la serie de NASA para la respuesta: sin los miles de registros diarios salvo que se pidan. */
+function summarizeClimate({ records, ...summary }: ClimateResult, includeDailyRecords: boolean): AnalysisClimate {
+  const dates = records.map((record) => record.date).sort();
+  return { ...summary, daysAnalyzed: records.length, firstDate: dates[0], lastDate: dates[dates.length - 1], ...(includeDailyRecords ? { records } : {}) };
+}
 
 /** ¿Cae el sitio dentro de la zona donde vale el calendario de siembra del catálogo (Eje Cafetero)? */
 export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
@@ -47,7 +56,7 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  * Con `scenario` todo se calcula sobre la serie modificada, pero `climate` conserva los datos originales de NASA.
  * Es pura (sin red ni archivos). Lanza `AnalysisInputError` si no hay registros o si el cultivo actual es desconocido.
  */
-export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario }: AnalysisInput): AnalysisResponse {
+export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   const current = resolveCurrentCrop(crops, priorities.currentCropId);
   const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined);
@@ -65,5 +74,5 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const candidates = candidateRotations(crops, current);
   const rotations = [...score([baselineRotation(current)]), bestOf(score(candidates.legume), "leguminosa"), bestOf(score(candidates.coverDrought), "cobertura y sequía")];
   const results = rotations.map((result) => ({ ...result, informationGaps: [...result.informationGaps, ...extraGaps] }));
-  return { climate, monthlyClimate, indicators, rotations: results, ...(scenario ? { scenario } : {}) };
+  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators), ...(scenario ? { scenario } : {}) };
 }

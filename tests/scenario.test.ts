@@ -88,8 +88,8 @@ describe("buildAnalysis: escenarios", () => {
   });
 
   it("conserva en climate los datos originales de NASA y refleja el escenario en el resumen mensual", () => {
-    const response = analyze({ tempDeltaC: 2 });
-    expect(response.climate.records[0].T2M).toBe(22);
+    const response = buildAnalysis({ climate, crops: CROPS, priorities: EQUAL, location: PEREIRA, scenario: { tempDeltaC: 2 }, includeDailyRecords: true });
+    expect(response.climate.records?.[0]?.T2M).toBe(22);
     expect(response.monthlyClimate[0].meanTemperatureC).toBeCloseTo(24);
   });
 

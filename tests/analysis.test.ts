@@ -56,7 +56,9 @@ describe("buildAnalysis", () => {
     const response = buildAnalysis({ climate, crops: CROPS, priorities, location: PEREIRA });
     expect(analysisResponseSchema.safeParse(response).success).toBe(true);
     expect(response.rotations).toHaveLength(3);
-    expect(response.climate).toBe(climate);
+    // La respuesta lleva el resumen de la serie; los registros diarios solo van si se piden (includeDailyRecords).
+    expect(response.climate).toMatchObject({ source: climate.source, missingByParameter: climate.missingByParameter, daysAnalyzed: climate.records.length });
+    expect(response.climate.records).toBeUndefined();
   });
 
   it("calcula indicadores y resumen mensual a partir de los registros diarios", () => {
