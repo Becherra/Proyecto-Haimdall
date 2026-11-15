@@ -1,14 +1,19 @@
 "use client";
 
 import L from "leaflet";
-import { useEffect, useMemo, useState } from "react";
-import { Circle, CircleMarker, LayersControl, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Circle, CircleMarker, LayersControl, MapContainer, Marker, Polygon, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { convertCoordinateOrder, squareFromArea } from "../lib/geo";
 import { buildGibsTileUrl, GIBS_LAYER_CONFIG, isGibsDateAvailable } from "../lib/ui/mapLayers";
 import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
 import { calculateMapView } from "../lib/ui/mapView";
-import type { LocationResult } from "../types";
+import { buildFarmFromEditor, createTerrainEditor, getTerrainEditorStatus, requiresGpsPinAdjustment, terrainEditorReducer } from "../lib/ui/terrainEditor";
+import { validateFarmDraft } from "../lib/geo/farmValidation";
+import type { AreaRangeHa, TerrainEditorMode } from "../lib/ui/terrainEditor";
+import { APPROXIMATE_AREA_RANGES_HA, FOOTBALL_PITCH_AREA_HA } from "../lib/geo/limits";
+import type { Farm, LocationResult } from "../types";
 
-type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void };
+type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onBack: () => void; onFarmConfirmed: (farm: Farm) => void; debugMode?: boolean };
 type TileState = { loading: boolean; error: string | null };
 
 const initialDate = "2026-10-16";
@@ -35,8 +40,13 @@ function ZoomToLocation({ location, gpsAccuracyMeters }: Pick<MapSceneProps, "lo
   return null;
 }
 
-function MapPinSelector({ onSelect }: { onSelect: (location: LocationResult) => void }) {
-  useMapEvents({ click: (event) => onSelect(validateMapLocation(event.latlng.lat, event.latlng.lng)) });
+function MapPinSelector({ onSelect }: { onSelect: (lat: number, lon: number) => void }) {
+  const dragging = useRef(false);
+  useMapEvents({
+    dragstart: () => { dragging.current = true; },
+    dragend: () => { dragging.current = false; },
+    click: (event) => { if (!dragging.current) onSelect(event.latlng.lat, event.latlng.lng); },
+  });
   return null;
 }
 
@@ -47,8 +57,14 @@ function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => voi
   return null;
 }
 
-export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack }: MapSceneProps) {
-  const [draftLocation, setDraftLocation] = useState(location);
+export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmConfirmed, debugMode = false }: MapSceneProps) {
+  const [editor, dispatch] = useReducer(terrainEditorReducer, location, (initial) => createTerrainEditor(initial, gpsAccuracyMeters === undefined ? "search" : "gps", gpsAccuracyMeters));
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [confirmedFarm, setConfirmedFarm] = useState<Farm | null>(null);
+  const draftLocation = editor.location;
+  const terrainStatus = getTerrainEditorStatus(editor);
+  const currentFarm = buildFarmFromEditor(editor);
+  const showConfirmedFarm = confirmedFarm !== null && JSON.stringify(currentFarm) === JSON.stringify(confirmedFarm);
   const [opacity, setOpacity] = useState(65);
   const [date, setDate] = useState(initialDate);
   const [zoom, setZoom] = useState(8);
@@ -65,6 +81,10 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
     : null;
   const trueColorError = !trueColorUrl && !dateError ? "Color real NASA GIBS no tiene datos para esta fecha." : null;
   const ndviError = !ndviUrl && !dateError ? "NDVI NASA GIBS no tiene datos para esta fecha; las demás capas siguen disponibles." : null;
+  const approximateRing = useMemo(() => {
+    if (editor.mode !== "approx_size" || terrainStatus.areaHa === null || !terrainStatus.canConfirm) return null;
+    try { return squareFromArea(draftLocation, terrainStatus.areaHa); } catch { return null; }
+  }, [draftLocation, editor.mode, terrainStatus.areaHa, terrainStatus.canConfirm]);
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
     updateOnline();
@@ -83,7 +103,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
     {dateError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{dateError}</p>}
     {trueColorError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{trueColorError}</p>}
     {ndviError && <p className="mb-3 rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-sm text-amber-100" role="alert">{ndviError}</p>}
-    <div className="relative h-[min(38vh,280px)] min-h-[235px] overflow-hidden rounded-2xl border border-white/15 shadow-2xl shadow-cyan-950/30 sm:h-[min(58vh,520px)] sm:min-h-[360px]">
+    <div className="relative h-[min(38svh,280px)] min-h-[220px] overflow-hidden rounded-xl border border-white/15 sm:h-[min(58svh,520px)] sm:min-h-[360px]">
       <MapContainer center={[location.lat, location.lon]} zoom={8} scrollWheelZoom className="h-full w-full" zoomControl>
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Satélite">
@@ -101,32 +121,92 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
         </LayersControl>
         <ZoomToLocation location={location} gpsAccuracyMeters={gpsAccuracyMeters} />
         <MapZoomObserver onZoomChange={setZoom} />
-        <MapPinSelector onSelect={setDraftLocation} />
-        <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); setDraftLocation(validateMapLocation(point.lat, point.lng)); } }} title="Pin de la finca" />
+        <MapPinSelector onSelect={(lat, lon) => {
+          if (editor.mode === "polygon") dispatch({ type: "add-vertex", lat, lon });
+          else dispatch({ type: "set-location", location: validateMapLocation(lat, lon, draftLocation.label) });
+        }} />
+        {approximateRing && <Polygon positions={approximateRing.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#ffb829", weight: 2, fillColor: "#ffb829", fillOpacity: 0.12 }} />}
+        {editor.mode === "polygon" && editor.vertices.length >= 3 && <Polygon positions={editor.vertices.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#ffb829", weight: 2, fillColor: "#ffb829", fillOpacity: 0.12, dashArray: editor.polygonFinished ? undefined : "6 6" }} />}
+        {editor.mode === "polygon" && editor.vertices.map((point, index) => <Marker key={`vertex-${index}`} position={convertCoordinateOrder(point, "geojson")} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const moved = marker.getLatLng(); dispatch({ type: "move-vertex", index, lat: moved.lat, lon: moved.lng }); } }} title={`Vértice ${index + 1}`} />)}
+        <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable={editor.mode !== "polygon" || requiresGpsPinAdjustment(editor)} eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draftLocation.label), locationSource: "map" }); }} } title="Pin de la finca" />
         <CircleMarker center={[draftLocation.lat, draftLocation.lon]} radius={8} pathOptions={{ color: "#fbbf24", fillColor: "#fbbf24", fillOpacity: 0.25 }} />
-        {gpsAccuracyMeters !== undefined && <Circle center={[draftLocation.lat, draftLocation.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
+        {gpsAccuracyMeters !== undefined && <Circle center={[location.lat, location.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
       </MapContainer>
     </div>
-    <div className="sticky bottom-0 z-20 mt-3 grid grid-cols-[1fr_auto] gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-3 text-left backdrop-blur sm:mt-4 sm:grid-cols-[1fr_auto] sm:p-4">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Finca seleccionada</p>
+    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto grid max-h-[40svh] max-w-[1440px] grid-cols-[1fr_auto] gap-3 overflow-y-auto border-t border-white/15 bg-black/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-left shadow-[0_-12px_36px_rgba(0,0,0,0.6)] backdrop-blur sm:grid-cols-[1fr_auto] sm:p-4">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-saffron-spark">Finca seleccionada</p>
         <p className="mt-2 text-base font-semibold text-white">{draftLocation.label}</p>
         <p className="mt-1 text-sm text-slate-300">{formatCoordinates(draftLocation)}</p>
-        <p className="mt-2 text-xs text-slate-400">Haz click en el mapa o arrastra el pin para ajustar la ubicación.</p>
+        <p className="mt-2 text-xs text-slate-400">{editor.mode === "polygon" ? "Toca el mapa para añadir vértices; arrástralos para ajustar." : "Toca el mapa o arrastra el pin para ajustar la ubicación."}</p>
       </div>
-      <div className="flex min-w-32 flex-col gap-2 sm:min-w-44">
+      <div className="flex min-w-28 flex-col gap-2 sm:min-w-44">
         <label htmlFor="gibs-date" className="text-xs font-semibold text-slate-300">Fecha NASA GIBS</label>
-        <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/50" />
+        <input id="gibs-date" type="date" value={date} onChange={(event) => { setDate(event.target.value); setTiles({ loading: true, error: null }); }} className="rounded-lg border border-white/20 bg-black px-3 py-2 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" />
         <label htmlFor="gibs-opacity" className="text-xs font-semibold text-slate-300">Opacidad de capas: {opacity}%</label>
-        <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-cyan-300" />
+        <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-[#8052ff]" />
       </div>
-      <p className="col-span-2 text-xs leading-5 text-slate-400">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
+      <p className="col-span-2 text-xs leading-5 text-slate-400">NASA POWER representa clima regional según la resolución de cada producto; no mide el detalle del lote.</p>
+      <fieldset className="col-span-2 min-w-0">
+        <legend className="mb-2 text-sm font-semibold text-white">Define el terreno (opcional)</legend>
+        <div role="radiogroup" aria-label="Tipo de terreno" className="grid grid-cols-3 gap-2">
+          {([
+            ["point", "Solo el punto"], ["approx_size", "Tamaño aproximado"], ["polygon", "Dibujar el terreno"],
+          ] as const satisfies readonly (readonly [TerrainEditorMode, string])[]).map(([mode, label]) => (
+            <label key={mode} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-xs font-medium focus-within:ring-2 focus-within:ring-saffron-spark sm:text-sm ${editor.mode === mode ? "border-saffron-spark bg-saffron-spark/15 text-white" : "border-white/20 text-slate-300"}`}>
+              <input className="sr-only" type="radio" name="terrain-mode" value={mode} checked={editor.mode === mode} onChange={() => dispatch({ type: "set-mode", mode })} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {editor.mode === "approx_size" && <div className="col-span-2 space-y-3">
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-slate-300">Elige un rango</legend>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {APPROXIMATE_AREA_RANGES_HA.map((range) => {
+              const label = range[0] === 0.01 ? "Menos de 1 ha" : range[0] === 20 ? "Más de 20 ha" : `${range[0]}–${range[1]} ha`;
+              const selected = editor.areaRangeHa?.[0] === range[0] && editor.areaRangeHa[1] === range[1];
+              return <label key={label} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-xs focus-within:ring-2 focus-within:ring-saffron-spark ${selected ? "border-saffron-spark bg-saffron-spark/15 text-white" : "border-white/20 text-slate-300"}`}>
+                <input className="sr-only" type="radio" name="terrain-area-range" checked={selected} onChange={() => dispatch({ type: "set-area-range", range: range as AreaRangeHa })} />
+                {label}
+              </label>;
+            })}
+          </div>
+        </fieldset>
+        <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+          <div>
+            <label htmlFor="terrain-area" className="mb-1 block text-xs font-medium text-slate-300">O escribe el área exacta</label>
+            <input id="terrain-area" type="number" min="0" step="any" value={editor.exactAreaHa === null ? "" : editor.areaUnit === "m2" ? editor.exactAreaHa * 10_000 : editor.exactAreaHa} onChange={(event) => dispatch({ type: "set-exact-area", value: event.target.value === "" ? null : Number(event.target.value), unit: editor.areaUnit })} className="min-h-11 w-full rounded-lg border border-white/20 bg-black px-3 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50" />
+          </div>
+          <div>
+            <label htmlFor="terrain-area-unit" className="mb-1 block text-xs font-medium text-slate-300">Unidad</label>
+            <select id="terrain-area-unit" value={editor.areaUnit} onChange={(event) => dispatch({ type: "set-area-unit", unit: event.target.value as "ha" | "m2" })} className="min-h-11 rounded-lg border border-white/20 bg-black px-3 text-sm text-white outline-none focus:border-saffron-spark focus:ring-2 focus:ring-saffron-spark/50"><option value="ha">ha</option><option value="m2">m²</option></select>
+          </div>
+        </div>
+      </div>}
+      {editor.mode === "polygon" && <div className="col-span-2 flex flex-wrap gap-2">
+        <button type="button" disabled={editor.vertices.length === 0} onClick={() => dispatch({ type: "undo" })} className="min-h-11 rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:border-saffron-spark focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Deshacer</button>
+        <button type="button" disabled={editor.vertices.length === 0} onClick={() => dispatch({ type: "clear" })} className="min-h-11 rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:border-saffron-spark focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Borrar</button>
+        <button type="button" disabled={editor.vertices.length < 3} onClick={() => dispatch({ type: "finish" })} className="min-h-11 rounded-full border border-saffron-spark/70 px-4 text-sm font-semibold text-saffron-spark hover:bg-saffron-spark/10 focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Terminar</button>
+      </div>}
+      {terrainStatus.areaHa !== null && <p className="col-span-2 text-sm text-white">Área: {terrainStatus.areaHa.toFixed(2)} ha{terrainStatus.areaHa >= FOOTBALL_PITCH_AREA_HA ? ` · ≈ ${Math.round(terrainStatus.areaHa / FOOTBALL_PITCH_AREA_HA)} canchas de fútbol` : ""}</p>}
+      {editor.mode === "polygon" && terrainStatus.areaHa === null && <p className="col-span-2 text-xs text-slate-300">Añade al menos tres puntos para calcular el área. La vía accesible para indicar el tamaño es el modo aproximado con campo numérico.</p>}
+      {(editor.error ?? terrainStatus.error) && <p className="col-span-2 text-sm text-amber-200" role="alert">{editor.error ?? terrainStatus.error}</p>}
+      {terrainStatus.warnings.map((warning) => <p key={warning} className="col-span-2 text-sm text-amber-200" role="alert">{warning}</p>)}
       <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" onClick={onBack} className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300">Volver al globo</button>
-        <button type="button" onClick={() => onLocationSelected(draftLocation)} className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Confirmar finca</button>
+        <button type="button" onClick={onBack} className="min-h-11 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark">Volver al globo</button>
+        <button type="button" disabled={!terrainStatus.canConfirm} onClick={() => {
+          const candidate = buildFarmFromEditor(editor);
+          const result = validateFarmDraft(candidate);
+          if (!result.valid) { setConfirmationError(result.errors.join(" ")); return; }
+          setConfirmationError(null); setConfirmedFarm(result.farm); onFarmConfirmed(result.farm);
+        }} className="min-h-11 rounded-full bg-electric-iris px-4 py-3 text-sm font-semibold text-white hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
       </div>
+      {confirmationError && <p className="col-span-2 text-sm text-red-200" role="alert">No se pudo confirmar la finca: {confirmationError}</p>}
+      {showConfirmedFarm && confirmedFarm && debugMode && <details className="col-span-2 rounded-lg border border-white/15 p-3 text-xs text-slate-200"><summary className="cursor-pointer font-semibold">Farm enviado (depuración)</summary><pre className="mt-2 overflow-auto">{JSON.stringify(confirmedFarm, null, 2)}</pre></details>}
+      <p className="col-span-2 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
     </div>
-    <p className="mt-3 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
     {gpsAccuracyMeters !== undefined && gpsAccuracyMeters > 1000 && <p className="mt-1 text-xs text-amber-200">La precisión del GPS es aproximada ({Math.round(gpsAccuracyMeters)} m); ajusta el pin manualmente.</p>}
     {zoom < 14 && <p className="mt-1 text-xs text-amber-200">Toca el mapa donde queda tu finca.</p>}
   </section>;
