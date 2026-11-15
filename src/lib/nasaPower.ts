@@ -12,7 +12,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [100, 250] as const;
 /**
- * Respuestas reales de NASA POWER (2020–2022) guardadas para que la demo no dependa de la red.
+ * Respuestas reales de NASA POWER (2011–2025, regenerables con scripts/build-power-samples.mjs) guardadas para que la demo no dependa de la red.
  * Cada una cubre los sitios a menos de `tolerance` grados; Santa Rosa de Cabal cae dentro de la de Pereira (misma celda de NASA POWER).
  */
 const SAMPLES: ReadonlyArray<{ lat: number; lon: number; tolerance: number; payload: unknown }> = [

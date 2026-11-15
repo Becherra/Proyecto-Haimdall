@@ -97,6 +97,20 @@ describe("fetchDailyClimate", () => {
   });
 });
 
+describe("respaldo precargado", () => {
+  beforeEach(() => { clearClimateCache(); vi.restoreAllMocks(); });
+
+  it("cubre los 15 años 2011–2025 completos y sin días faltantes cuando NASA POWER no responde", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
+    const result = await fetchDailyClimate({ lat: 4.8133, lon: -75.6961, startYear: 2011, endYear: 2025 });
+    expect(result.source).toBe("sample");
+    expect(result.records).toHaveLength(5479);
+    expect(result.records[0].date).toBe("20110101");
+    expect(result.records.at(-1)?.date).toBe("20251231");
+    expect(Object.values(result.missingByParameter).every((count) => count === 0)).toBe(true);
+  });
+});
+
 describe("fetchRecentClimate", () => {
   const NOW = new Date("2026-11-15T12:00:00Z");
   const payload = (dates: Record<string, number>) => ({ properties: { parameter: Object.fromEntries(["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT", "ALLSKY_SFC_SW_DWN"].map((name) => [name, dates])) } });
