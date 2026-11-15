@@ -9,7 +9,7 @@ import { locationResultSchema, type LocationResult } from "../types";
 
 type LocationSearchProps = { onLocationSelected: (location: LocationResult, accuracyMeters?: number) => void; onGpsStart?: () => void; onGpsLocationSelected?: (location: LocationResult, accuracyMeters: number) => void; onGpsError?: (message: string) => void };
 
-const SUGGEST_DEBOUNCE_MS = 350;
+const SUGGEST_DEBOUNCE_MS = 150;
 const SUGGEST_MIN_CHARS = 3;
 const suggestionsSchema = z.object({ results: z.array(locationResultSchema) });
 
@@ -40,15 +40,19 @@ export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLo
     try {
       const response = await fetch(`/api/geocode/suggest?q=${encodeURIComponent(text)}`, { signal: controller.signal });
       const parsed = response.ok ? suggestionsSchema.safeParse(await response.json()) : null;
-      setSuggestions(parsed?.success ? parsed.data.results : []);
+      // Una respuesta vieja nunca debe pisar la de lo que se escribió después.
+      if (!controller.signal.aborted) setSuggestions(parsed?.success ? parsed.data.results : []);
     } catch { if (!controller.signal.aborted) setSuggestions([]); }
   }
 
+  /** La lista se queda visible mientras llega la siguiente, así cambia al ritmo de la escritura sin parpadear. */
   function onQueryChange(value: string) {
     setQuery(value);
     setError(null);
-    cancelSuggestions();
-    if (value.trim().length < SUGGEST_MIN_CHARS) return;
+    window.clearTimeout(debounceTimer.current);
+    suggestAbort.current?.abort();
+    setHighlight(-1);
+    if (value.trim().length < SUGGEST_MIN_CHARS) { setSuggestions([]); return; }
     debounceTimer.current = window.setTimeout(() => void loadSuggestions(value.trim()), SUGGEST_DEBOUNCE_MS);
   }
 
