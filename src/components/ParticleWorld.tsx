@@ -150,7 +150,7 @@ function createPointLayer(positions: ParticlePosition[], mask: TextureMask | nul
   const color = new THREE.Color();
   positions.forEach((position, index) => {
     const land = isLandPosition(position, mask);
-    color.set(land ? getParticleColor(position) : "#303d83");
+    color.set(land ? getParticleColor(position) : "#243D47");
     target.set(position, index * 3);
     start[index * 3] = Math.random() * 2 - 1;
     start[index * 3 + 1] = Math.random() * 2 - 1;
@@ -357,7 +357,7 @@ export default function ParticleWorld({ stage = "settled", startRef, anchorRef, 
     <div aria-hidden="true" className={`particle-loading pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 motion-reduce:transition-none ${firstFrameRendered ? "opacity-0" : "opacity-100"}`} />
     {renderError
       ? <p className="absolute inset-x-4 bottom-4 text-center text-xs text-silver-mist" role="alert">No fue posible iniciar WebGL para la vista de partículas.</p>
-      : isPreview && <output className="fixed bottom-3 right-3 z-10 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 font-mono text-[10px] text-silver-mist" aria-live="off">
+      : isPreview && <output className="fixed bottom-3 right-3 z-10 rounded-full border border-cream/10 bg-meadow/70 px-3 py-1.5 font-mono text-[10px] text-silver-mist" aria-live="off">
         {pointCount.toLocaleString("es-CO")} puntos · {fps || "—"} FPS
       </output>}
   </div>;

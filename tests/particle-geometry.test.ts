@@ -26,7 +26,7 @@ describe("particle geometry", () => {
   it("keeps chromatic patches stable for the same position and index", () => {
     const position = [0.2, -0.5, 0.84] as [number, number, number];
     expect(getParticleColor(position)).toBe(getParticleColor(position));
-    expect(["#ffb829", "#8052ff", "#15846e", "#ffffff"]).toContain(getParticleColor(position));
+    expect(["#EAD39D", "#737F35", "#B5C266", "#F8EFD2"]).toContain(getParticleColor(position));
   });
 
   it("rejects invalid sphere dimensions", () => {

@@ -8,7 +8,7 @@ export function sampleWholeSurface(points: ParticlePosition[], count: number): P
 }
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const PALETTE = ["#ffb829", "#8052ff", "#15846e", "#ffffff"] as const;
+const PALETTE = ["#EAD39D", "#737F35", "#B5C266", "#F8EFD2"] as const;
 
 /** Distributes samples evenly across a sphere using a Fibonacci spiral. */
 export function generateFibonacciSphere(count: number, radius = 1): ParticlePosition[] {

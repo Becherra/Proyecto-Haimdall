@@ -2,21 +2,26 @@
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --color-void: #000000;
-  --color-bone-white: #ffffff;
-  --color-ash-gray: #9a9a9a;
-  --color-silver-mist: #bdbdbd;
-  --color-electric-iris: #8052ff;
-  --color-saffron-spark: #ffb829;
+  /* Paleta oficial (rediseño campesino). Hex medidos de la imagen de referencia. */
+  --color-meadow: #0d3c16;        /* verde pradera: fondo principal */
+  --color-spruce: #243d47;        /* azul abeto: superficies y mensajes informativos */
+  --color-cream: #ead39d;         /* crema: acento principal y botones */
+  --color-olive: #737f35;         /* oliva: acento secundario */
+  --color-olive-light: #b5c266;   /* oliva claro: texto/íconos sobre fondo oscuro (contraste) */
+  --color-bone-white: #f8efd2;    /* crema muy claro: texto principal */
+  --color-silver-mist: #d9cca3;   /* texto secundario */
+  --color-ash-gray: #b3aa86;      /* texto terciario */
+  --color-clay: #8f3a26;          /* alertas/errores (único color fuera de la paleta) */
+  --color-clay-light: #f0a58f;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-html { background: #000; }
-body { min-height: 100vh; background: #000; color: #fff; }
+html { background: var(--color-meadow); }
+body { min-height: 100vh; background: var(--color-meadow); color: var(--color-bone-white); }
 
 .brand-mark {
-  color: #8052ff;
+  color: var(--color-olive-light);
   font-size: 19px;
   line-height: 1;
 }
@@ -47,29 +52,29 @@ body { min-height: 100vh; background: #000; color: #fff; }
 }
 .particle-loading::before {
   background-image:
-    radial-gradient(circle at 7% 18%, #ffb829 0 1px, transparent 1.8px),
-    radial-gradient(circle at 17% 72%, #8052ff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 29% 36%, #32c7b0 0 1px, transparent 1.8px),
-    radial-gradient(circle at 38% 84%, #fff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 48% 22%, #ffb829 0 1px, transparent 1.8px),
-    radial-gradient(circle at 58% 67%, #8052ff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 68% 34%, #32c7b0 0 1px, transparent 1.8px),
-    radial-gradient(circle at 78% 79%, #fff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 89% 17%, #ffb829 0 1px, transparent 1.8px),
-    radial-gradient(circle at 94% 56%, #8052ff 0 1px, transparent 1.8px);
+    radial-gradient(circle at 7% 18%, #EAD39D 0 1px, transparent 1.8px),
+    radial-gradient(circle at 17% 72%, #737F35 0 1px, transparent 1.8px),
+    radial-gradient(circle at 29% 36%, #B5C266 0 1px, transparent 1.8px),
+    radial-gradient(circle at 38% 84%, #F8EFD2 0 1px, transparent 1.8px),
+    radial-gradient(circle at 48% 22%, #EAD39D 0 1px, transparent 1.8px),
+    radial-gradient(circle at 58% 67%, #737F35 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 34%, #B5C266 0 1px, transparent 1.8px),
+    radial-gradient(circle at 78% 79%, #F8EFD2 0 1px, transparent 1.8px),
+    radial-gradient(circle at 89% 17%, #EAD39D 0 1px, transparent 1.8px),
+    radial-gradient(circle at 94% 56%, #737F35 0 1px, transparent 1.8px);
 }
 .particle-loading::after {
   opacity: 0.65;
   background-image:
-    radial-gradient(circle at 12% 48%, #32c7b0 0 1px, transparent 1.8px),
-    radial-gradient(circle at 24% 12%, #fff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 34% 62%, #ffb829 0 1px, transparent 1.8px),
-    radial-gradient(circle at 44% 43%, #8052ff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 53% 91%, #32c7b0 0 1px, transparent 1.8px),
-    radial-gradient(circle at 63% 12%, #fff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 73% 54%, #ffb829 0 1px, transparent 1.8px),
-    radial-gradient(circle at 83% 29%, #8052ff 0 1px, transparent 1.8px),
-    radial-gradient(circle at 91% 89%, #32c7b0 0 1px, transparent 1.8px);
+    radial-gradient(circle at 12% 48%, #B5C266 0 1px, transparent 1.8px),
+    radial-gradient(circle at 24% 12%, #F8EFD2 0 1px, transparent 1.8px),
+    radial-gradient(circle at 34% 62%, #EAD39D 0 1px, transparent 1.8px),
+    radial-gradient(circle at 44% 43%, #737F35 0 1px, transparent 1.8px),
+    radial-gradient(circle at 53% 91%, #B5C266 0 1px, transparent 1.8px),
+    radial-gradient(circle at 63% 12%, #F8EFD2 0 1px, transparent 1.8px),
+    radial-gradient(circle at 73% 54%, #EAD39D 0 1px, transparent 1.8px),
+    radial-gradient(circle at 83% 29%, #737F35 0 1px, transparent 1.8px),
+    radial-gradient(circle at 91% 89%, #B5C266 0 1px, transparent 1.8px);
   animation-delay: -1.2s;
 }
 @keyframes particle-loading-drift { from { transform: translateY(3px); opacity: 0.55; } to { transform: translateY(-3px); opacity: 1; } }
@@ -78,15 +83,15 @@ body { min-height: 100vh; background: #000; color: #fff; }
 }
 
 .leaflet-container {
-  background: #090909;
+  background: #0D3C16;
   font-family: inherit;
 }
 
 .leaflet-control-layers,
 .leaflet-control-zoom a {
-  border-color: #333 !important;
-  background: #000 !important;
-  color: #fff !important;
+  border-color: #2F4F3A !important;
+  background: #0D3C16 !important;
+  color: #F8EFD2 !important;
 }
 
 .heimdall-pin { background: transparent; border: 0; }
@@ -94,9 +99,9 @@ body { min-height: 100vh; background: #000; color: #fff; }
   display: block;
   width: 20px;
   height: 20px;
-  border: 3px solid #000;
+  border: 3px solid #0D3C16;
   border-radius: 9999px 9999px 9999px 0;
-  background: #ffb829;
+  background: #EAD39D;
   box-shadow: 0 0 0 4px rgb(255 184 41 / 25%);
   transform: rotate(-45deg);
 }

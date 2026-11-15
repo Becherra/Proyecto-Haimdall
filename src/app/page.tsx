@@ -96,10 +96,10 @@ export default function Home() {
     : introStage === "explode" || introStage === "globe" || introStage === "settled" ? 1 : 0;
   const globeInteractive = introStage === "globe" || introStage === "settled";
 
-  return <main id="inicio" className="min-h-screen overflow-hidden bg-void text-bone-white">
+  return <main id="inicio" className="min-h-screen overflow-hidden bg-meadow text-bone-white">
     {!showMap && !showAnalysis && <section className="mx-auto grid min-h-[calc(100svh-76px)] w-full max-w-[1440px] grid-cols-1 items-center px-5 pb-8 pt-2 sm:px-10 lg:min-h-[calc(100svh-88px)] lg:grid-cols-[0.88fr_1.12fr] lg:gap-3 lg:px-12 lg:py-8">
       <div aria-hidden={introIsEarly} inert={introIsEarly} style={{ opacity: introIsEarly ? 0 : 1 }} className={`relative z-10 order-2 mx-auto w-full max-w-[580px] text-center lg:order-1 lg:mx-0 lg:text-left hero-copy-${introStage}`}>
-        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-saffron-spark sm:text-sm">NASA · agricultura · futuro</p>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-cream sm:text-sm">NASA · agricultura · futuro</p>
         <h1 className="font-display text-[clamp(3.5rem,9vw,7rem)] font-normal leading-[0.92] tracking-[-0.055em]">HEIMDALL</h1>
         <p className="mt-5 text-xl font-light leading-relaxed text-silver-mist sm:text-2xl">Decide qué sembrar con datos de la NASA.</p>
         <p className="mx-auto mt-3 max-w-[460px] text-sm leading-7 text-ash-gray sm:text-base lg:mx-0">Marca tu finca y compara rotaciones de cultivo con evidencia, riesgos y lo que aún no sabemos.</p>
@@ -114,12 +114,12 @@ export default function Home() {
       {/* Overlay a pantalla completa: los puntos cruzan la página y se ensamblan sobre el globo. */}
       {!particlesPreview && introStage !== "settled" && <ParticleWorld stage={introStage} startRef={introStart} anchorRef={globeAnchor} onReady={beginIntro} onError={finishIntro} />}
       {particlesPreview && <ParticleWorld stage="preview" anchorRef={globeAnchor} />}
-      {introStage !== "settled" && !particlesPreview && <button type="button" onClick={finishIntro} className="fixed right-5 top-24 z-30 rounded-full border border-white/30 bg-black px-4 py-2 text-xs text-white focus-visible:outline-2 focus-visible:outline-saffron-spark">Saltar</button>}
-      {flow.status === "flying" && location && <p className="order-3 text-center text-sm text-saffron-spark" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
+      {introStage !== "settled" && !particlesPreview && <button type="button" onClick={finishIntro} className="fixed right-5 top-24 z-30 rounded-full border border-cream/30 bg-meadow px-4 py-2 text-xs text-bone-white focus-visible:outline-2 focus-visible:outline-cream">Saltar</button>}
+      {flow.status === "flying" && location && <p className="order-3 text-center text-sm text-cream" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
       <footer className="order-4 mt-2 space-y-1 text-center text-xs text-ash-gray lg:col-span-2"><p>© Colaboradores de OpenStreetMap</p><p>Imagen: NASA Blue Marble, con tratamiento de color propio</p></footer>
     </section>}
     {showMap && <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
-      <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-saffron-spark">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
+      <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cream">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
       {location && <MapScene key={`${location.lat}:${location.lon}:${gpsAccuracyMeters ?? "search"}`} location={location} gpsAccuracyMeters={gpsAccuracyMeters} onBack={onBackToGlobe} debugMode={debugMode} onFarmConfirmed={(farm) => { setConfirmedFarm(farm); dispatch({ type: "confirmar" }); }} />}
     </section>}
     {showAnalysis && confirmedFarm && <AnalysisFlow farm={confirmedFarm} onChangeFarm={onBackToGlobe} />}

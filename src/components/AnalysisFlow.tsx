@@ -65,7 +65,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
   if (step === "priorities" || !response || !baseResponse) {
     return <>
       <PrioritiesForm farm={farm} initialValues={priorities} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />
-      <p className="mx-auto -mt-5 mb-8 max-w-5xl px-4 text-center text-[11px] text-slate-600 sm:px-8">Periodo climático de referencia: 2020–2022. Los escenarios se prueban después y no son pronósticos.</p>
+      <p className="mx-auto -mt-5 mb-8 max-w-5xl px-4 text-center text-[11px] text-ash-gray sm:px-8">Periodo climático de referencia: 2020–2022. Los escenarios se prueban después y no son pronósticos.</p>
     </>;
   }
 
