@@ -2,7 +2,7 @@ import type { AnalysisClimate, AnalysisResponse, ClimateResult, ClimateScenario,
 import { DEFAULT_CURRENT_CROP_ID, SOWING_CALENDAR_REGION } from "./config";
 import { listDataSources } from "./dataSources";
 import { aggregateMonthly, computeIndicators, countYears } from "./indicators";
-import { baselineRotation, candidateRotations, pickBest } from "./rotations";
+import { baselineRotation, candidateRotations, pickBest, startingRotations } from "./rotations";
 import { applyScenario, isNeutralScenario, scenarioGap } from "./scenario";
 import { scoreRotations } from "./scoring";
 import { computeSeasonality } from "./seasonality";
@@ -23,6 +23,20 @@ export function resolveCurrentCrop(crops: readonly Crop[], currentCropId: string
 function bestOf(results: readonly RotationResult[], strategy: string): RotationResult {
   if (results.length === 0) throw new Error(`El catálogo no tiene cultivos suficientes para armar la alternativa de ${strategy}`);
   return pickBest(results);
+}
+
+type Scorer = (rotations: readonly Rotation[]) => RotationResult[];
+
+/** Línea base (el cultivo actual) más la mejor alternativa de leguminosa y la mejor de cobertura con sequía. */
+function alternativesAround(crops: readonly Crop[], current: Crop, score: Scorer): RotationResult[] {
+  const candidates = candidateRotations(crops, current);
+  return [...score([baselineRotation(current)]), bestOf(score(candidates.legume), "leguminosa"), bestOf(score(candidates.coverDrought), "cobertura y sequía")];
+}
+
+/** Sin cultivo actual: la mejor opción de un solo cultivo y la mejor de cada estrategia alternativa, sin línea base. */
+function startingOptions(crops: readonly Crop[], score: Scorer): RotationResult[] {
+  const candidates = startingRotations(crops);
+  return [bestOf(score(candidates.single), "un solo cultivo"), bestOf(score(candidates.legume), "leguminosa"), bestOf(score(candidates.coverDrought), "cobertura y sequía")];
 }
 
 export type AnalysisInput = {
@@ -58,7 +72,8 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  */
 export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
-  const current = resolveCurrentCrop(crops, priorities.currentCropId);
+  // «No tengo cultivo» no compara contra uno actual; sin esa marca se mantiene el cultivo declarado o el por defecto.
+  const current = priorities.noCurrentCrop ? null : resolveCurrentCrop(crops, priorities.currentCropId);
   const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined);
   const terrainInput = terrain || climate.cellElevationMeters !== undefined
     ? { cellElevationMeters: climate.cellElevationMeters, siteElevationMeters: terrain?.elevationMeters, slopePercent: terrain?.slopePercent, terrainSource: terrain?.source }
@@ -71,8 +86,7 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const seasonality = isInSowingCalendarRegion(location.lat, location.lon) ? computeSeasonality(monthlyClimate) : undefined;
   const yearsAnalyzed = countYears(records);
   const score = (rotations: readonly Rotation[]) => scoreRotations({ rotations, crops, indicators, priorities, seasonality, yearsAnalyzed });
-  const candidates = candidateRotations(crops, current);
-  const rotations = [...score([baselineRotation(current)]), bestOf(score(candidates.legume), "leguminosa"), bestOf(score(candidates.coverDrought), "cobertura y sequía")];
+  const rotations = current ? alternativesAround(crops, current, score) : startingOptions(crops, score);
   const results = rotations.map((result) => ({ ...result, informationGaps: [...result.informationGaps, ...extraGaps] }));
   return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators), ...(scenario ? { scenario } : {}) };
 }

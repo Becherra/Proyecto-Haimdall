@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { CropIcon, GoalIcon } from "./icons";
 import Logo from "./Logo";
-import { applySelection, selectionFromPriorities } from "../lib/ui/prioritySelection";
+import { applySelection, cropAnswerFields, cropAnswerFromPriorities, NO_CROP, selectionFromPriorities } from "../lib/ui/prioritySelection";
 import type { PriorityKey } from "../lib/ui/prioritySelection";
 import { userPrioritiesSchema } from "../types";
 import type { Farm, UserPriorities } from "../types";
@@ -19,7 +19,6 @@ type PrioritiesSlidesProps = {
 
 type Water = NonNullable<UserPriorities["waterAvailability"]>;
 
-const NO_CROP = "none";
 const CROPS = [
   ["maiz", "Maíz"], ["frijol", "Fríjol"], ["soya", "Soya"], ["arveja", "Arveja"],
   ["mucuna", "Mucuna"], ["crotalaria", "Crotalaria"], ["yuca", "Yuca"], ["papa", "Papa"],
@@ -60,7 +59,7 @@ const optionOn = "border-cream bg-cream text-meadow";
 
 export default function PrioritiesSlides({ farm, initialValues, error, submitting, onSubmit, onChangeFarm }: PrioritiesSlidesProps) {
   const [step, setStep] = useState(0);
-  const [crop, setCrop] = useState<string | null>(initialValues.currentCropId ?? null);
+  const [crop, setCrop] = useState<string | null>(cropAnswerFromPriorities(initialValues));
   const [water, setWater] = useState<Water | null>(initialValues.waterAvailability ?? null);
   const [goals, setGoals] = useState<PriorityKey[]>(() => selectionFromPriorities(initialValues));
   const last = TITLES.length - 1;
@@ -70,8 +69,8 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
   const toggleGoal = (key: PriorityKey) => setGoals((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
 
   function submit() {
-    // «Ninguno» no manda cultivo actual: el campo es opcional en el análisis.
-    const answers = { ...initialValues, currentCropId: crop === NO_CROP ? undefined : crop ?? undefined, waterAvailability: water ?? undefined };
+    // «Ninguno» marca que no hay cultivo actual en lugar de mandar uno.
+    const answers = { ...initialValues, ...cropAnswerFields(crop), waterAvailability: water ?? undefined };
     const parsed = userPrioritiesSchema.safeParse(applySelection(answers, goals));
     if (parsed.success) onSubmit(parsed.data);
   }

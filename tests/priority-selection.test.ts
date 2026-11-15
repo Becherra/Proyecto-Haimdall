@@ -35,3 +35,23 @@ describe("selectionFromPriorities", () => {
     expect(selectionFromPriorities(applySelection(base, ["erosionReduction", "extraIncome"]))).toEqual(["extraIncome", "erosionReduction"]);
   });
 });
+
+describe("respuesta de cultivo · Ninguno", () => {
+  it("«Ninguno» marca noCurrentCrop y no manda cultivo", async () => {
+    const { cropAnswerFields, NO_CROP } = await import("../src/lib/ui/prioritySelection");
+    expect(cropAnswerFields(NO_CROP)).toEqual({ currentCropId: undefined, noCurrentCrop: true });
+  });
+  it("un cultivo elegido se manda tal cual y sin la marca", async () => {
+    const { cropAnswerFields } = await import("../src/lib/ui/prioritySelection");
+    expect(cropAnswerFields("papa")).toEqual({ currentCropId: "papa", noCurrentCrop: undefined });
+    expect(cropAnswerFields(null)).toEqual({ currentCropId: undefined, noCurrentCrop: undefined });
+  });
+  it("ida y vuelta al volver a editar", async () => {
+    const { cropAnswerFields, cropAnswerFromPriorities } = await import("../src/lib/ui/prioritySelection");
+    for (const answer of ["none", "yuca", null]) expect(cropAnswerFromPriorities(cropAnswerFields(answer))).toBe(answer);
+  });
+  it("el resultado de applySelection con «Ninguno» es válido para el esquema", async () => {
+    const { cropAnswerFields } = await import("../src/lib/ui/prioritySelection");
+    expect(userPrioritiesSchema.safeParse(applySelection({ ...base, ...cropAnswerFields("none"), currentCropId: undefined }, ["lowRisk"])).success).toBe(true);
+  });
+});

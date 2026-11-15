@@ -25,3 +25,17 @@ export function applySelection(base: UserPriorities, selected: readonly Priority
   const weights = Object.fromEntries(PRIORITY_KEYS.map((key) => [key, selected.length === 0 ? NEUTRAL_WEIGHT : selected.includes(key) ? SELECTED_WEIGHT : UNSELECTED_WEIGHT])) as Record<PriorityKey, number>;
   return { ...base, ...weights };
 }
+
+/** Valor de la opción «Ninguno» en la pregunta de cultivo. */
+export const NO_CROP = "none";
+
+/** Respuesta a «¿qué cultivo tienes?» convertida a los campos del análisis: «Ninguno» marca `noCurrentCrop` en vez de mandar un cultivo. */
+export function cropAnswerFields(answer: string | null): Pick<UserPriorities, "currentCropId" | "noCurrentCrop"> {
+  if (answer === NO_CROP) return { currentCropId: undefined, noCurrentCrop: true };
+  return { currentCropId: answer ?? undefined, noCurrentCrop: undefined };
+}
+
+/** Inverso de `cropAnswerFields`: la respuesta que se marca al volver a editar; null si aún no se contestó. */
+export function cropAnswerFromPriorities(priorities: Pick<UserPriorities, "currentCropId" | "noCurrentCrop">): string | null {
+  return priorities.noCurrentCrop ? NO_CROP : priorities.currentCropId ?? null;
+}
