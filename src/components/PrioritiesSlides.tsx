@@ -137,7 +137,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
 
     {error && <p className="mx-4 mb-2 rounded-2xl bg-clay/40 px-4 py-3 text-center text-sm text-clay-light" role="alert">{error}</p>}
     <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:max-w-3xl">
-      <button type="button" onClick={onBack} disabled={submitting} aria-label={step === 0 ? "Volver al mapa" : "Pregunta anterior"} className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:opacity-40"><ArrowLeft /></button>
+      <button type="button" onClick={onBack} disabled={submitting} aria-label={step === 0 ? "Volver al mapa" : "Pregunta anterior"} className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:opacity-40"><ArrowLeft /></button>
       <button type="button" onClick={onNext} disabled={submitting || unanswered} aria-label={step === last ? "Ver resultados" : "Siguiente"} className={`flex h-20 min-w-0 flex-1 lg:h-16 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 ${submitting ? "cursor-wait opacity-70" : "disabled:cursor-not-allowed disabled:opacity-40"}`}>
         {submitting ? <Spinner /> : step === last ? <Check /> : <ArrowRight />}
       </button>
