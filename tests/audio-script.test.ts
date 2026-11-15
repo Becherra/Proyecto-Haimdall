@@ -5,7 +5,7 @@ import type { Indicators, RotationResult } from "../src/types";
 
 const script = readFileSync("docs/guion-de-audio.md", "utf8");
 const indicators: Indicators = { waterDeficitMm: 1, heatStressDays: 0, frostRiskDays: 0, extremeRainThresholdMm: 10, meanRootZoneWetness: 0.5, missingByParameter: {} };
-const result: RotationResult = { rotation: { id: "x", name: "x", cropIds: ["maiz"], description: "d" }, score: 3, whySuggested: "a", evidence: ["b"], benefits: ["c"], informationGaps: ["d"], risks: ["e"], validateWithLocalExpert: ["f"] };
+const result: RotationResult = { rotation: { id: "x", name: "x", cropIds: ["maiz"], description: "d" }, score: 3, whySuggested: "a", evidence: ["b"], benefits: ["c"], informationGaps: ["d"], risks: ["e"], validateWithLocalExpert: ["f"], plain: { why: "a", benefits: ["c"], risks: ["e"], gaps: ["d"], validate: ["f"] } };
 
 /** El guion de grabación debe seguir al código: cada frase fija con audioId aparece con su texto exacto. */
 describe("guion de audio", () => {

@@ -7,11 +7,12 @@ import {
 import { formatTemperatureRange, frostExposure, frostUnprotected, temperatureMismatch, temperatureSuitability } from "./climateFit";
 import { commonName, familyBreakShare } from "./rotations";
 import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
+import { buildPlain, type PenaltyKind } from "./plainText";
 import { slopeErosionExposure } from "./terrain";
 
 type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk";
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
-type Penalty = { label: string; value: number };
+type Penalty = { label: string; value: number; kind: PenaltyKind };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
 /** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
 type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
@@ -82,10 +83,11 @@ function riskPenalties(crops: readonly Crop[], indicators: Indicators, dryness: 
   const heatShare = Math.min(heatPerYear / HEAT_DAYS_REFERENCE, 1);
   const heatGap = (MAX_SCORE - average(crops, (crop) => crop.heatTolerance)) / MAX_SCORE;
   const droughtGap = (MAX_SCORE - average(crops, (crop) => crop.droughtTolerance)) / MAX_SCORE;
-  return [
-    { label: `calor (≈${heatPerYear.toFixed(0)} días al año sobre ${HEAT_STRESS_THRESHOLD_C} °C)`, value: heatShare * heatGap * MAX_RISK_PENALTY },
-    { label: "sequía (balance hídrico negativo)", value: dryness * droughtGap * MAX_RISK_PENALTY * waterFactor },
-  ].filter((penalty) => penalty.value > 0);
+  const penalties: Penalty[] = [
+    { kind: "heat", label: `calor (≈${heatPerYear.toFixed(0)} días al año sobre ${HEAT_STRESS_THRESHOLD_C} °C)`, value: heatShare * heatGap * MAX_RISK_PENALTY },
+    { kind: "drought", label: "sequía (balance hídrico negativo)", value: dryness * droughtGap * MAX_RISK_PENALTY * waterFactor },
+  ];
+  return penalties.filter((penalty) => penalty.value > 0);
 }
 
 function dryShare({ dryMonths, wetMonths }: SowingAssessment): number {
@@ -99,7 +101,7 @@ function sowingPenalties(sowing: SowingFinding[] | null): Penalty[] {
   const gap = ({ crop }: SowingFinding) => (MAX_SCORE - crop.droughtTolerance) / MAX_SCORE;
   const value = sowing.reduce((total, finding) => total + dryShare(finding.assessment) * gap(finding) * MAX_RISK_PENALTY, 0) / sowing.length;
   const dryMonths = [...new Set(sowing.flatMap(({ assessment }) => assessment.dryMonths))];
-  return value > 0 ? [{ label: `siembra en meses secos (${formatMonths(dryMonths)})`, value }] : [];
+  return value > 0 ? [{ kind: "sowing-dry", label: `siembra en meses secos (${formatMonths(dryMonths)})`, value }] : [];
 }
 
 /**
@@ -111,18 +113,19 @@ function climatePenalties(crops: readonly Crop[], indicators: Indicators, years:
   const frostPerYear = perYear(indicators.frostRiskDays, years);
   const waterUseShare = average(crops, (crop) => crop.waterUse) / MAX_SCORE;
   const slopeRisk = slopeErosionExposure(crops, indicators.slopePercent, indicators.extremeRainThresholdMm) * MAX_SLOPE_EROSION_PENALTY;
-  return [
-    { label: `temperatura fuera del rango de los cultivos (media del sitio ${temperature?.toFixed(1)} °C)`, value: temperature === null ? 0 : temperatureMismatch(crops, temperature) * MAX_TEMPERATURE_PENALTY },
-    { label: `heladas (≈${frostPerYear.toFixed(0)} días al año bajo ${FROST_THRESHOLD_C} °C)`, value: frostExposure(crops, frostPerYear) * MAX_FROST_PENALTY },
-    { label: "poca agua disponible para cultivos de alto consumo", value: waterAvailability === "low" ? waterUseShare * MAX_WATER_SCARCITY_PENALTY : 0 },
-    { label: `ladera (${indicators.slopePercent?.toFixed(0)} % de pendiente) con baja cobertura frente a lluvias fuertes`, value: slopeRisk },
-  ].filter((penalty) => penalty.value > 0);
+  const penalties: Penalty[] = [
+    { kind: "temperature", label: `temperatura fuera del rango de los cultivos (media del sitio ${temperature?.toFixed(1)} °C)`, value: temperature === null ? 0 : temperatureMismatch(crops, temperature) * MAX_TEMPERATURE_PENALTY },
+    { kind: "frost", label: `heladas (≈${frostPerYear.toFixed(0)} días al año bajo ${FROST_THRESHOLD_C} °C)`, value: frostExposure(crops, frostPerYear) * MAX_FROST_PENALTY },
+    { kind: "water-scarcity", label: "poca agua disponible para cultivos de alto consumo", value: waterAvailability === "low" ? waterUseShare * MAX_WATER_SCARCITY_PENALTY : 0 },
+    { kind: "slope", label: `ladera (${indicators.slopePercent?.toFixed(0)} % de pendiente) con baja cobertura frente a lluvias fuertes`, value: slopeRisk },
+  ];
+  return penalties.filter((penalty) => penalty.value > 0);
 }
 
 /** Castiga repetir la misma familia botánica en relevos seguidos: completa para el monocultivo, nula si siempre se alterna o si no hay dato de familia. */
 function pestCyclePenalties(familyBreak: number | null): Penalty[] {
   if (familyBreak === null || familyBreak >= 1) return [];
-  return [{ label: "repetir la misma familia botánica en relevos seguidos (plagas y enfermedades)", value: (1 - familyBreak) * MAX_PEST_CYCLE_PENALTY }];
+  return [{ kind: "pests", label: "repetir la misma familia botánica en relevos seguidos (plagas y enfermedades)", value: (1 - familyBreak) * MAX_PEST_CYCLE_PENALTY }];
 }
 
 function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, priorities, seasonality, years }: Context): Evaluation {
@@ -352,6 +355,10 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
       "Confirmar con un agrónomo local los atributos del catálogo y su adecuación al sitio.",
     ],
     ...(evaluation.calendar ? { calendar: evaluation.calendar } : {}),
+    plain: buildPlain({
+      crops: evaluation.crops, criteria: evaluation.criteria, penaltyKinds: evaluation.penalties.map((penalty) => penalty.kind), indicators,
+      dryness: drynessFactor(indicators), sowing: evaluation.sowing, calendar: evaluation.calendar, familyBreak: evaluation.familyBreak, waterAvailability: evaluation.waterAvailability,
+    }),
   };
 }
 

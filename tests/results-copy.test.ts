@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestRotationIndex, climateTopicSpeechItems, describeClimate, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import { NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, bestRotationIndex, climateTopicSpeechItems, describeClimate, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
 import type { Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
@@ -78,5 +78,26 @@ describe("rotationSections / rotationSpeechItems", () => {
     expect(items).toHaveLength(12);
     expect(items[0]).toEqual({ text: "¿Por qué?", audioId: "seccion-por-que" });
     expect(items[5]?.text).toBe("Beneficio 1. Beneficio 2.");
+  });
+});
+
+describe("rotationSections con texto simple", () => {
+  const plainResult: RotationResult = { ...rotation(3), plain: { why: "Simple porque.", benefits: ["Simple bueno."], risks: ["Simple riesgo."], gaps: ["Simple vacío."], validate: ["Simple técnico."] } };
+
+  it("usa los textos simples y no muestra la lista técnica de evidencia", () => {
+    const sections = rotationSections(plainResult);
+    expect(sections.find((section) => section.id === "why")?.texts).toEqual(["Simple porque."]);
+    expect(sections.find((section) => section.id === "risks")?.texts).toEqual(["Simple riesgo."]);
+    expect(sections.find((section) => section.id === "evidence")?.texts).toEqual([NASA_DATA_TEXT]);
+    expect(JSON.stringify(sections)).not.toContain("Dato A");
+  });
+  it("la frase fija de datos NASA es grabable", () => {
+    const items = rotationSpeechItems(plainResult);
+    expect(items.find((item) => item.text === NASA_DATA_TEXT)?.audioId).toBe(NASA_DATA_AUDIO_ID);
+  });
+  it("sin texto simple cae a los técnicos", () => {
+    const sections = rotationSections(rotation(3));
+    expect(sections.find((section) => section.id === "evidence")?.texts).toEqual(["Dato A"]);
+    expect(sections.find((section) => section.id === "why")?.texts).toEqual(["Porque sí."]);
   });
 });

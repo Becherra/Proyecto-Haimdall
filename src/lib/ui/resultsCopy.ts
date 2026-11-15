@@ -102,23 +102,36 @@ export function rainCalendarSentence(calendar: readonly RainMonth[]): string {
 
 const sentences = (list: readonly string[]) => list.map((item) => item.trim().replace(/[.]+$/, "")).join(". ") + ".";
 
-export type RotationSection = { id: "why" | "evidence" | "benefits" | "risks" | "gaps" | "expert"; title: string; audioId: string; texts: readonly string[] };
+/** Frase fija (grabable) que reemplaza a la lista técnica de evidencia en la versión simple. */
+export const NASA_DATA_TEXT = "Usamos datos de la NASA de los últimos años en tu zona: lluvia, temperatura y humedad de la tierra.";
+export const NASA_DATA_AUDIO_ID = "texto-datos-nasa";
 
-/** Secciones del detalle de una rotación, en el orden en que se leen. */
+export type RotationSection = { id: "why" | "evidence" | "benefits" | "risks" | "gaps" | "expert"; title: string; audioId: string; texts: readonly string[]; /** Grabación propia del texto, si es una frase fija. */ textAudioId?: string };
+
+/**
+ * Secciones del detalle de una rotación, en el orden en que se leen. Usa los textos simples (`result.plain`) y,
+ * si la respuesta no los trae, los técnicos. La evidencia técnica completa queda en la vista de datos técnicos.
+ */
 export function rotationSections(result: RotationResult): RotationSection[] {
+  const plain = result.plain;
   return [
-    { id: "why", title: "¿Por qué?", audioId: "seccion-por-que", texts: [result.whySuggested] },
-    { id: "evidence", title: "Datos que lo respaldan", audioId: "seccion-datos", texts: result.evidence },
-    { id: "benefits", title: "Lo bueno", audioId: "seccion-bueno", texts: result.benefits },
-    { id: "risks", title: "Cuidado con", audioId: "seccion-cuidado", texts: result.risks },
-    { id: "gaps", title: "Lo que no sabemos", audioId: "seccion-no-sabemos", texts: result.informationGaps },
-    { id: "expert", title: "Pregunta a un técnico", audioId: "seccion-tecnico", texts: result.validateWithLocalExpert },
+    { id: "why", title: "¿Por qué?", audioId: "seccion-por-que", texts: [plain?.why ?? result.whySuggested] },
+    plain
+      ? { id: "evidence", title: "Datos que lo respaldan", audioId: "seccion-datos", texts: [NASA_DATA_TEXT], textAudioId: NASA_DATA_AUDIO_ID }
+      : { id: "evidence", title: "Datos que lo respaldan", audioId: "seccion-datos", texts: result.evidence },
+    { id: "benefits", title: "Lo bueno", audioId: "seccion-bueno", texts: plain?.benefits ?? result.benefits },
+    { id: "risks", title: "Cuidado con", audioId: "seccion-cuidado", texts: plain?.risks ?? result.risks },
+    { id: "gaps", title: "Lo que no sabemos", audioId: "seccion-no-sabemos", texts: plain?.gaps ?? result.informationGaps },
+    { id: "expert", title: "Pregunta a un técnico", audioId: "seccion-tecnico", texts: plain?.validate ?? result.validateWithLocalExpert },
   ];
 }
 
 /** Todo el detalle de una rotación como lista de pedazos para leer: títulos fijos (grabables) y textos del análisis. */
 export function rotationSpeechItems(result: RotationResult): SpeechItem[] {
-  return rotationSections(result).flatMap((section) => [{ text: section.title, audioId: section.audioId }, { text: sentences(section.texts) }]);
+  return rotationSections(result).flatMap((section) => [
+    { text: section.title, audioId: section.audioId },
+    section.textAudioId ? { text: sentences(section.texts), audioId: section.textAudioId } : { text: sentences(section.texts) },
+  ]);
 }
 
 /** Explicación de un indicador para leer: la parte fija (grabable) y luego lo que dice el dato. */

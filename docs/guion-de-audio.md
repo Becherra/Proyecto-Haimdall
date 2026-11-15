@@ -19,6 +19,7 @@ cuántos días de calor hubo, qué meses llueve más) **no se pueden grabar de a
 | `seccion-cuidado` | Cuidado con |
 | `seccion-no-sabemos` | Lo que no sabemos |
 | `seccion-tecnico` | Pregunta a un técnico |
+| `texto-datos-nasa` | Usamos datos de la NASA de los últimos años en tu zona: lluvia, temperatura y humedad de la tierra. |
 | `clima-water` | ¿Alcanza el agua? Compara la lluvia que cae con el agua que se pierde por el calor y el viento. Si se pierde más de la que cae, a los cultivos les puede faltar agua. |
 | `clima-heat` | ¿Hace mucho calor? Cuenta los días en que el calor fue tan fuerte que puede dañar los cultivos. |
 | `clima-frost` | ¿Hay heladas? Cuenta los días en que hizo tanto frío que el hielo puede quemar las plantas. |
