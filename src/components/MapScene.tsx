@@ -7,12 +7,13 @@ import { convertCoordinateOrder, squareFromArea } from "../lib/geo";
 import { buildGibsTileUrl, GIBS_LAYER_CONFIG, isGibsDateAvailable } from "../lib/ui/mapLayers";
 import { formatCoordinates, validateMapLocation } from "../lib/ui/coordinates";
 import { calculateMapView } from "../lib/ui/mapView";
-import { createTerrainEditor, getTerrainEditorStatus, terrainEditorReducer } from "../lib/ui/terrainEditor";
+import { buildFarmFromEditor, createTerrainEditor, getTerrainEditorStatus, requiresGpsPinAdjustment, terrainEditorReducer } from "../lib/ui/terrainEditor";
+import { validateFarmDraft } from "../lib/geo/farmValidation";
 import type { AreaRangeHa, TerrainEditorMode } from "../lib/ui/terrainEditor";
 import { APPROXIMATE_AREA_RANGES_HA, FOOTBALL_PITCH_AREA_HA } from "../lib/geo/limits";
-import type { LocationResult } from "../types";
+import type { Farm, LocationResult } from "../types";
 
-type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onLocationSelected: (location: LocationResult) => void; onBack: () => void; onConfirmed?: () => void };
+type MapSceneProps = { location: LocationResult; gpsAccuracyMeters?: number; onBack: () => void; onFarmConfirmed: (farm: Farm) => void; debugMode?: boolean };
 type TileState = { loading: boolean; error: string | null };
 
 const initialDate = "2026-10-16";
@@ -56,10 +57,14 @@ function MapZoomObserver({ onZoomChange }: { onZoomChange: (zoom: number) => voi
   return null;
 }
 
-export default function MapScene({ location, gpsAccuracyMeters, onLocationSelected, onBack, onConfirmed }: MapSceneProps) {
-  const [editor, dispatch] = useReducer(terrainEditorReducer, location, createTerrainEditor);
+export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmConfirmed, debugMode = false }: MapSceneProps) {
+  const [editor, dispatch] = useReducer(terrainEditorReducer, location, (initial) => createTerrainEditor(initial, gpsAccuracyMeters === undefined ? "search" : "gps", gpsAccuracyMeters));
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [confirmedFarm, setConfirmedFarm] = useState<Farm | null>(null);
   const draftLocation = editor.location;
   const terrainStatus = getTerrainEditorStatus(editor);
+  const currentFarm = buildFarmFromEditor(editor);
+  const showConfirmedFarm = confirmedFarm !== null && JSON.stringify(currentFarm) === JSON.stringify(confirmedFarm);
   const [opacity, setOpacity] = useState(65);
   const [date, setDate] = useState(initialDate);
   const [zoom, setZoom] = useState(8);
@@ -87,8 +92,6 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
     window.addEventListener("offline", updateOnline);
     return () => { window.removeEventListener("online", updateOnline); window.removeEventListener("offline", updateOnline); };
   }, []);
-
-  useEffect(() => { dispatch({ type: "set-location", location }); }, [location]);
 
   const onTileLoad = () => setTiles({ loading: false, error: null });
   const onTileError = () => setTiles({ loading: false, error: "No se pudieron cargar las teselas. Revisa tu conexión o cambia la fecha." });
@@ -125,9 +128,9 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
         {approximateRing && <Polygon positions={approximateRing.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#ffb829", weight: 2, fillColor: "#ffb829", fillOpacity: 0.12 }} />}
         {editor.mode === "polygon" && editor.vertices.length >= 3 && <Polygon positions={editor.vertices.map((point) => convertCoordinateOrder(point, "geojson"))} pathOptions={{ color: "#ffb829", weight: 2, fillColor: "#ffb829", fillOpacity: 0.12, dashArray: editor.polygonFinished ? undefined : "6 6" }} />}
         {editor.mode === "polygon" && editor.vertices.map((point, index) => <Marker key={`vertex-${index}`} position={convertCoordinateOrder(point, "geojson")} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const moved = marker.getLatLng(); dispatch({ type: "move-vertex", index, lat: moved.lat, lon: moved.lng }); } }} title={`Vértice ${index + 1}`} />)}
-        <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable={editor.mode !== "polygon"} eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draftLocation.label) }); } }} title="Pin de la finca" />
+        <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable={editor.mode !== "polygon" || requiresGpsPinAdjustment(editor)} eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draftLocation.label), locationSource: "map" }); }} } title="Pin de la finca" />
         <CircleMarker center={[draftLocation.lat, draftLocation.lon]} radius={8} pathOptions={{ color: "#fbbf24", fillColor: "#fbbf24", fillOpacity: 0.25 }} />
-        {gpsAccuracyMeters !== undefined && <Circle center={[draftLocation.lat, draftLocation.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
+        {gpsAccuracyMeters !== undefined && <Circle center={[location.lat, location.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
       </MapContainer>
     </div>
     <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto grid max-h-[40svh] max-w-[1440px] grid-cols-[1fr_auto] gap-3 overflow-y-auto border-t border-white/15 bg-black/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-left shadow-[0_-12px_36px_rgba(0,0,0,0.6)] backdrop-blur sm:grid-cols-[1fr_auto] sm:p-4">
@@ -143,7 +146,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
         <label htmlFor="gibs-opacity" className="text-xs font-semibold text-slate-300">Opacidad de capas: {opacity}%</label>
         <input id="gibs-opacity" type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="accent-[#8052ff]" />
       </div>
-      <p className="col-span-2 text-xs leading-5 text-slate-400">Capa NASA: resolución regional (cientos de metros), no representa el detalle del lote.</p>
+      <p className="col-span-2 text-xs leading-5 text-slate-400">NASA POWER representa clima regional según la resolución de cada producto; no mide el detalle del lote.</p>
       <fieldset className="col-span-2 min-w-0">
         <legend className="mb-2 text-sm font-semibold text-white">Define el terreno (opcional)</legend>
         <div role="radiogroup" aria-label="Tipo de terreno" className="grid grid-cols-3 gap-2">
@@ -193,8 +196,15 @@ export default function MapScene({ location, gpsAccuracyMeters, onLocationSelect
       {terrainStatus.warnings.map((warning) => <p key={warning} className="col-span-2 text-sm text-amber-200" role="alert">{warning}</p>)}
       <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onBack} className="min-h-11 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark">Volver al globo</button>
-        <button type="button" disabled={!terrainStatus.canConfirm} onClick={() => { onLocationSelected(draftLocation); onConfirmed?.(); }} className="min-h-11 rounded-full bg-electric-iris px-4 py-3 text-sm font-semibold text-white hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
+        <button type="button" disabled={!terrainStatus.canConfirm} onClick={() => {
+          const candidate = buildFarmFromEditor(editor);
+          const result = validateFarmDraft(candidate);
+          if (!result.valid) { setConfirmationError(result.errors.join(" ")); return; }
+          setConfirmationError(null); setConfirmedFarm(result.farm); onFarmConfirmed(result.farm);
+        }} className="min-h-11 rounded-full bg-electric-iris px-4 py-3 text-sm font-semibold text-white hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
       </div>
+      {confirmationError && <p className="col-span-2 text-sm text-red-200" role="alert">No se pudo confirmar la finca: {confirmationError}</p>}
+      {showConfirmedFarm && confirmedFarm && debugMode && <details className="col-span-2 rounded-lg border border-white/15 p-3 text-xs text-slate-200"><summary className="cursor-pointer font-semibold">Farm enviado (depuración)</summary><pre className="mt-2 overflow-auto">{JSON.stringify(confirmedFarm, null, 2)}</pre></details>}
       <p className="col-span-2 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
     </div>
     {gpsAccuracyMeters !== undefined && gpsAccuracyMeters > 1000 && <p className="mt-1 text-xs text-amber-200">La precisión del GPS es aproximada ({Math.round(gpsAccuracyMeters)} m); ajusta el pin manualmente.</p>}
