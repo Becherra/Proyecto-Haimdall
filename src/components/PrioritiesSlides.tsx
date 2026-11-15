@@ -103,8 +103,8 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
       <div className="relative h-full">
         <StackCard offset={0 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[0]}</h2>
-          <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 grid-cols-3 content-start gap-2.5 lg:grid-cols-4 lg:gap-4">
-            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} data-option onClick={(event) => { popElement(event.currentTarget); setCrop(id); }} className={`${optionBase} min-h-[5.5rem] flex-col justify-center gap-1 ${crop === id ? optionOn : optionOff}`}>
+          <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 auto-rows-fr grid-cols-3 gap-2.5 lg:grid-cols-4 lg:gap-4">
+            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} data-option onClick={(event) => { popElement(event.currentTarget); setCrop(id); }} className={`${optionBase} min-h-[5.5rem] justify-center gap-1 ${id === NO_CROP ? "col-span-full flex-row gap-3" : "flex-col"} ${crop === id ? optionOn : optionOff}`}>
               <CropIcon id={id} /><span className="text-sm font-semibold">{name}</span>
             </button>)}
           </div>
@@ -112,8 +112,8 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
 
         <StackCard offset={1 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[1]}</h2>
-          <div role="radiogroup" aria-label={TITLES[1]} className="flex flex-1 flex-col justify-center gap-4">
-            {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} data-option onClick={(event) => { popElement(event.currentTarget); setWater(id); }} className={`${optionBase} min-h-24 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
+          <div role="radiogroup" aria-label={TITLES[1]} className="flex flex-1 flex-col gap-3 lg:gap-4">
+            {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} data-option onClick={(event) => { popElement(event.currentTarget); setWater(id); }} className={`${optionBase} min-h-24 flex-1 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
               <span className={`flex gap-1 ${water === id ? "text-meadow" : "text-cream"}`} aria-hidden="true">{[1, 2, 3].map((slot) => <Drop key={slot} filled={slot <= drops} />)}</span>
               <span className="text-xl font-bold">{name}</span>
             </button>)}
@@ -122,7 +122,7 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
 
         <StackCard offset={2 - step}>
           <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[2]}</h2>
-          <div role="group" aria-label={TITLES[2]} className="grid flex-1 grid-cols-2 content-start gap-2.5 lg:grid-cols-3 lg:gap-4">
+          <div role="group" aria-label={TITLES[2]} className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4">
             {GOALS.map(([key, name], index) => {
               const on = goals.includes(key);
               return <button key={key} type="button" aria-pressed={on} data-option onClick={(event) => { popElement(event.currentTarget); toggleGoal(key); }} className={`${optionBase} relative min-h-28 flex-col justify-center gap-1.5 ${index === GOALS.length - 1 ? "col-span-2" : ""} ${on ? optionOn : optionOff}`}>
