@@ -112,10 +112,13 @@ export const CURRENT_SEASON_DAYS = 90;
 /** Años mínimos de la serie histórica con dato suficiente en la misma época para que "lo normal" sirva de comparación. */
 export const MIN_YEARS_FOR_CURRENT_SEASON = 5;
 /**
- * Cortes de la lluvia reciente como % de la normal para decir si la temporada va muy seca, seca, normal, húmeda o muy húmeda.
- * Heurística de diseño, no un dato oficial; validar con un agrónomo local.
+ * Cortes del lugar que ocupa la lluvia reciente entre los años de la serie (0 = la más seca, 1 = la más lluviosa) para decir si la temporada va
+ * muy seca, seca, normal, húmeda o muy húmeda. Se mide contra la variabilidad real del sitio y no contra un porcentaje fijo: la misma lluvia puede
+ * ser normal donde llueve muy distinto cada año y muy seca donde llueve parecido. Heurística de diseño; validar con un agrónomo local.
  */
-export const CURRENT_SEASON_PERCENT = { muchDrier: 50, drier: 80, wetter: 120, muchWetter: 150 } as const;
+export const CURRENT_SEASON_PERCENTILE = { muchDrier: 0.1, drier: 1 / 3, wetter: 2 / 3, muchWetter: 0.9 } as const;
+/** Un estado "muy seca" o "muy lluviosa" pide además que la lluvia se aleje al menos este % de lo normal: ser la más seca de la serie por poco no es "casi no ha llovido". */
+export const CURRENT_SEASON_MUCH_CHANGE_PERCENT = 30;
 
 /** Desde cuántos grados de diferencia frente a lo normal la pantalla del agricultor habla de "más calor" o "menos calor". */
 export const CURRENT_SEASON_TEMPERATURE_NOTICE_C = 0.5;

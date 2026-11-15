@@ -1,9 +1,11 @@
 import type { AnalysisClimate, AnalysisResponse, ClimateResult, ClimateScenario, Crop, Rotation, RotationResult, UserPriorities } from "../types";
 import { DEFAULT_CURRENT_CROP_ID, SOWING_CALENDAR_REGION } from "./config";
+import { temperatureSuitability } from "./climateFit";
+import { computeExtremeYears } from "./extremeYears";
 import { listDataSources } from "./dataSources";
 import { computeCurrentSeason } from "./currentSeason";
 import { aggregateMonthly, computeIndicators, countYears } from "./indicators";
-import { baselineRotation, candidateRotations, pickBest, startingRotations } from "./rotations";
+import { baselineRotation, candidateRotations, commonName, pickBest, startingRotations } from "./rotations";
 import { applyScenario, isNeutralScenario, scenarioGap } from "./scenario";
 import { scoreRotations } from "./scoring";
 import { computeSeasonality } from "./seasonality";
@@ -19,6 +21,21 @@ export function resolveCurrentCrop(crops: readonly Crop[], currentCropId: string
   const current = crops.find((crop) => crop.id === cropId);
   if (!current) throw new AnalysisInputError(`El cultivo actual "${cropId}" no existe en el catálogo`);
   return current;
+}
+
+/**
+ * Cultivo con el que se compara cuando el agricultor no declara uno: el maíz (`DEFAULT_CURRENT_CROP_ID`) si encaja en la temperatura media del sitio.
+ * Si el maíz no crece bien ahí (aptitud térmica menor que 1) y otro cultivo anual del catálogo encaja mejor, usa ese. Nunca elige un permanente.
+ * `reason` explica el cambio (null si se queda el maíz). Es un supuesto del sistema: el análisis lo avisa como vacío de información.
+ */
+export function defaultCurrentCrop(crops: readonly Crop[], meanTemperatureC: number | null): { crop: Crop; reason: string | null } {
+  const maize = resolveCurrentCrop(crops, undefined);
+  if (meanTemperatureC === null || !maize.temperatureC) return { crop: maize, reason: null };
+  const suitability = (crop: Crop) => (crop.temperatureC ? temperatureSuitability(crop.temperatureC, meanTemperatureC) : 0);
+  if (suitability(maize) >= 1) return { crop: maize, reason: null };
+  const best = crops.filter((crop) => crop.perennial !== true && crop.temperatureC)
+    .reduce((top, crop) => (suitability(crop) > suitability(top) || (suitability(crop) === suitability(top) && crop.marketPotential > top.marketPotential) ? crop : top), maize);
+  return best.id === maize.id ? { crop: maize, reason: null } : { crop: best, reason: `el ${commonName(maize).toLowerCase()} no crece bien a la temperatura media de este sitio (${meanTemperatureC.toFixed(1)} °C)` };
 }
 
 /** La mejor candidata de una estrategia según el puntaje; falla con un mensaje claro si el catálogo no dio ninguna. */
@@ -92,17 +109,19 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  */
 export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false, recentClimate, requestedYears, liveTerrain = null }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
-  // «No tengo cultivo» no compara contra uno actual; sin esa marca se mantiene el cultivo declarado o el por defecto.
-  const current = priorities.noCurrentCrop ? null : resolveCurrentCrop(crops, priorities.currentCropId);
   const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined, undefined, liveTerrain);
   const terrainInput = terrain || climate.cellElevationMeters !== undefined
     ? { cellElevationMeters: climate.cellElevationMeters, siteElevationMeters: terrain?.elevationMeters, slopePercent: terrain?.slopePercent, terrainSource: terrain?.source, slopeRangePercent: terrain?.slopeRangePercent, terrainCellMeters: terrain?.cellMeters }
     : undefined;
   const applied = scenario && !isNeutralScenario(scenario) ? scenario : undefined;
   const records = applied ? applyScenario(climate.records, applied) : climate.records;
-  const baseGaps = [...siteGaps, ...seriesGaps(climate, requestedYears)];
-  const extraGaps = applied ? [...baseGaps, scenarioGap(applied)] : baseGaps;
   const indicators = computeIndicators(records, location.lat, terrainInput);
+  // «No tengo cultivo» no compara contra uno actual; sin cultivo declarado se parte de uno supuesto (se avisa), y si se declara uno desconocido se rechaza.
+  const assumed = priorities.noCurrentCrop || priorities.currentCropId !== undefined ? null : defaultCurrentCrop(crops, indicators.meanTemperatureC ?? null);
+  const current = priorities.noCurrentCrop ? null : (assumed?.crop ?? resolveCurrentCrop(crops, priorities.currentCropId));
+  const baseGaps = [...siteGaps, ...seriesGaps(climate, requestedYears)];
+  const assumedGap = assumed ? [`No indicaste qué cultivo tienes hoy: se compara contra ${commonName(assumed.crop)} como punto de partida (supuesto del sistema${assumed.reason ? `, elegido porque ${assumed.reason}` : ""}).`] : [];
+  const extraGaps = [...assumedGap, ...baseGaps, ...(applied ? [scenarioGap(applied)] : [])];
   const monthlyClimate = aggregateMonthly(adjustRecordsForElevation(records, terrainInput?.cellElevationMeters, terrainInput?.siteElevationMeters), location.lat);
   const seasonality = isInSowingCalendarRegion(location.lat, location.lon) ? computeSeasonality(monthlyClimate) : undefined;
   const yearsAnalyzed = countYears(records);
@@ -111,5 +130,7 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const results = rotations.map((result) => ({ ...result, informationGaps: [...result.informationGaps, ...extraGaps] }));
   // La temporada actual se compara con los datos originales de NASA, no con la serie modificada por un escenario.
   const currentSeason = recentClimate ? computeCurrentSeason(recentClimate.records, climate.records) : null;
-  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators, { currentSeason: currentSeason !== null }), ...(currentSeason ? { currentSeason } : {}), ...(scenario ? { scenario } : {}) };
+  // Los años extremos se buscan en los datos originales de NASA, no en la serie con escenario.
+  const extremeYears = computeExtremeYears(climate.records);
+  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators, { currentSeason: currentSeason !== null }), ...(currentSeason ? { currentSeason } : {}), ...(extremeYears ? { extremeYears } : {}), ...(scenario ? { scenario } : {}) };
 }

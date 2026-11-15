@@ -1,16 +1,23 @@
 import type { ClimateRecord, CurrentSeason, CurrentSeasonStatus } from "../types";
-import { CURRENT_SEASON_PERCENT, DRY_DAY_RAIN_MM, MIN_YEAR_COVERAGE, MIN_YEARS_FOR_CURRENT_SEASON } from "./config";
+import { CURRENT_SEASON_MUCH_CHANGE_PERCENT, CURRENT_SEASON_PERCENTILE, DRY_DAY_RAIN_MM, MIN_YEAR_COVERAGE, MIN_YEARS_FOR_CURRENT_SEASON } from "./config";
 
 const mean = (values: readonly number[]): number | null => (values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length);
 const monthDay = (date: string) => date.slice(4);
 
-function statusOf(percent: number | null, rainMm: number): CurrentSeasonStatus {
-  if (percent === null) return rainMm > 0 ? "much-wetter" : "normal";
-  if (percent < CURRENT_SEASON_PERCENT.muchDrier) return "much-drier";
-  if (percent < CURRENT_SEASON_PERCENT.drier) return "drier";
-  if (percent <= CURRENT_SEASON_PERCENT.wetter) return "normal";
-  return percent <= CURRENT_SEASON_PERCENT.muchWetter ? "wetter" : "much-wetter";
+/**
+ * Estado de la temporada según el lugar de la lluvia entre los años de la serie. Los estados "muy" piden además alejarse
+ * `CURRENT_SEASON_MUCH_CHANGE_PERCENT` % de lo normal; si lo normal es 0 no hay porcentaje y no se exige.
+ */
+function statusOf(percentile: number, percentOfNormal: number | null): CurrentSeasonStatus {
+  const { muchDrier, drier, wetter, muchWetter } = CURRENT_SEASON_PERCENTILE;
+  const farFromNormal = percentOfNormal === null || Math.abs(percentOfNormal - 100) >= CURRENT_SEASON_MUCH_CHANGE_PERCENT;
+  if (percentile < muchDrier) return farFromNormal ? "much-drier" : "drier";
+  if (percentile < drier) return "drier";
+  if (percentile <= wetter) return "normal";
+  return percentile <= muchWetter || !farFromNormal ? "wetter" : "much-wetter";
 }
+
+const sameRain = (a: number, b: number) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
 
 /** Días secos seguidos que terminan en el último registro recibido; un día sin dato corta la cuenta. */
 function trailingDryStreak(window: readonly ClimateRecord[]): number {
@@ -64,10 +71,13 @@ export function computeCurrentSeason(recent: readonly ClimateRecord[], history: 
   const normalRainMm = mean(normals.map(({ rainMm }) => rainMm)) as number;
   const normalTemperatureC = mean(normals.flatMap(({ meanTemperatureC }) => meanTemperatureC ?? []));
   const rainPercentOfNormal = normalRainMm > 0 ? (current.rainMm / normalRainMm) * 100 : null;
+  const drier = normals.filter(({ rainMm }) => rainMm < current.rainMm && !sameRain(rainMm, current.rainMm)).length;
+  const equal = normals.filter(({ rainMm }) => sameRain(rainMm, current.rainMm)).length;
+  const rainPercentile = (drier + equal / 2) / normals.length;
   return {
     windowDays: window.length, firstDate, lastDate, daysWithData: window.filter((record) => record.PRECTOTCORR !== null).length,
-    rainMm: current.rainMm, normalRainMm, rainPercentOfNormal, status: statusOf(rainPercentOfNormal, current.rainMm),
+    rainMm: current.rainMm, normalRainMm, rainPercentOfNormal, status: statusOf(rainPercentile, rainPercentOfNormal),
     temperatureAnomalyC: current.meanTemperatureC === null || normalTemperatureC === null ? null : current.meanTemperatureC - normalTemperatureC,
-    currentDryStreakDays: trailingDryStreak(window), baselineYears: normals.length,
+    currentDryStreakDays: trailingDryStreak(window), baselineYears: normals.length, baselineYearsDrier: drier, rainPercentile,
   };
 }
