@@ -49,22 +49,22 @@ export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLo
     } finally { setLocating(false); }
   }
 
-  /** Un solo botón secundario: la primera vez abre el campo; con texto escrito, busca. */
+  /** El botón secundario abre el campo; la búsqueda se dispara con Enter o con la lupa. */
   function onManualClick(event: React.MouseEvent<HTMLButtonElement>) {
-    if (manualOpen) return;
-    event.preventDefault();
     setManualOpen(true);
     window.setTimeout(() => document.getElementById("location-query")?.focus(), 0);
   }
 
   return <div className="w-full max-w-xl">
     <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="flex min-h-16 w-full items-center justify-center rounded-full bg-cream px-6 py-4 text-lg font-bold text-meadow transition hover:bg-bone-white focus:outline-none focus:ring-2 focus:ring-cream focus:ring-offset-2 focus:ring-offset-meadow disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
-    <form onSubmit={submitSearch} noValidate className="mt-4 flex flex-col items-center gap-3">
-      {manualOpen && <>
-        <label htmlFor="location-query" className="sr-only">Escribe tu finca o municipio</label>
-        <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Escribe tu vereda o municipio" className="min-h-12 w-full rounded-full border border-cream/40 bg-transparent px-5 text-base text-bone-white outline-none placeholder:text-ash-gray focus:border-cream focus:ring-2 focus:ring-cream/50" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
-      </>}
-      <button type={manualOpen ? "submit" : "button"} onClick={onManualClick} disabled={loading || locating} className="min-h-11 rounded-full border border-cream/40 px-5 text-sm font-medium text-silver-mist transition hover:border-cream hover:text-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-wait disabled:opacity-60">{loading ? "Buscando…" : manualOpen ? "Buscar" : "Escribir mi ubicación"}</button>
+    <form onSubmit={submitSearch} noValidate className="mt-4 flex justify-center">
+      {manualOpen
+        ? <div className="relative w-full">
+            <label htmlFor="location-query" className="sr-only">Escribe tu finca o municipio</label>
+            <input id="location-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Escribe tu vereda o municipio" className="min-h-12 w-full rounded-full border border-cream/40 bg-transparent pl-5 pr-14 text-base text-bone-white outline-none placeholder:text-ash-gray focus:border-cream focus:ring-2 focus:ring-cream/50" aria-invalid={Boolean(error)} aria-describedby={error ? "location-error" : undefined} />
+            <button type="submit" disabled={loading || locating} aria-label="Buscar ubicación" className="absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-full text-xl text-cream transition hover:bg-cream/15 focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-wait disabled:opacity-60"><span aria-hidden="true">{loading ? "…" : "⌕"}</span></button>
+          </div>
+        : <button type="button" onClick={onManualClick} disabled={locating} className="min-h-11 rounded-full border border-cream/40 px-5 text-sm font-medium text-silver-mist transition hover:border-cream hover:text-cream focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-wait disabled:opacity-60">Escribir mi ubicación</button>}
     </form>
     {loading && <p className="mt-3 text-center text-sm text-cream" role="status" aria-live="polite">Buscando…</p>}
     {error && <p id="location-error" className="mt-3 text-center text-sm text-clay-light" role="alert">{error}</p>}
