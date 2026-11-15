@@ -23,7 +23,7 @@ export function locationFlowReducer(state: LocationFlowState, event: LocationFlo
     case "locating":
       return state.status === "idle" || state.status === "error" ? { status: "locating", location: null } : state;
     case "buscar":
-      if (!["idle", "error"].includes(state.status)) return state;
+      if (!["idle", "error", "flying", "transitioning"].includes(state.status)) return state;
       return { status: "flying", location: event.location };
     case "gpsOk":
       if (!["idle", "locating", "error"].includes(state.status)) return state;

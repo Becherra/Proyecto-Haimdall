@@ -21,6 +21,62 @@ body { min-height: 100vh; background: #000; color: #fff; }
   line-height: 1;
 }
 
+/* ── Intro: puntos de luz → mundo ────────────────────────────────────────
+   La animación de puntos la maneja ParticleWorld (WebGL) con su propio reloj.
+   Aquí solo se controla el texto del hero:
+   - scatter/gather/hold : oculto (solo se ven los puntos formando el mundo)
+   - explode/globe       : cada elemento entra en cascada mientras aparece el globo real */
+.hero-copy-scatter, .hero-copy-gather, .hero-copy-hold { opacity: 0; transform: translateX(-24px); }
+.hero-copy-explode > *, .hero-copy-globe > * { animation: hero-copy-reveal 700ms both; }
+.hero-copy-explode > :nth-child(1), .hero-copy-globe > :nth-child(1) { animation-delay: 0ms; }
+.hero-copy-explode > :nth-child(2), .hero-copy-globe > :nth-child(2) { animation-delay: 120ms; }
+.hero-copy-explode > :nth-child(3), .hero-copy-globe > :nth-child(3) { animation-delay: 220ms; }
+.hero-copy-explode > :nth-child(4), .hero-copy-globe > :nth-child(4) { animation-delay: 320ms; }
+.hero-copy-explode > :nth-child(5), .hero-copy-globe > :nth-child(5) { animation-delay: 420ms; }
+.hero-copy-explode > :nth-child(6), .hero-copy-globe > :nth-child(6) { animation-delay: 520ms; }
+@keyframes hero-copy-reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.globe-intro { will-change: opacity; }
+.globe-intro-explode { animation: globe-crossfade 700ms ease-out both; }
+@keyframes globe-crossfade { from { opacity: 0.28; } to { opacity: 1; } }
+.particle-loading::before, .particle-loading::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background-repeat: no-repeat;
+  animation: particle-loading-drift 2.4s ease-in-out infinite alternate;
+}
+.particle-loading::before {
+  background-image:
+    radial-gradient(circle at 7% 18%, #ffb829 0 1px, transparent 1.8px),
+    radial-gradient(circle at 17% 72%, #8052ff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 29% 36%, #32c7b0 0 1px, transparent 1.8px),
+    radial-gradient(circle at 38% 84%, #fff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 48% 22%, #ffb829 0 1px, transparent 1.8px),
+    radial-gradient(circle at 58% 67%, #8052ff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 34%, #32c7b0 0 1px, transparent 1.8px),
+    radial-gradient(circle at 78% 79%, #fff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 89% 17%, #ffb829 0 1px, transparent 1.8px),
+    radial-gradient(circle at 94% 56%, #8052ff 0 1px, transparent 1.8px);
+}
+.particle-loading::after {
+  opacity: 0.65;
+  background-image:
+    radial-gradient(circle at 12% 48%, #32c7b0 0 1px, transparent 1.8px),
+    radial-gradient(circle at 24% 12%, #fff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 34% 62%, #ffb829 0 1px, transparent 1.8px),
+    radial-gradient(circle at 44% 43%, #8052ff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 53% 91%, #32c7b0 0 1px, transparent 1.8px),
+    radial-gradient(circle at 63% 12%, #fff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 73% 54%, #ffb829 0 1px, transparent 1.8px),
+    radial-gradient(circle at 83% 29%, #8052ff 0 1px, transparent 1.8px),
+    radial-gradient(circle at 91% 89%, #32c7b0 0 1px, transparent 1.8px);
+  animation-delay: -1.2s;
+}
+@keyframes particle-loading-drift { from { transform: translateY(3px); opacity: 0.55; } to { transform: translateY(-3px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy-explode > *, .hero-copy-globe > *, .globe-intro-explode, .particle-loading::before, .particle-loading::after { animation: none !important; }
+}
+
 .leaflet-container {
   background: #090909;
   font-family: inherit;

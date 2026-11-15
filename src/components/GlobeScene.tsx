@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { calculateGlobeView } from "../lib/ui/globeView";
 import type { LocationResult } from "../types";
 
-type GlobeSceneProps = { location: LocationResult | null; active?: boolean };
+type GlobeSceneProps = { location: LocationResult | null; active?: boolean; introSpin?: boolean };
 // globe.gl clears material.color when it applies a texture, so a uniform material tint cannot color land and sea separately.
 const TWO_K_TEXTURE = "/textures/earth-bluemarble-2048-heimdall.webp";
 // NASA SVS Blue Marble January source: https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography/january/world.topo.200401.3x5400x2700.jpg
@@ -26,7 +26,7 @@ function canUseHighResolutionTexture(): boolean {
   return !window.matchMedia("(max-width: 767px)").matches && !slowNetwork;
 }
 
-export default function GlobeScene({ location, active = true }: GlobeSceneProps) {
+export default function GlobeScene({ location, active = true, introSpin = false }: GlobeSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const resumeTimer = useRef<number | undefined>(undefined);
@@ -78,10 +78,23 @@ export default function GlobeScene({ location, active = true }: GlobeSceneProps)
 
   useEffect(() => {
     if (location && globeRef.current && size.width > 0) {
-      const view = calculateGlobeView(true, size.width);
+      const view = calculateGlobeView(true, size.width, reducedMotion);
       globeRef.current.pointOfView({ lat: location.lat, lng: location.lon, altitude: view.altitude }, view.transitionMs);
     }
-  }, [location, size.width]);
+  }, [location, reducedMotion, size.width]);
+
+  useEffect(() => {
+    if (!introSpin || !globeRef.current) return;
+    const start = performance.now();
+    let frame = 0;
+    const spin = (now: number) => {
+      const progress = Math.min(1, (now - start) / 1000);
+      globeRef.current?.pointOfView({ lat: 0, lng: progress * 360, altitude: 2.5 });
+      if (progress < 1) frame = window.requestAnimationFrame(spin);
+    };
+    frame = window.requestAnimationFrame(spin);
+    return () => window.cancelAnimationFrame(frame);
+  }, [introSpin]);
 
   useEffect(() => {
     if (!location || reducedMotion) return;

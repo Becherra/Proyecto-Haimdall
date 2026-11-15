@@ -62,6 +62,50 @@ export const userPrioritiesSchema = z.object({
 });
 export type UserPriorities = z.infer<typeof userPrioritiesSchema>;
 
+export const farmCoordinateSchema = z.object({
+  lat: z.number().finite().gte(-90).lte(90),
+  lon: z.number().finite().gte(-180).lte(180),
+});
+
+const geoJsonPositionSchema = z.tuple([
+  z.number().finite().gte(-180).lte(180),
+  z.number().finite().gte(-90).lte(90),
+]);
+
+const terrainSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("point") }),
+  z.object({
+    kind: z.literal("approx_size"),
+    areaHa: z.number().finite().positive(),
+    // Manual area entry is exact and intentionally has no selected estimate bucket.
+    areaRangeHa: z.tuple([z.number().finite().positive(), z.number().finite().positive()])
+      .refine(([minimum, maximum]) => minimum < maximum, "El rango de área debe crecer").optional(),
+  }),
+  z.object({
+    kind: z.literal("polygon"),
+    areaHa: z.number().finite().positive(),
+    // GeoJSON positions use [longitude, latitude], and the last point closes the ring.
+    ring: z.array(geoJsonPositionSchema).min(4).refine((ring) => {
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      return first !== undefined && last !== undefined && first[0] === last[0] && first[1] === last[1];
+    }, "El anillo debe cerrar en su primera coordenada"),
+  }),
+]);
+
+export const farmSchema = z.object({
+  centroid: farmCoordinateSchema,
+  locationSource: z.enum(["gps", "search", "map"]),
+  placeLabel: z.string().min(1).optional(),
+  accuracyM: z.number().finite().nonnegative().optional(),
+  terrain: terrainSchema,
+}).refine((farm) => farm.accuracyM === undefined || farm.locationSource === "gps", {
+  message: "accuracyM solo aplica a ubicaciones obtenidas por GPS",
+  path: ["accuracyM"],
+});
+export type Farm = z.infer<typeof farmSchema>;
+export type FarmTerrain = z.infer<typeof terrainSchema>;
+
 export const rotationResultSchema = z.object({
   rotation: rotationSchema, score: z.number(), whySuggested: z.string().min(1), evidence: z.array(z.string().min(1)).min(1),
   benefits: z.array(z.string().min(1)).min(1), informationGaps: z.array(z.string().min(1)).min(1),
@@ -85,6 +129,8 @@ export type ClimateRequest = z.infer<typeof climateRequestSchema>;
 export const analysisRequestSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
   startYear: z.number().int().min(1981), endYear: z.number().int().min(1981), priorities: userPrioritiesSchema,
+  // Climate should use farm.centroid when a Farm is supplied; lat/lon remain for older clients.
+  farm: farmSchema.optional(),
 }).refine((value) => value.startYear <= value.endYear, "startYear debe ser menor o igual que endYear");
 export type AnalysisRequest = z.infer<typeof analysisRequestSchema>;
 
