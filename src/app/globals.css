@@ -105,3 +105,10 @@ body { min-height: 100vh; background: var(--color-meadow); color: var(--color-bo
   box-shadow: 0 0 0 4px rgb(255 184 41 / 25%);
   transform: rotate(-45deg);
 }
+
+/* Tutorial del mapa: el trazo se dibuja solo, en bucle, para enseñar el gesto del lazo. */
+.lasso-tutorial-stroke { stroke-dasharray: 1; stroke-dashoffset: 1; animation: lasso-draw 2.6s ease-in-out infinite; }
+@keyframes lasso-draw { 0% { stroke-dashoffset: 1; } 85%, 100% { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .lasso-tutorial-stroke { animation: none; stroke-dashoffset: 0; } .lasso-tutorial-finger { display: none; } }
+.leaflet-control-attribution { background: rgb(13 60 22 / 70%) !important; color: var(--color-silver-mist) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--color-cream) !important; }

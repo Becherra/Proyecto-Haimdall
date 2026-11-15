@@ -27,7 +27,9 @@ export type TerrainEditorEvent =
   | { type: "move-vertex"; index: number; lat: number; lon: number }
   | { type: "undo" }
   | { type: "clear" }
-  | { type: "finish" };
+  | { type: "finish" }
+  | { type: "set-polygon"; points: readonly (readonly [lat: number, lon: number])[] }
+  | { type: "reset"; initial: TerrainEditorState };
 export type TerrainEditorStatus = {
   canConfirm: boolean;
   areaHa: number | null;
@@ -158,6 +160,14 @@ export function terrainEditorReducer(state: TerrainEditorState, event: TerrainEd
       const centroid = polygonCentroid(result.ring);
       return { ...state, location: updateLocation(state, centroid.lat, centroid.lon), polygonFinished: true, error: null };
     }
+    case "set-polygon": {
+      // Un lazo dibujado a mano reemplaza cualquier terreno anterior y se valida igual que «finish».
+      const vertices = event.points.map(([lat, lon]) => convertCoordinateOrder([lat, lon], "leaflet"));
+      const drawn: TerrainEditorState = { ...state, mode: "polygon", locationSource: "map", accuracyM: undefined, pinAdjusted: true, vertices, polygonFinished: false, error: null };
+      return terrainEditorReducer(drawn, { type: "finish" });
+    }
+    case "reset":
+      return event.initial;
     default:
       return state;
   }

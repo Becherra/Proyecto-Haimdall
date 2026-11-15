@@ -15,7 +15,6 @@ const ParticleLoading = () => <div className="particle-loading pointer-events-no
 const ParticleWorld = dynamic(() => import("../components/ParticleWorld"), { ssr: false, loading: ParticleLoading });
 
 const subscribePreview = () => () => {};
-const getDebugMode = () => new URLSearchParams(window.location.search).get("debug") === "1";
 export default function Home() {
   const [flow, dispatch] = useReducer(locationFlowReducer, initialLocationFlow);
   const [confirmedFarm, setConfirmedFarm] = useState<Farm | null>(null);
@@ -26,7 +25,6 @@ export default function Home() {
   const introFrame = useRef(0);
   const globeAnchor = useRef<HTMLDivElement>(null);
   const particlesPreview = useSyncExternalStore(subscribePreview, () => new URLSearchParams(window.location.search).get("particles") === "1", () => false);
-  const debugMode = useSyncExternalStore(subscribePreview, getDebugMode, () => false);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [webglAvailable] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -120,7 +118,7 @@ export default function Home() {
     </section>}
     {showMap && <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
       <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cream">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
-      {location && <MapScene key={`${location.lat}:${location.lon}:${gpsAccuracyMeters ?? "search"}`} location={location} gpsAccuracyMeters={gpsAccuracyMeters} onBack={onBackToGlobe} debugMode={debugMode} onFarmConfirmed={(farm) => { setConfirmedFarm(farm); dispatch({ type: "confirmar" }); }} />}
+      {location && <MapScene key={`${location.lat}:${location.lon}:${gpsAccuracyMeters ?? "search"}`} location={location} gpsAccuracyMeters={gpsAccuracyMeters} onBack={onBackToGlobe} onFarmConfirmed={(farm) => { setConfirmedFarm(farm); dispatch({ type: "confirmar" }); }} />}
     </section>}
     {showAnalysis && confirmedFarm && <AnalysisFlow farm={confirmedFarm} onChangeFarm={onBackToGlobe} />}
   </main>;
