@@ -38,6 +38,9 @@ function ZoomToLocation({ location, gpsAccuracyMeters }: Pick<MapSceneProps, "lo
   return null;
 }
 
+/** Botones que mueven el mapa con el ratón: derecho, central, o izquierdo con Ctrl/⌘ (trackpads de Mac). */
+const isPanButton = (event: MouseEvent | PointerEvent) => event.button === 2 || event.button === 1 || (event.button === 0 && (event.ctrlKey || event.metaKey));
+
 type LassoDrawerProps = { onStart: () => void; onComplete: (points: [number, number][] | null) => void };
 
 /**
@@ -55,7 +58,7 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
     const pointers = new Set<number>();
     let stroke: PixelPoint[] = [];
     let drawingId: number | null = null;
-    let panning: { id: number; x: number; y: number } | null = null;
+    let panFrom: { x: number; y: number } | null = null;
     map.dragging.disable();
     container.style.touchAction = "none";
 
@@ -66,19 +69,13 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
       pointers.add(event.pointerId);
       if (pointers.size > 1) { cancel(); return; }
       const target = event.target as HTMLElement;
-      if (event.pointerType === "mouse" && event.button === 2) { panning = { id: event.pointerId, x: event.clientX, y: event.clientY }; return; }
+      if (event.pointerType === "mouse" && isPanButton(event)) return; // lo maneja onMouseDown
       if (event.button !== 0 || target.closest(".leaflet-marker-icon, .leaflet-control")) return;
       drawingId = event.pointerId;
       stroke = [toPixel(event)];
       callbacks.current.onStart();
     };
     const onMove = (event: PointerEvent) => {
-      // Computador: clic derecho sostenido arrastra el mapa.
-      if (panning && event.pointerId === panning.id) {
-        map.panBy([panning.x - event.clientX, panning.y - event.clientY], { animate: false });
-        panning = { id: panning.id, x: event.clientX, y: event.clientY };
-        return;
-      }
       if (event.pointerId !== drawingId) return;
       const point = toPixel(event);
       const last = stroke[stroke.length - 1] as PixelPoint;
@@ -88,7 +85,6 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
     };
     const onUp = (event: PointerEvent) => {
       pointers.delete(event.pointerId);
-      if (panning && event.pointerId === panning.id) { panning = null; return; }
       if (event.pointerId !== drawingId) return;
       const polygon = buildLassoPolygon(stroke);
       cancel();
@@ -96,6 +92,24 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
     };
 
     const onContextMenu = (event: Event) => event.preventDefault();
+    // Computador: clic derecho (o central, o Ctrl/⌘ + clic) sostenido y mover el ratón arrastra el mapa.
+    // Los eventos de ratón se escuchan en window para no perder el arrastre al salir del mapa.
+    const onPanMove = (event: MouseEvent) => {
+      if (!panFrom) return;
+      map.panBy([panFrom.x - event.clientX, panFrom.y - event.clientY], { animate: false });
+      panFrom = { x: event.clientX, y: event.clientY };
+    };
+    const endPan = () => { panFrom = null; container.style.cursor = ""; };
+    const onMouseDown = (event: MouseEvent) => {
+      if (!isPanButton(event) || (event.target as HTMLElement).closest(".leaflet-control")) return;
+      event.preventDefault();
+      panFrom = { x: event.clientX, y: event.clientY };
+      container.style.cursor = "grabbing";
+    };
+    container.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onPanMove);
+    window.addEventListener("mouseup", endPan);
+    window.addEventListener("blur", endPan);
     container.addEventListener("contextmenu", onContextMenu);
     container.addEventListener("pointerdown", onDown);
     container.addEventListener("pointermove", onMove);
@@ -103,6 +117,10 @@ function LassoDrawer({ onStart, onComplete }: LassoDrawerProps) {
     container.addEventListener("pointercancel", onUp);
     return () => {
       container.removeEventListener("contextmenu", onContextMenu);
+      container.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onPanMove);
+      window.removeEventListener("mouseup", endPan);
+      window.removeEventListener("blur", endPan);
       container.removeEventListener("pointerdown", onDown);
       container.removeEventListener("pointermove", onMove);
       container.removeEventListener("pointerup", onUp);
