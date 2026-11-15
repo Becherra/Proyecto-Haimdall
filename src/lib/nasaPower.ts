@@ -2,7 +2,8 @@ import { z } from "zod";
 import armeniaSample from "../../data/samples/power-armenia.json";
 import manizalesSample from "../../data/samples/power-manizales.json";
 import pereiraSample from "../../data/samples/power-pereira.json";
-import { CURRENT_SEASON_DAYS } from "./config";
+import { CLIMATE_CACHE, CURRENT_SEASON_DAYS, NASA_POWER_GRID } from "./config";
+import { createPromiseCache } from "./climateCache";
 import { CLIMATE_PARAMETERS, climateResultSchema, type ClimateParameter, type ClimateRecord, type ClimateRequest, type ClimateResult } from "../types";
 
 const BASE_URL = "https://power.larc.nasa.gov/api/temporal/daily/point";
@@ -32,8 +33,13 @@ const requestSchema = z.object({
 
 /** La solicitud climática es inválida (años fuera de rango, etc.): lo corrige quien llama, no es una falla de NASA POWER. */
 export class InvalidClimateRequestError extends Error {}
-class RetryableClimateError extends Error {}
+/** NASA POWER no puede atender ahora (red, tiempo agotado, error 5xx o límite de uso): hay que usar el respaldo precargado si existe. */
+class ClimateUnavailableError extends Error {}
+/** Falla pasajera que vale la pena reintentar de inmediato. */
+class RetryableClimateError extends ClimateUnavailableError {}
 class ClimateServerError extends RetryableClimateError {}
+/** HTTP 429: reintentar enseguida no sirve, pero la muestra guardada sí puede tapar el hueco. */
+class ClimateRateLimitError extends ClimateUnavailableError {}
 
 function buildUrl(input: { lat: number; lon: number; start: string; end: string }): string {
   const params = new URLSearchParams({ parameters: CLIMATE_PARAMETERS.join(","), community: "AG", latitude: String(input.lat), longitude: String(input.lon), start: input.start, end: input.end, format: "JSON" });
@@ -76,6 +82,7 @@ async function fetchAttempt(url: string): Promise<ClimateResult> {
   } catch (error) {
     throw new RetryableClimateError(error instanceof Error && error.name === "AbortError" ? "NASA POWER agotó el tiempo de espera de 15 segundos" : "No se pudo conectar con NASA POWER");
   } finally { clearTimeout(timeout); }
+  if (response.status === 429) throw new ClimateRateLimitError("NASA POWER limitó las consultas (HTTP 429): espera un momento e inténtalo de nuevo");
   if (response.status >= 500) throw new ClimateServerError(`NASA POWER respondió con HTTP ${response.status}`);
   if (!response.ok) throw new Error(`NASA POWER respondió con HTTP ${response.status}`);
   let payload: unknown;
@@ -99,24 +106,45 @@ function sampleFor(input: ClimateRequest): ClimateResult | null {
   return sample ? parseResponse(sample.payload, "sample", input) : null;
 }
 
-/** Obtiene clima diario con timeout, reintentos y respaldo precargado por zona. */
+/**
+ * Centro de la celda de NASA POWER que contiene el punto. NASA devuelve la misma serie para todo punto de la celda, así que se consulta
+ * y se guarda en caché por celda: dos fincas vecinas (o dos lecturas de GPS a un metro) comparten una sola petición.
+ */
+export function snapToPowerCell(lat: number, lon: number): { lat: number; lon: number } {
+  const { latStepDegrees, lonStepDegrees } = NASA_POWER_GRID;
+  const lonCells = Math.round(360 / lonStepDegrees);
+  const lonIndex = Math.round((lon + 180) / lonStepDegrees) % lonCells;
+  return { lat: Math.round(lat / latStepDegrees) * latStepDegrees, lon: lonIndex * lonStepDegrees - 180 };
+}
+
+/** Una consulta guardada: la muestra de respaldo conserva su rótulo (no es "caché" de NASA) y vence pronto para volver a intentar con NASA. */
+const asCached = (result: ClimateResult): ClimateResult => ({ ...result, source: result.source === "sample" ? "sample" : "cache" });
+
+// Esta caché vive solo en el proceso; en serverless no persiste entre instancias.
+const cache = createPromiseCache<ClimateResult>({ maxEntries: CLIMATE_CACHE.maxEntries });
+
+function cached(url: string, ttlMs: number, load: () => Promise<ClimateResult>): Promise<ClimateResult> {
+  const hit = cache.get(url);
+  if (hit) return hit.then(asCached);
+  const request = load().catch((error: unknown) => { cache.delete(url); throw error; });
+  cache.set(url, request, ttlMs);
+  request.then((result) => { if (result.source === "sample") cache.expireIn(url, request, CLIMATE_CACHE.fallbackTtlMs); }, () => undefined);
+  return request;
+}
+
+/** Obtiene clima diario con timeout, reintentos y respaldo precargado por zona (también cuando NASA limita las consultas). */
 export function fetchDailyClimate(input: ClimateRequest): Promise<ClimateResult> {
   const parsed = requestSchema.safeParse(input);
   if (!parsed.success) throw new InvalidClimateRequestError(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
   const normalizedInput = parsed.data;
-  const url = buildUrl({ lat: normalizedInput.lat, lon: normalizedInput.lon, start: `${normalizedInput.startYear}0101`, end: `${normalizedInput.endYear}1231` });
-  const cached = cache.get(url);
-  if (cached) return cached.then((result) => ({ ...result, source: "cache" }));
-  const request = requestLive(url).catch((error: unknown) => {
-    if (error instanceof RetryableClimateError || error instanceof ClimateServerError) {
+  const url = buildUrl({ ...snapToPowerCell(normalizedInput.lat, normalizedInput.lon), start: `${normalizedInput.startYear}0101`, end: `${normalizedInput.endYear}1231` });
+  return cached(url, CLIMATE_CACHE.historicalTtlMs, () => requestLive(url).catch((error: unknown) => {
+    if (error instanceof ClimateUnavailableError) {
       const sample = sampleFor(normalizedInput);
       if (sample) return sample;
     }
     throw error;
-  }).catch((error: unknown) => { cache.delete(url); throw error; });
-  // Esta caché vive solo en el proceso; en serverless no persiste entre instancias.
-  cache.set(url, request);
-  return request;
+  }));
 }
 
 const MAX_RECENT_DAYS = 90;
@@ -136,14 +164,8 @@ export function fetchRecentClimate(input: { lat: number; lon: number; days?: num
   if (!parsed.success) throw new InvalidClimateRequestError(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
   const { lat, lon, days } = parsed.data;
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const url = buildUrl({ lat, lon, start: compactDate(today - (days - 1) * 86_400_000), end: compactDate(today) });
-  const cached = cache.get(url);
-  if (cached) return cached.then((result) => ({ ...result, source: "cache" }));
-  const request = requestLive(url).then((result) => result).catch((error: unknown) => { cache.delete(url); throw error; });
-  cache.set(url, request);
-  return request;
+  const url = buildUrl({ ...snapToPowerCell(lat, lon), start: compactDate(today - (days - 1) * 86_400_000), end: compactDate(today) });
+  return cached(url, CLIMATE_CACHE.recentTtlMs, () => requestLive(url));
 }
-
-const cache = new Map<string, Promise<ClimateResult>>();
 
 export function clearClimateCache(): void { cache.clear(); }

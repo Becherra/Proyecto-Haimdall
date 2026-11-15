@@ -82,6 +82,21 @@ export const WORST_YEAR_DROUGHT_WEIGHT = 0.5;
 /** Racha seca (días seguidos) desde la cual se avisa a los cultivos de baja tolerancia a sequía. Heurística de diseño; validar con un agrónomo local. */
 export const DRY_SPELL_ALERT_DAYS = 20;
 
+/**
+ * Malla de NASA POWER (MERRA-2) de la que salen temperatura, lluvia, evaporación y humedad: celdas de 0,5° de latitud por 0,625° de longitud,
+ * con centros en múltiplos de esos pasos. Todos los puntos de una celda reciben la misma serie (verificado contra la API), así que la caché
+ * se indexa por celda y no por coordenada exacta. ALLSKY_SFC_SW_DWN usa una malla de 1° y por eso puede variar dentro de la celda; no interviene en ningún indicador.
+ */
+export const NASA_POWER_GRID = { latStepDegrees: 0.5, lonStepDegrees: 0.625 } as const;
+/**
+ * Caché en memoria de las respuestas de NASA POWER. Heurísticas de operación, no datos:
+ * - `maxEntries`: una serie de 15 años pesa del orden de 1–2 MB; con 50 la memoria queda acotada aunque lleguen muchas celdas distintas.
+ * - `historicalTtlMs`: la serie histórica casi no cambia, basta renovarla a diario.
+ * - `recentTtlMs`: los últimos días se corrigen y se completan, se renuevan a las pocas horas.
+ * - `fallbackTtlMs`: una muestra guardada solo tapa la caída de NASA; se reintenta con NASA pasado este tiempo.
+ */
+export const CLIMATE_CACHE = { maxEntries: 50, historicalTtlMs: 24 * 60 * 60 * 1000, recentTtlMs: 6 * 60 * 60 * 1000, fallbackTtlMs: 60 * 1000 } as const;
+
 /** Días de NASA POWER reciente que se comparan con lo normal para describir la temporada actual. */
 export const CURRENT_SEASON_DAYS = 90;
 /** Años mínimos de la serie histórica con dato suficiente en la misma época para que "lo normal" sirva de comparación. */
