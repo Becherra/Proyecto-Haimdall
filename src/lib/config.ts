@@ -98,3 +98,7 @@ export const CURRENT_SEASON_TEMPERATURE_NOTICE_C = 0.5;
 export const CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS = 10;
 /** Porcentaje de la lluvia normal con el que se llena la barra de comparación; si llovió más, la escala crece para que quepa. */
 export const CURRENT_SEASON_BAR_MAX_PERCENT = 150;
+
+/** Colores de la app instalada (PWA). Coinciden con `--color-meadow` de `globals.css`. */
+export const PWA_THEME_COLOR = "#0d3c16";
+export const PWA_BACKGROUND_COLOR = "#0d3c16";
