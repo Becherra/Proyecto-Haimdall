@@ -88,7 +88,7 @@ Todo el clima viene de **NASA POWER**, API diaria por punto (`https://power.larc
 | `T2M_MAX` | Días de estrés por calor, evaporación potencial. |
 | `PRECTOTCORR` | Balance hídrico, meses secos y lluviosos, umbral de lluvia extrema. |
 | `EVLAND` | Resumen mensual de evaporación. El balance hídrico usa la evaporación potencial estimada con Hargreaves–Samani. |
-| `GWETROOT` | Humedad media de la zona de raíces. Se muestra como evidencia; no cambia el puntaje. |
+| `GWETROOT` | Humedad de la zona de raíces: media del sitio y, por cada cultivo, el rango en sus meses de siembra, con aviso de los meses de siembra en que el suelo queda por debajo de lo normal (menos del 97 % de la media anual). Se muestra como evidencia y riesgo; no cambia el puntaje: varía poco (0,75–0,85 en el Eje Cafetero), sigue a la lluvia y es un proxy de ~50 km. |
 | `ALLSKY_SFC_SW_DWN` | Se descarga, pero todavía no interviene en indicadores ni puntajes. |
 | Altitud de la celda | Corregir la temperatura de la celda a la altitud del lote. |
 
