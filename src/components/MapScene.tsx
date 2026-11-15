@@ -241,9 +241,9 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
       {shownMessage && <p className="pointer-events-none absolute inset-x-4 top-16 z-[600] rounded-2xl lg:inset-x-auto lg:left-1/2 lg:w-max lg:max-w-xl lg:-translate-x-1/2 bg-meadow/90 px-4 py-3 text-center text-base font-semibold text-cream" role="status">{shownMessage}</p>}
     </div>
     <div className="flex flex-1 items-center gap-3 px-4 pb-[env(safe-area-inset-bottom)] lg:mx-auto lg:w-full lg:max-w-2xl lg:flex-none lg:py-4">
-      <button type="button" onClick={onBack} aria-label="Volver al inicio" className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><ArrowLeft /></button>
-      <button type="button" onClick={reset} aria-label="Borrar y dibujar de nuevo" className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><Restart /></button>
-      <button type="button" onClick={confirm} disabled={!status.canConfirm} aria-label="Siguiente" className="flex h-20 min-w-0 flex-1 lg:h-16items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 disabled:opacity-40"><ArrowRight /></button>
+      <button type="button" onClick={onBack} aria-label="Volver al inicio" className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><ArrowLeft /></button>
+      <button type="button" onClick={reset} aria-label="Borrar y dibujar de nuevo" className="flex h-20 w-20 shrink-0 lg:h-16 lg:w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><Restart /></button>
+      <button type="button" onClick={confirm} disabled={!status.canConfirm} aria-label="Siguiente" className="flex h-20 min-w-0 flex-1 lg:h-16 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 disabled:opacity-40"><ArrowRight /></button>
     </div>
   </section>;
 }
