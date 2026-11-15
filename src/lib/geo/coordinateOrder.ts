@@ -1,6 +1,6 @@
 import type { GeoJsonPosition } from "./geometry";
 
-export type LeafletPosition = readonly [latitude: number, longitude: number];
+export type LeafletPosition = [latitude: number, longitude: number];
 
 /** Converts the tuple order at the map/GeoJSON boundary: Leaflet [lat, lon] ↔ GeoJSON [lon, lat]. */
 export function convertCoordinateOrder(position: LeafletPosition, source: "leaflet"): GeoJsonPosition;

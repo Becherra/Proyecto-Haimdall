@@ -26,7 +26,16 @@ describe("terrainEditorReducer", () => {
     expect(getTerrainEditorStatus(state)).toMatchObject({ canConfirm: true, areaHa: 3 });
     state = terrainEditorReducer(state, { type: "set-exact-area", value: 23_500, unit: "m2" });
     expect(state).toMatchObject({ exactAreaHa: 2.35, areaRangeHa: null, areaUnit: "m2" });
+    state = terrainEditorReducer(state, { type: "set-area-unit", unit: "ha" });
+    expect(state.exactAreaHa).toBe(2.35);
     expect(getTerrainEditorStatus(state)).toMatchObject({ canConfirm: true, areaHa: 2.35 });
+  });
+
+  it("bloquea el tamaño aproximado si el cuadrado sale de los límites del mapa", () => {
+    const edgeLocation: LocationResult = { lat: 0, lon: 179.9999, label: "Borde del mapa" };
+    let state = terrainEditorReducer(createTerrainEditor(edgeLocation), { type: "set-mode", mode: "approx_size" });
+    state = terrainEditorReducer(state, { type: "set-area-range", range: [1, 5] });
+    expect(getTerrainEditorStatus(state)).toMatchObject({ canConfirm: false });
   });
 
   it("añade y arrastra vértices, deshace el último y borra el dibujo", () => {
