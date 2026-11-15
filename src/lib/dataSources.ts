@@ -11,7 +11,7 @@ const POWER_PARAMETERS: Record<ClimateParameter, ParameterUse> = {
   T2M: { label: "Temperatura media a 2 m", use: () => "Temperatura media del sitio, aptitud térmica de cada cultivo y evaporación potencial." },
   T2M_MIN: { label: "Temperatura mínima a 2 m", use: () => "Días con riesgo de helada y evaporación potencial." },
   T2M_MAX: { label: "Temperatura máxima a 2 m", use: () => "Días de estrés por calor y evaporación potencial." },
-  PRECTOTCORR: { label: "Precipitación corregida", use: () => "Balance hídrico, meses secos y lluviosos, y umbral de lluvia extrema." },
+  PRECTOTCORR: { label: "Precipitación corregida", use: () => "Balance hídrico, meses secos y lluviosos, meses de siembra del sitio, umbral de lluvia extrema y erosividad de la lluvia." },
   EVLAND: {
     label: "Evaporación terrestre",
     use: ({ waterBalanceMethod }) => (waterBalanceMethod === "potential"
@@ -19,7 +19,7 @@ const POWER_PARAMETERS: Record<ClimateParameter, ParameterUse> = {
       : "Balance hídrico (lluvia − evaporación)."),
   },
   GWETROOT: { label: "Humedad de la zona de raíces", use: () => "Humedad media del suelo; se muestra como evidencia y no cambia el puntaje." },
-  ALLSKY_SFC_SW_DWN: { label: "Radiación solar en superficie", use: () => "Se descarga, pero todavía no interviene en indicadores ni puntajes." },
+  ALLSKY_SFC_SW_DWN: { label: "Radiación solar en superficie", use: () => "Luz que llega al sitio y nubosidad (índice de claridad); se muestra como evidencia y no cambia el puntaje." },
 };
 
 function powerSources(indicators: Indicators): DataSource[] {

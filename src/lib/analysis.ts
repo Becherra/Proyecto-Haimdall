@@ -103,7 +103,7 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const monthlyClimate = aggregateMonthly(adjustRecordsForElevation(records, terrainInput?.cellElevationMeters, terrainInput?.siteElevationMeters), location.lat);
   const seasonality = isInSowingCalendarRegion(location.lat, location.lon) ? computeSeasonality(monthlyClimate) : undefined;
   const yearsAnalyzed = countYears(records);
-  const score = (rotations: readonly Rotation[]) => scoreRotations({ rotations, crops, indicators, priorities, seasonality, yearsAnalyzed });
+  const score = (rotations: readonly Rotation[]) => scoreRotations({ rotations, crops, indicators, priorities, seasonality, yearsAnalyzed, monthlyClimate });
   const rotations = current ? alternativesAround(crops, current, score) : startingOptions(crops, score);
   const results = rotations.map((result) => ({ ...result, informationGaps: [...result.informationGaps, ...extraGaps] }));
   // La temporada actual se compara con los datos originales de NASA, no con la serie modificada por un escenario.

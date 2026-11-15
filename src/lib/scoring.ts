@@ -1,4 +1,4 @@
-import type { Crop, Indicators, Rotation, RotationCalendar, RotationResult, UserPriorities } from "../types";
+import type { Crop, Indicators, MonthlyClimate, Rotation, RotationCalendar, RotationResult, UserPriorities } from "../types";
 import { buildRotationCalendar, calendarEvidence, calendarGap, calendarRisks } from "./calendar";
 import {
   SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, DRY_DAY_RAIN_MM, DRY_SPELL_ALERT_DAYS, MIN_YEARS_FOR_WORST_YEAR, WORST_YEAR_DROUGHT_WEIGHT, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
@@ -9,13 +9,16 @@ import { commonName, familyBreakShare } from "./rotations";
 import { assessSowing, formatMonths, type MonthSeason, type SowingAssessment } from "./seasonality";
 import { buildPlain, type PenaltyKind } from "./plainText";
 import { slopeErosionExposure } from "./terrain";
+import { clearnessLabel, fournierClass } from "./indicators";
+import { sowingWindows, type SowingWindows } from "./sowingWindows";
 
 type CriterionKey = "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk";
 type Criterion = { key: CriterionKey; label: string; weight: number; value: number };
 type Penalty = { label: string; value: number; kind: PenaltyKind };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
+type WindowFinding = { crop: Crop; windows: SowingWindows };
 /** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
-type Evaluation = { rotation: Rotation; crops: Crop[]; permanent: boolean; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
+type Evaluation = { rotation: Rotation; crops: Crop[]; permanent: boolean; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined; windows: WindowFinding[] };
 type WaterAvailability = NonNullable<UserPriorities["waterAvailability"]>;
 
 /**
@@ -23,7 +26,9 @@ type WaterAvailability = NonNullable<UserPriorities["waterAvailability"]>;
  * `seasonality` (opcional) permite cruzar los meses de siembra con las épocas secas del sitio.
  * `yearsAnalyzed` (opcional, por defecto 1) son los años que cubren los conteos de días de `indicators`, para pasarlos a días por año.
  */
-export type ScoringInput = { rotations: readonly Rotation[]; crops: readonly Crop[]; indicators: Indicators; priorities: UserPriorities; seasonality?: readonly MonthSeason[]; yearsAnalyzed?: number };
+export type ScoringInput = { rotations: readonly Rotation[]; crops: readonly Crop[]; indicators: Indicators; priorities: UserPriorities; seasonality?: readonly MonthSeason[]; yearsAnalyzed?: number;
+  /** Serie mensual ya corregida por altitud: con ella se calculan los mejores meses de siembra del sitio. */
+  monthlyClimate?: readonly MonthlyClimate[] };
 type Context = Omit<ScoringInput, "rotations" | "yearsAnalyzed"> & { years: number };
 
 const LABELS: Record<CriterionKey, string> = {
@@ -122,7 +127,7 @@ function climatePenalties(crops: readonly Crop[], indicators: Indicators, years:
   const temperature = indicators.meanTemperatureC ?? null;
   const frostPerYear = perYear(indicators.frostRiskDays, years);
   const waterUseShare = average(crops, (crop) => crop.waterUse) / MAX_SCORE;
-  const slopeRisk = slopeErosionExposure(crops, indicators.slopePercent, indicators.extremeRainThresholdMm) * MAX_SLOPE_EROSION_PENALTY;
+  const slopeRisk = slopeErosionExposure(crops, indicators.slopePercent, indicators.extremeRainThresholdMm, indicators.rainErosivityIndex ?? null) * MAX_SLOPE_EROSION_PENALTY;
   const penalties: Penalty[] = [
     { kind: "temperature", label: `temperatura fuera del rango de los cultivos (media del sitio ${temperature?.toFixed(1)} °C)`, value: temperature === null ? 0 : temperatureMismatch(crops, temperature) * MAX_TEMPERATURE_PENALTY },
     { kind: "frost", label: `heladas (≈${frostPerYear.toFixed(0)} días al año bajo ${FROST_THRESHOLD_C} °C)`, value: frostExposure(crops, frostPerYear) * MAX_FROST_PENALTY },
@@ -138,7 +143,7 @@ function pestCyclePenalties(familyBreak: number | null): Penalty[] {
   return [{ kind: "pests", label: "repetir la misma familia botánica en relevos seguidos (plagas y enfermedades)", value: (1 - familyBreak) * MAX_PEST_CYCLE_PENALTY }];
 }
 
-function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, priorities, seasonality, years }: Context): Evaluation {
+function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, priorities, seasonality, years, monthlyClimate }: Context): Evaluation {
   const crops = resolveCrops(rotation, catalog);
   const dryness = drynessFactor(indicators);
   const weights = normalizedWeights(priorities);
@@ -149,13 +154,14 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const sowing = seasonality ? crops.filter((crop) => crop.perennial !== true).map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
   const calendar = seasonality && !permanent ? buildRotationCalendar(crops, seasonality) : null;
   const familyBreak = permanent ? null : familyBreakShare(crops);
+  const windows = monthlyClimate ? crops.flatMap((crop) => { const found = sowingWindows(crop, monthlyClimate); return found ? [{ crop, windows: found }] : []; }) : [];
   const { waterAvailability } = priorities;
   const waterFactor = WATER_AVAILABILITY_DROUGHT_FACTOR[waterAvailability ?? "medium"];
   const sowingRisk = sowingPenalties(sowing).map((penalty) => ({ ...penalty, value: penalty.value * waterFactor }));
   const penalties = [...riskPenalties(crops, indicators, dryness, years, waterFactor), ...climatePenalties(crops, indicators, years, waterAvailability), ...sowingRisk, ...pestCyclePenalties(familyBreak)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, permanent, criteria, penalties, sowing, calendar, years, familyBreak, waterAvailability, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, permanent, criteria, penalties, sowing, calendar, years, familyBreak, waterAvailability, windows, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -242,6 +248,23 @@ function droughtHistoryEvidence({ longestDrySpellDays, meanAnnualDrySpellDays, w
   return [...spell, ...worst];
 }
 
+/** Los mejores meses para sembrar cada cultivo anual con el clima del sitio, junto a los del catálogo para poder compararlos. */
+function windowsEvidence(windows: readonly WindowFinding[]): string[] {
+  return windows.map(({ crop, windows: found }) => {
+    const best = Math.min(...found.exposureByMonth.flatMap((value) => value ?? []));
+    const catalog = crop.sowingMonths.length > 0 ? `; el catálogo propone ${formatMonths(crop.sowingMonths)}` : "";
+    return `Mejores meses para sembrar ${crop.name} según la lluvia, la evaporación y la temperatura de tu sitio: ${formatMonths(found.months)} (en promedio ${best.toFixed(1)} de ${found.cycleMonths} meses del ciclo con déficit de agua)${catalog}.`;
+  });
+}
+
+/** Erosividad de la lluvia y luz solar del sitio, con su clase en palabras; la luz es solo evidencia. */
+function siteClimateEvidence({ rainErosivityIndex, meanSolarRadiationMJ, clearnessIndex }: Indicators): string[] {
+  const erosivity = rainErosivityIndex === undefined ? [] : [`Erosividad de la lluvia (índice de Fournier modificado): ${rainErosivityIndex.toFixed(0)}, clase ${fournierClass(rainErosivityIndex)} (NASA POWER, PRECTOTCORR mensual; es la lluvia de toda la celda, no la de tu lote).`];
+  const sun = meanSolarRadiationMJ === undefined || meanSolarRadiationMJ === null ? []
+    : [`Radiación solar media: ${meanSolarRadiationMJ.toFixed(1)} MJ/m²/día${clearnessIndex === undefined || clearnessIndex === null ? "" : `; llega el ${(clearnessIndex * 100).toFixed(0)} % de la del borde de la atmósfera (índice de claridad ${clearnessIndex.toFixed(2)}: ${clearnessLabel(clearnessIndex)})`} (NASA POWER, ALLSKY_SFC_SW_DWN; no cambia el puntaje).`];
+  return [...erosivity, ...sun];
+}
+
 function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[] {
   const { criteria, crops, sowing, years, waterAvailability } = evaluation;
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
@@ -250,12 +273,14 @@ function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[]
     `Días con T2M_MAX > ${HEAT_STRESS_THRESHOLD_C} °C: ${daysPerYearText(heatStressDays, years)}; días con T2M_MIN < ${FROST_THRESHOLD_C} °C: ${daysPerYearText(frostRiskDays, years)} (NASA POWER${isElevationAdjusted(indicators) ? ", temperaturas ajustadas a la altitud del lote" : ""}).`,
     ...droughtHistoryEvidence(indicators),
     ...(rain === null ? [] : [`Lluvia diaria extrema (percentil 95): ${oneDecimal(rain)} mm/día (NASA POWER, PRECTOTCORR).`]),
+    ...siteClimateEvidence(indicators),
     ...(wetness === null ? [] : [`Humedad media de la zona radicular: ${wetness.toFixed(2)} (NASA POWER, GWETROOT; proxy, no medición del lote).`]),
     ...criteria.filter((criterion) => criterion.weight > 0).map((criterion) => `${criterion.label}: ${oneDecimal(criterion.value)}/5 con peso ${(criterion.weight * 100).toFixed(0)} %.`),
     ...temperatureEvidence(crops, indicators),
     ...terrainEvidence(indicators),
     ...(waterAvailability ? [`Disponibilidad de agua declarada por el agricultor: ${WATER_AVAILABILITY_LABELS[waterAvailability]}.`] : []),
     ...sowingEvidence(sowing, indicators),
+    ...windowsEvidence(evaluation.windows),
     ...(evaluation.calendar ? calendarEvidence(evaluation.calendar) : []),
     ...permanentEvidence(evaluation),
     ...familyEvidence(evaluation),
@@ -374,7 +399,7 @@ function seriesLengthGap(years: number): string[] {
   return years < MIN_YEARS_FOR_WORST_YEAR ? [`La serie climática cubre solo ${years} ${years === 1 ? "año" : "años"}: no alcanza para ver cómo cambia la lluvia de un año a otro ni identificar el año más seco.`] : [];
 }
 
-function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar, years, permanent }: Evaluation): string[] {
+function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar, years, permanent, windows }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
@@ -383,6 +408,7 @@ function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calenda
     ...temperatureGaps(crops, indicators),
     ...terrainGaps(indicators),
     ...sowingGaps(sowing),
+    ...(windows.length > 0 ? ["Los mejores meses de siembra se calcularon con la lluvia, la evaporación y la temperatura del sitio (NASA POWER): no consideran plagas, heladas locales, mercado ni el manejo real; un calendario agronómico local debe confirmarlos."] : []),
     ...(calendar ? [calendarGap()] : []),
     familyGap(familyBreak, permanent, crops.length),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),

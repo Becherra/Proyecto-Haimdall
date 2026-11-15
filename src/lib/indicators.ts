@@ -1,6 +1,6 @@
 import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, type MonthlyWaterDeficit, type MonthlyWetnessAnomaly } from "../types";
 import { dayOfYear, extraterrestrialRadiation, hargreavesDailyPet } from "./evapotranspiration";
-import { DRY_DAY_RAIN_MM, EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_MONTHS_FOR_WORST_YEAR, MIN_YEAR_COVERAGE, MIN_YEARS_FOR_ANOMALY_BASELINE, MIN_YEARS_FOR_WORST_YEAR } from "./config";
+import { CLEARNESS_LIMITS, DRY_DAY_RAIN_MM, EXTREME_RAIN_PERCENTILE, FOURNIER_CLASS_LIMITS, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_MONTHS_FOR_WORST_YEAR, MIN_YEAR_COVERAGE, MIN_YEARS_FOR_ANOMALY_BASELINE, MIN_YEARS_FOR_WORST_YEAR } from "./config";
 import { adjustRecordsForElevation } from "./terrain";
 
 export type TerrainIndicatorsInput = {
@@ -103,6 +103,48 @@ export function computeMonthlyWaterDeficit(monthly: readonly MonthlyClimate[]): 
     const demandMissing = entry.potentialEvaporationMm === undefined ? (missing.EVLAND ?? 0) : Math.max(missing.T2M ?? 0, missing.T2M_MIN ?? 0, missing.T2M_MAX ?? 0);
     return { year: entry.year, month: entry.month, waterDeficitMm: monthlyWaterBalance(entry), missing: (missing.PRECTOTCORR ?? 0) + demandMissing };
   });
+}
+
+/**
+ * Índice de Fournier modificado: suma de la lluvia media de cada mes calendario al cuadrado, entre la lluvia anual (mm). Es mayor cuanto más
+ * se concentra la lluvia en pocos meses, que es cuando más erosiona. Usa totales mensuales, que se ven menos afectados que la lluvia diaria por
+ * el promedio de toda la celda de NASA. Devuelve null si algún mes del calendario no tiene dato o si no llovió nada.
+ */
+export function fournierIndex(monthly: readonly MonthlyClimate[]): number | null {
+  const byMonth = new Map<number, number[]>();
+  for (const { month, precipitationMm } of monthly) {
+    if (precipitationMm !== null) byMonth.set(month, [...(byMonth.get(month) ?? []), precipitationMm]);
+  }
+  if (byMonth.size < 12) return null;
+  const means = [...byMonth.values()].map((values) => mean(values) as number);
+  const annual = means.reduce((total, value) => total + value, 0);
+  return annual <= 0 ? null : means.reduce((total, value) => total + value * value, 0) / annual;
+}
+
+/** Clase de erosividad de la lluvia según `FOURNIER_CLASS_LIMITS`. */
+export function fournierClass(index: number): "muy baja" | "baja" | "moderada" | "alta" | "muy alta" {
+  const classes = ["muy baja", "baja", "moderada", "alta", "muy alta"] as const;
+  return classes[FOURNIER_CLASS_LIMITS.filter((limit) => index >= limit).length]!;
+}
+
+/** El cielo en palabras según el índice de claridad (`CLEARNESS_LIMITS`). */
+export function clearnessLabel(clearness: number): "muy nublado" | "bastante nublado" | "parcialmente nublado" | "despejado" {
+  const labels = ["muy nublado", "bastante nublado", "parcialmente nublado", "despejado"] as const;
+  return labels[CLEARNESS_LIMITS.filter((limit) => clearness >= limit).length]!;
+}
+
+/**
+ * Radiación solar media (MJ/m²/día, solo días con dato) e índice de claridad: promedio diario de radiación recibida entre la que llegaría al borde de
+ * la atmósfera a esa latitud y fecha. Sin latitud no hay índice; sin datos de radiación no hay ninguno de los dos.
+ */
+function solarIndicators(records: readonly ClimateRecord[], latitude: number | undefined): { meanSolarRadiationMJ?: number; clearnessIndex?: number } {
+  const days = records.flatMap((record) => (record.ALLSKY_SFC_SW_DWN === null ? [] : [{ date: record.date, radiation: record.ALLSKY_SFC_SW_DWN }]));
+  if (days.length === 0) return {};
+  const ratios = latitude === undefined ? [] : days.flatMap(({ date, radiation }) => {
+    const top = extraterrestrialRadiation(latitude, dayOfYear(date));
+    return top > 0 ? [Math.min(radiation / top, 1)] : [];
+  });
+  return { meanSolarRadiationMJ: mean(days.map(({ radiation }) => radiation)) as number, ...(ratios.length > 0 ? { clearnessIndex: mean(ratios) as number } : {}) };
 }
 
 /** Años calendario distintos que cubre la serie (los parciales cuentan como uno). */
@@ -239,6 +281,7 @@ export function computeIndicators(rawRecords: readonly ClimateRecord[], latitude
   const monthly = aggregateMonthly(records, latitude);
   const annualSpells = annualDrySpells(records);
   const worstYear = worstYearWaterBalance(monthly);
+  const erosivity = fournierIndex(monthly);
   const monthlyBalances = computeMonthlyWaterDeficit(monthly).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
   const cellMeanC = mean(validValues(rawRecords, "T2M").value);
   const meanTemperatureC = mean(validValues(records, "T2M").value);
@@ -253,6 +296,8 @@ export function computeIndicators(rawRecords: readonly ClimateRecord[], latitude
     longestDrySpellDays: longestDrySpell(records),
     meanAnnualDrySpellDays: mean(annualSpells.map(({ days }) => days)),
     ...(worstYear ? { worstYear } : {}),
+    ...(erosivity === null ? {} : { rainErosivityIndex: erosivity }),
+    ...solarIndicators(records, latitude),
     ...(canAdjust ? { cellMeanTemperatureC: cellMeanC } : {}),
     ...(terrain?.cellElevationMeters === undefined ? {} : { cellElevationMeters: terrain.cellElevationMeters }),
     ...(terrain?.siteElevationMeters === undefined ? {} : { siteElevationMeters: terrain.siteElevationMeters }),

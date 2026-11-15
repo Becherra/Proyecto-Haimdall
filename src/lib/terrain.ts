@@ -1,7 +1,7 @@
 import { z } from "zod";
 import srtmSamplesData from "../../data/samples/srtm-eje-cafetero.json";
 import { terrainSampleSchema, type ClimateRecord, type Crop, type TerrainSample, type UserPriorities } from "../types";
-import { EROSIVE_RAIN_REFERENCE_MM, SLOPE_CAUTION_THRESHOLD_PERCENT, STEEP_SLOPE_REFERENCE_PERCENT, TEMPERATURE_LAPSE_RATE_C_PER_METER } from "./config";
+import { EROSIVE_RAIN_REFERENCE_MM, FOURNIER_FULL_EXPOSURE, SLOPE_CAUTION_THRESHOLD_PERCENT, STEEP_SLOPE_REFERENCE_PERCENT, TEMPERATURE_LAPSE_RATE_C_PER_METER } from "./config";
 
 const MAX_SCORE = 5;
 
@@ -71,13 +71,14 @@ export function adjustRecordsForElevation(records: readonly ClimateRecord[], cel
 
 /**
  * Exposición a erosión en ladera (0–1): combina qué tan empinado es el lote por encima de `SLOPE_CAUTION_THRESHOLD_PERCENT`,
- * la fuerza de los aguaceros (`extremeRainMm` frente a `EROSIVE_RAIN_REFERENCE_MM`) y la desprotección de los cultivos (`erosionReduction`).
+ * la fuerza de la lluvia (el índice de Fournier frente a `FOURNIER_FULL_EXPOSURE` o, sin él, `extremeRainMm` frente a `EROSIVE_RAIN_REFERENCE_MM`) y la desprotección de los cultivos (`erosionReduction`).
  */
-export function slopeErosionExposure(crops: readonly Crop[], slopePercent: number | undefined, extremeRainMm: number | null): number {
+export function slopeErosionExposure(crops: readonly Crop[], slopePercent: number | undefined, extremeRainMm: number | null, fournierIndex: number | null = null): number {
   if (slopePercent === undefined || slopePercent <= SLOPE_CAUTION_THRESHOLD_PERCENT || crops.length === 0) return 0;
   const slopeSpan = STEEP_SLOPE_REFERENCE_PERCENT - SLOPE_CAUTION_THRESHOLD_PERCENT;
   const slopeShare = Math.min((slopePercent - SLOPE_CAUTION_THRESHOLD_PERCENT) / slopeSpan, 1);
-  const rainShare = extremeRainMm === null ? 0.5 : Math.min(extremeRainMm / EROSIVE_RAIN_REFERENCE_MM, 1);
+  // La erosividad mensual de Fournier describe mejor la fuerza de la lluvia del sitio que un solo percentil de lluvia diaria; sin ella se usa ese percentil.
+  const rainShare = fournierIndex !== null ? Math.min(fournierIndex / FOURNIER_FULL_EXPOSURE, 1) : extremeRainMm === null ? 0.5 : Math.min(extremeRainMm / EROSIVE_RAIN_REFERENCE_MM, 1);
   const averageProtection = crops.reduce((sum, crop) => sum + crop.erosionReduction, 0) / crops.length;
   const coverGap = (MAX_SCORE - averageProtection) / MAX_SCORE;
   return slopeShare * rainShare * coverGap;

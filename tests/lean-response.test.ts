@@ -54,7 +54,7 @@ describe("listDataSources", () => {
 
   it("dice con franqueza qué datos se descargan pero no cambian el puntaje", () => {
     const sources = listDataSources(indicators);
-    expect(sources.find(({ name }) => name.includes("(ALLSKY_SFC_SW_DWN)"))?.use).toContain("todavía no");
+    expect(sources.find(({ name }) => name.includes("(ALLSKY_SFC_SW_DWN)"))?.use).toContain("no cambia el puntaje");
     expect(sources.find(({ name }) => name.includes("(GWETROOT)"))?.use).toContain("no cambia el puntaje");
   });
 

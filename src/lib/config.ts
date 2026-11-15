@@ -98,3 +98,14 @@ export const CURRENT_SEASON_TEMPERATURE_NOTICE_C = 0.5;
 export const CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS = 10;
 /** Porcentaje de la lluvia normal con el que se llena la barra de comparación; si llovió más, la escala crece para que quepa. */
 export const CURRENT_SEASON_BAR_MAX_PERCENT = 150;
+
+/** Cortes del índice de Fournier modificado entre las clases de erosividad de la lluvia muy baja, baja, moderada, alta y muy alta (Arnoldus, usados por FAO). */
+export const FOURNIER_CLASS_LIMITS = [60, 90, 120, 160] as const;
+/** Erosividad desde la cual la exposición a erosión por lluvia en ladera llega al máximo: el inicio de la clase "muy alta". Heurística de diseño. */
+export const FOURNIER_FULL_EXPOSURE = 160;
+/** Cortes del índice de claridad (radiación recibida / radiación en el borde de la atmósfera) entre muy nublado, bastante nublado, parcialmente nublado y despejado. Convención habitual, no un dato. */
+export const CLEARNESS_LIMITS = [0.35, 0.5, 0.6] as const;
+/** Meses de déficit de agua en el ciclo de más que el mejor mes de siembra para dejar de llamar "buen mes" a otro. Heurística de diseño; validar con un agrónomo local. */
+export const SOWING_WINDOW_TOLERANCE_MONTHS = 0.3;
+/** Ciclos completos con dato que debe tener cada mes de siembra para hablar de su exposición al déficit de agua; con menos años no dice nada. */
+export const MIN_YEARS_FOR_SOWING_WINDOWS = 5;
