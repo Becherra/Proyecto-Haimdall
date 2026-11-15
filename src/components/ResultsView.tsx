@@ -6,11 +6,12 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { prefersReducedMotion, useReveal } from "./motion";
 import { CropIcon, UiIcon } from "./icons";
+import { StarGlyphs } from "./StarGlyphs";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import EnsoContextCard from "./EnsoContextCard";
 import { useSpeaker } from "./useSpeaker";
-import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, CurrentSeasonTone, RotationSection, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, CurrentSeason, Farm, RotationResult } from "../types";
 
@@ -42,15 +43,12 @@ function PlayButton({ playing, onClick, size = "small" }: PlayProps) {
 }
 
 function Stars({ score, className = "h-7 w-7" }: { score: number; className?: string }) {
-  const full = scoreToStars(score);
   const stars = useRef<HTMLSpanElement>(null);
   useGSAP(() => {
     if (prefersReducedMotion()) return;
     gsap.from(".star-on", { scale: 0, rotation: -40, duration: 0.55, ease: "back.out(2.6)", stagger: 0.11, delay: 0.35, clearProps: "transform" });
   }, { scope: stars });
-  return <span ref={stars} className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
-    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "star-on" : "opacity-25"}><UiIcon name="star" className={className} /></span>)}
-  </span>;
+  return <span ref={stars} className="inline-flex"><StarGlyphs score={score} iconClassName={className} litClassName="star-on" /></span>;
 }
 
 function CropChain({ cropIds, link = "then", className = "h-14 w-14" }: { cropIds: readonly string[]; link?: "then" | "with"; className?: string }) {
@@ -182,7 +180,7 @@ function SeasonCard({ season }: { season: CurrentSeason }) {
 
 function ClimateList({ response }: { response: AnalysisResponse }) {
   const { playingKey, play } = useSpeaker();
-  const topics = useMemo(() => describeClimate(response.indicators), [response.indicators]);
+  const topics = useMemo(() => describeClimate(response.indicators, response.monthlyClimate), [response.indicators, response.monthlyClimate]);
   return <>{topics.map((topic) => <article key={topic.id} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
     <div className="flex items-center gap-3">
       <UiIcon name={CLIMATE_ICONS[topic.id]} className="h-12 w-12 shrink-0 text-olive-light" />

@@ -1,18 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, SCENARIO_PRESETS, activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, describeNasaSupport, describeSimpleSources, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, SCENARIO_PRESETS, activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, describeNasaSupport, describeSimpleSources, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, starFills, starsLabel, compareScores } from "../src/lib/ui/resultsCopy";
+import { waterShortMonths } from "../src/lib/ui/monthlyClimateSummary";
 import type { CurrentSeason, Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
 const rotation = (score: number, id = "x"): RotationResult => ({ rotation: { id, name: id, cropIds: ["maiz"], description: "d" }, score, whySuggested: "Porque sí.", evidence: ["Dato A"], benefits: ["Beneficio 1", "Beneficio 2."], informationGaps: ["Vacío"], risks: ["Riesgo"], validateWithLocalExpert: ["Validar"] });
 const month = (m: number, mm: number | null): MonthlyClimate => ({ year: 2020, month: m, meanTemperatureC: 20, precipitationMm: mm, evaporationMm: 1, rootZoneWetness: 0.5, missingByParameter: {} });
 
-describe("scoreToStars", () => {
-  it("redondea y limita de 0 a 5", () => {
-    expect(scoreToStars(3.4)).toBe(3);
-    expect(scoreToStars(4.6)).toBe(5);
-    expect(scoreToStars(9)).toBe(5);
-    expect(scoreToStars(-2)).toBe(0);
-    expect(scoreToStars(Number.NaN)).toBe(0);
+describe("starFills y starsLabel", () => {
+  it("reparte el puntaje en medias estrellas y lo limita de 0 a 5", () => {
+    expect(starFills(1.95)).toEqual([1, 1, 0, 0, 0]);
+    expect(starFills(2.63)).toEqual([1, 1, 0.5, 0, 0]);
+    expect(starFills(4.6)).toEqual([1, 1, 1, 1, 0.5]);
+    expect(starFills(4.8)).toEqual([1, 1, 1, 1, 1]);
+    expect(starFills(9)).toEqual([1, 1, 1, 1, 1]);
+    expect(starFills(-2)).toEqual([0, 0, 0, 0, 0]);
+    expect(starFills(Number.NaN)).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it("una diferencia chica ya no cambia una estrella entera: 2,49 y 2,51 se ven casi igual", () => {
+    expect(starFills(2.49)).toEqual(starFills(2.51));
+    expect(starFills(2.2)).not.toEqual(starFills(2.7));
+  });
+
+  it("el texto para lectores de pantalla dice las medias estrellas", () => {
+    expect(starsLabel(2.63)).toBe("2,5 de 5");
+    expect(starsLabel(5)).toBe("5 de 5");
+    expect(starsLabel(Number.NaN)).toBe("0 de 5");
+  });
+});
+
+describe("compareScores", () => {
+  it("dice mejor, peor o igual solo si la diferencia importa (0,25 puntos o más)", () => {
+    expect(compareScores(2.7, 2)).toBe("better");
+    expect(compareScores(2, 2.7)).toBe("worse");
+    expect(compareScores(2.6, 2.5)).toBe("same");
+    expect(compareScores(2.74, 2.5)).toBe("same");
+    expect(compareScores(2.75, 2.5)).toBe("better");
+  });
+
+  it("no depende de dónde caiga el redondeo de las estrellas", () => {
+    expect(compareScores(2.51, 2.49)).toBe("same");
+    expect(compareScores(2.49, 2.51)).toBe("same");
   });
 });
 
@@ -32,7 +61,7 @@ describe("describeClimate", () => {
     expect(topics.find((topic) => topic.id === "heat")?.yourZone).toContain("no hubo días de calor");
     expect(topics.find((topic) => topic.id === "frost")?.yourZone).toContain("3 días");
     expect(topics.find((topic) => topic.id === "rain")?.yourZone).toContain("17 milímetros");
-    expect(topics.find((topic) => topic.id === "roots")?.yourZone).toContain("80 por ciento");
+    expect(topics.find((topic) => topic.id === "roots")?.yourZone).toContain("húmeda");
   });
   it("dice que faltan datos en lugar de inventarlos", () => {
     const topics = describeClimate({ ...indicators, waterDeficitMm: null, extremeRainThresholdMm: null, meanRootZoneWetness: null, meanTemperatureC: null });
@@ -237,5 +266,94 @@ describe("activeScenarioPreset y describeNasaSupport: simulador simple y respald
     expect(sources.map((item) => item.id)).toEqual(["terrainUser", "otra-fuente"]);
     expect(sources[1]).toMatchObject({ title: "Fuente nueva", body: "Uso nuevo" });
     expect(describeSimpleSources()).toEqual([]);
+  });
+});
+
+/** Serie sintética: `years` años con 12 meses; la lluvia sale de `rain(año, mes)` y la evaporación potencial es siempre 100 mm. */
+function seriesWith(years: number, rain: (yearIndex: number, month: number) => number | null): MonthlyClimate[] {
+  return Array.from({ length: years * 12 }, (_, index) => {
+    const yearIndex = Math.floor(index / 12);
+    const monthNumber = (index % 12) + 1;
+    return { year: 2011 + yearIndex, month: monthNumber, meanTemperatureC: 20, precipitationMm: rain(yearIndex, monthNumber), evaporationMm: 60, potentialEvaporationMm: 100, rootZoneWetness: 0.5, missingByParameter: {} };
+  });
+}
+/** Enero seco en 6 de 15 años (40 %), marzo en 9 de 15 (60 %), julio en 4 de 15 (27 %): los demás meses siempre alcanza. */
+const mixed = seriesWith(15, (year, m) => (m === 1 && year < 6) || (m === 3 && year < 9) || (m === 7 && year < 4) ? 50 : 150);
+
+describe("waterShortMonths", () => {
+  it("lista los meses en que falta agua en al menos 1 de cada 3 años, aunque el promedio alcance", () => {
+    expect(waterShortMonths(mixed)).toEqual([1, 3]);
+  });
+
+  it("devuelve una lista vacía si en ningún mes falta agua con frecuencia", () => {
+    expect(waterShortMonths(seriesWith(15, () => 150))).toEqual([]);
+  });
+
+  it("devuelve null si la serie es muy corta para hablar de frecuencia", () => {
+    expect(waterShortMonths(seriesWith(3, () => 50))).toBeNull();
+    expect(waterShortMonths([])).toBeNull();
+  });
+
+  it("no cuenta los meses sin dato de lluvia", () => {
+    expect(waterShortMonths(seriesWith(15, (year, m) => (m === 5 ? null : 150)))).toEqual([]);
+  });
+
+  it("usa la evaporación de NASA si la serie no trae la potencial estimada", () => {
+    const rows = seriesWith(15, (year, m) => (m === 2 ? 40 : 150)).map((row) => { const copy = { ...row }; delete copy.potentialEvaporationMm; return copy; });
+    expect(waterShortMonths(rows)).toEqual([2]);
+  });
+});
+
+describe("describeClimate con los meses de la serie", () => {
+  const withMonths = (override: Partial<Indicators> = {}, rows = mixed) => describeClimate({ ...indicators, waterDeficitMm: 60, heatStressDays: 0, frostRiskDays: 0, ...override }, rows);
+  const zone = (topics: ReturnType<typeof describeClimate>, id: string) => topics.find((topic) => topic.id === id)?.yourZone ?? "";
+
+  it("agua: aunque el promedio alcance, nombra los meses con falta frecuente", () => {
+    const text = zone(withMonths(), "water");
+    expect(text).toContain("En promedio la lluvia alcanza");
+    expect(text).toContain("enero y marzo");
+    expect(text).toContain("1 de cada 3 años");
+    expect(text).not.toContain("julio");
+  });
+
+  it("agua: si no falta nunca con frecuencia lo dice con confianza, y si el balance es negativo lo dice primero", () => {
+    expect(zone(withMonths({}, seriesWith(15, () => 150)), "water")).toContain("también en los meses más secos");
+    const deficit = zone(withMonths({ waterDeficitMm: -30 }), "water");
+    expect(deficit).toContain("puede faltar agua");
+    expect(deficit).toContain("Sobre todo en enero y marzo");
+  });
+
+  it("agua: si falta en los 12 meses no los lista uno por uno", () => {
+    const text = zone(withMonths({ waterDeficitMm: -80 }, seriesWith(15, () => 20)), "water");
+    expect(text).toBe("Aquí se pierde más agua de la que cae: puede faltar agua. Y falta durante todo el año.");
+  });
+
+  it("agua: con una serie corta no promete nada de los meses secos y usa la frase de antes", () => {
+    expect(zone(withMonths({}, seriesWith(3, () => 150)), "water")).toBe("Aquí la lluvia alcanza: cae más agua de la que se pierde.");
+  });
+
+  it("calor y helada: dicen el umbral y los días por año, no solo el total de la serie", () => {
+    expect(zone(withMonths({ heatStressDays: 45 }), "heat")).toBe("Hubo cerca de 3 días al año de calor fuerte (más de 35 °C): 45 en 15 años.");
+    expect(zone(withMonths({ frostRiskDays: 3 }), "frost")).toBe("Hubo menos de 1 día al año con riesgo de helada (menos de 0 °C): 3 en 15 años.");
+    expect(zone(withMonths({ frostRiskDays: 15 }), "frost")).toContain("cerca de 1 día al año");
+  });
+
+  it("calor y helada: con cero días igual dicen cuál era el umbral", () => {
+    expect(zone(withMonths(), "heat")).toContain("más de 35 °C");
+    expect(zone(withMonths(), "frost")).toContain("menos de 0 °C");
+  });
+
+  it("sin la serie mensual conservan la frase con el total, ahora con el umbral", () => {
+    expect(zone(describeClimate({ ...indicators, heatStressDays: 4 }), "heat")).toBe("Hubo 4 días de calor fuerte (más de 35 °C) en los años analizados.");
+    expect(zone(describeClimate({ ...indicators, frostRiskDays: 3 }), "frost")).toBe("Hubo 3 días con riesgo de helada (menos de 0 °C) en los años analizados.");
+  });
+
+  it("humedad de raíces: es un índice de 0 a 1, no un porcentaje de agua", () => {
+    const wet = zone(describeClimate({ ...indicators, meanRootZoneWetness: 0.8 }), "roots");
+    expect(wet).toContain("suele estar húmeda");
+    expect(wet).toContain("0,8 de 1");
+    expect(wet).not.toContain("por ciento");
+    expect(zone(describeClimate({ ...indicators, meanRootZoneWetness: 0.6 }), "roots")).toContain("humedad media");
+    expect(zone(describeClimate({ ...indicators, meanRootZoneWetness: 0.3 }), "roots")).toContain("bastante seca");
   });
 });
