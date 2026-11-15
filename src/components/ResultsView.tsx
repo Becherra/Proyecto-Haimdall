@@ -8,6 +8,7 @@ import { prefersReducedMotion, useReveal } from "./motion";
 import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
+import EnsoContextCard from "./EnsoContextCard";
 import { useSpeaker } from "./useSpeaker";
 import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, CurrentSeasonTone, RotationSection, ScenarioPresetId } from "../lib/ui/resultsCopy";
@@ -236,6 +237,7 @@ export default function ResultsView({ farm, response, applyingScenario, scenario
       <ScenarioBar response={response} applyingScenario={applyingScenario} scenarioError={scenarioError} mockMode={mockMode} onSelectScenario={onSelectScenario} />
 
       <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
+      <EnsoContextCard />
       {response.currentSeason && <SeasonCard season={response.currentSeason} />}
       <ClimateList response={response} />
       <RainCalendar response={response} />
