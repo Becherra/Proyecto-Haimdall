@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AnalysisDashboard from "./AnalysisDashboard";
 import PrioritiesSlides from "./PrioritiesSlides";
+import ResultsView from "./ResultsView";
 import { buildAnalysisRequest, isAnalysisMockMode, runAnalysis } from "../services/analysis";
 import type { AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "../types";
 
@@ -15,6 +16,7 @@ type AnalysisFlowProps = { farm: Farm; onChangeFarm: () => void };
 
 export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) {
   const [step, setStep] = useState<"priorities" | "results">("priorities");
+  const [technical, setTechnical] = useState(false);
   const [priorities, setPriorities] = useState(initialPriorities);
   const [baseResponse, setBaseResponse] = useState<AnalysisResponse | null>(null);
   const [response, setResponse] = useState<AnalysisResponse | null>(null);
@@ -32,6 +34,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
       setBaseResponse(result);
       setResponse(result);
       setScenarioDraft(neutralScenario);
+      setTechnical(false);
       setStep("results");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo analizar la finca. Inténtalo de nuevo.");
@@ -65,7 +68,10 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     return <PrioritiesSlides farm={farm} initialValues={priorities} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />;
   }
 
+  if (!technical) return <ResultsView farm={farm} response={response} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;
+
   return <AnalysisDashboard
+    onBackToSimple={() => setTechnical(false)}
     farm={farm}
     response={response}
     baseline={baseResponse}

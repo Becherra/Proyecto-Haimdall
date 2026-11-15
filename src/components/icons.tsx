@@ -18,6 +18,7 @@ const CROP_ICONS: Record<string, ReactNode> = {
   papa: <><path d="M12 18C12 8 23 4 31 6c5 2 6 7 7 12 3 6 6 10 4 17-2 7-9 10-18 10C13 45 7 40 7 31c0-6 5-8 5-13Z" /><path d="M15 17c-3 7-3 15 0 22" strokeWidth="2" /><path d="M27 15h4M20 33h4" strokeWidth="2" /><path d="M26 24h.01M34 30h.01M28 40h.01" strokeWidth="3.400" /></>,
   avena: <><path d="M24 45V8" /><ellipse cx="17" cy="15" rx="3.6" ry="6.5" transform="rotate(-30 17 15)" /><ellipse cx="31" cy="15" rx="3.6" ry="6.5" transform="rotate(30 31 15)" /><ellipse cx="17" cy="26" rx="3.6" ry="6.5" transform="rotate(-30 17 26)" /><ellipse cx="31" cy="26" rx="3.6" ry="6.5" transform="rotate(30 31 26)" /><ellipse cx="24" cy="6" rx="3" ry="4.5" /></>,
   repollo: <><path d="M24.0 7.0 A 6.6 6.6 0 0 1 34.9 11.0 A 6.6 6.6 0 0 1 40.7 21.0 A 6.6 6.6 0 0 1 38.7 32.5 A 6.6 6.6 0 0 1 29.8 40.0 A 6.6 6.6 0 0 1 18.2 40.0 A 6.6 6.6 0 0 1 9.3 32.5 A 6.6 6.6 0 0 1 7.3 21.0 A 6.6 6.6 0 0 1 13.1 11.0 A 6.6 6.6 0 0 1 24.0 7.0 Z" /><path d="M24 42C24 32 24 22 24 12M24 42C19 34 15 27 14 19M24 42C29 34 33 27 34 19" strokeWidth="2" /></>,
+  generic: <><path d="M24 44V22" /><path d="M24 26C14 26 8 20 8 11c10 0 16 5 16 15ZM24 22c0-9 6-14 16-14 0 9-6 14-16 14Z" /></>,
   none: <><circle cx="24" cy="24" r="16" /><path d="M13 35 35 13" /></>,
 };
 
@@ -37,4 +38,38 @@ export function CropIcon({ id, className }: { id: string; className?: string }) 
 /** Ícono de una prioridad por su clave (`waterSaving`, `extraIncome`, …). */
 export function GoalIcon({ id, className }: { id: string; className?: string }) {
   return <Svg className={className}>{GOAL_ICONS[id]}</Svg>;
+}
+
+const UI_ICONS = {
+  play: <path d="M14 8v32l26-16Z" fill="currentColor" />,
+  stop: <rect x="11" y="11" width="26" height="26" rx="4" fill="currentColor" />,
+  speaker: <><path d="M6 19h8l11-9v28l-11-9H6Z" fill="currentColor" /><path d="M32 17c3 4 3 10 0 14M37 12c6 7 6 17 0 24" /></>,
+  star: <path d="M24 5l5.500 11.500 12.500 1.700-9.200 8.700 2.300 12.400L24 33l-11.100 6.300 2.300-12.400L6 18.200l12.500-1.700Z" fill="currentColor" />,
+  leaf: <path d="M8 40C8 20 20 8 42 6c0 22-12 34-34 34ZM8 40 28 20" fill="currentColor" />,
+  arrow: <path d="M6 24h32M28 14l10 10-10 10" />,
+  back: <path d="M42 24H10M20 14 10 24l10 10" />,
+  field: <><path d="M4 38 14 16h20l10 22Z" /><path d="M9 28h30M12 22h24" strokeWidth="1.800" /></>,
+  sun: <><circle cx="24" cy="24" r="8" /><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4" /></>,
+  snow: <path d="M24 5v38M7.500 14.500l33 19M7.500 33.500l33-19M18 8l6 5 6-5M18 40l6-5 6 5" />,
+  rain: <><path d="M14 30a9 9 0 0 1 1-18 11 11 0 0 1 21 3 7.500 7.500 0 0 1-1 15Z" /><path d="M16 36l-2 6M24 36l-2 6M32 36l-2 6" /></>,
+  thermo: <><path d="M20 8a4 4 0 0 1 8 0v18a9 9 0 1 1-8 0Z" /><path d="M24 14v20" /><circle cx="24" cy="35" r="3" fill="currentColor" /></>,
+  roots: <><path d="M24 4v16M24 12c-4-6-10-6-13-3M24 12c4-6 10-6 13-3" /><path d="M24 20v22M24 26c-6 2-9 8-9 16M24 26c6 2 9 8 9 16" /></>,
+  drop: <path d="M24 5c8 9.500 14 16.500 14 24a14 14 0 0 1-28 0c0-7.500 6-14.500 14-24Z" />,
+  dropFilled: <path d="M24 5c8 9.500 14 16.500 14 24a14 14 0 0 1-28 0c0-7.500 6-14.500 14-24Z" fill="currentColor" />,
+  bulb: <><path d="M24 4a13 13 0 0 0-7 24v6h14v-6a13 13 0 0 0-7-24Z" /><path d="M18 40h12M21 45h6" /></>,
+  search: <><circle cx="21" cy="21" r="13" /><path d="m31 31 12 12" /></>,
+  check: <><circle cx="24" cy="24" r="19" /><path d="m14 25 7 7 14-15" /></>,
+  warning: <><path d="M24 6 3 41h42Z" /><path d="M24 19v10M24 35h.01" strokeWidth="3.500" /></>,
+  question: <><circle cx="24" cy="24" r="19" /><path d="M18 18c0-4 3-6 6-6s6 2 6 6c0 5-6 5-6 10M24 35h.01" strokeWidth="3" /></>,
+  person: <><circle cx="24" cy="15" r="8" /><path d="M7 43c0-10 7-16 17-16s17 6 17 16" /></>,
+  sliders: <><path d="M6 14h36M6 24h36M6 34h36" /><circle cx="16" cy="14" r="4" fill="currentColor" /><circle cx="32" cy="24" r="4" fill="currentColor" /><circle cx="20" cy="34" r="4" fill="currentColor" /></>,
+  pin: <><path d="M24 44S9 29 9 19a15 15 0 0 1 30 0c0 10-15 25-15 25Z" /><circle cx="24" cy="19" r="5" /></>,
+  calendar: <><rect x="6" y="9" width="36" height="33" rx="5" /><path d="M6 20h36M15 5v8M33 5v8" /></>,
+} as const;
+
+export type UiIconName = keyof typeof UI_ICONS;
+
+/** Íconos de interfaz (reproducir, alertas, clima…) en el mismo estilo de línea que los cultivos. */
+export function UiIcon({ name, className }: { name: UiIconName; className?: string }) {
+  return <Svg className={className}>{UI_ICONS[name]}</Svg>;
 }

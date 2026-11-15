@@ -1,0 +1,4 @@
+Aquí van las grabaciones con tu voz, en formato .mp3.
+El nombre del archivo debe ser exactamente el "id" del guion (docs/guion-de-audio.md), por ejemplo:
+  clima-water.mp3
+Si un archivo no existe, la app lee ese texto con la voz en español del celular.

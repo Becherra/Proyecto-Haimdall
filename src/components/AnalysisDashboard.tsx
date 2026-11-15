@@ -17,6 +17,8 @@ type AnalysisDashboardProps = {
   onShowBaseline: () => void;
   onEditPriorities: () => void;
   onChangeFarm: () => void;
+  /** Vuelve a la vista simple de resultados. */
+  onBackToSimple?: () => void;
 };
 
 const number = (value: number | null | undefined, digits = 1) => value === null || value === undefined ? "Sin dato" : new Intl.NumberFormat("es-CO", { maximumFractionDigits: digits }).format(value);
@@ -89,7 +91,7 @@ function RotationCard({ result, baseline, index }: { result: RotationResult; bas
   </article>;
 }
 
-export default function AnalysisDashboard({ farm, response, baseline, scenarioDraft, mockMode, applyingScenario, scenarioError, onScenarioChange, onApplyScenario, onShowBaseline, onEditPriorities, onChangeFarm }: AnalysisDashboardProps) {
+export default function AnalysisDashboard({ farm, response, baseline, scenarioDraft, mockMode, applyingScenario, scenarioError, onScenarioChange, onApplyScenario, onShowBaseline, onEditPriorities, onChangeFarm, onBackToSimple }: AnalysisDashboardProps) {
   const source = mockMode ? "Datos de demostración · no son datos para decisiones" : sourceLabel[response.climate.source];
   const dates = [monthDate(response.climate.firstDate), monthDate(response.climate.lastDate)].filter(Boolean).join(" – ");
   const rainfallPercent = Math.round(((scenarioDraft.rainFactor ?? 1) - 1) * 100);
@@ -102,7 +104,7 @@ export default function AnalysisDashboard({ farm, response, baseline, scenarioDr
     </ol>
     <header className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cream">HEIMDALL · análisis climático</p><h2 id="analysis-title" className="mt-2 font-display text-3xl font-medium tracking-tight text-bone-white sm:text-4xl">Tu finca, con contexto</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-silver-mist">{farm.placeLabel ?? "Finca seleccionada"} · {dates || "Periodo histórico"} · {number(response.climate.daysAnalyzed, 0)} días analizados</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={onEditPriorities} className="min-h-10 rounded-full border border-cream/20 px-4 text-sm text-bone-white transition hover:border-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Editar objetivos</button><button type="button" onClick={onChangeFarm} className="min-h-10 rounded-full border border-cream/20 px-4 text-sm text-bone-white transition hover:border-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Cambiar finca</button></div>
+      <div className="flex flex-wrap gap-2">{onBackToSimple && <button type="button" onClick={onBackToSimple} className="min-h-10 rounded-full bg-cream px-4 text-sm font-semibold text-meadow transition hover:bg-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">← Vista simple</button>}<button type="button" onClick={onEditPriorities} className="min-h-10 rounded-full border border-cream/20 px-4 text-sm text-bone-white transition hover:border-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Editar objetivos</button><button type="button" onClick={onChangeFarm} className="min-h-10 rounded-full border border-cream/20 px-4 text-sm text-bone-white transition hover:border-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Cambiar finca</button></div>
     </header>
 
     <div className="mb-5 flex flex-col gap-2 rounded-2xl border border-olive/40 bg-spruce p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-bone-white">{source}</p><p className="mt-1 text-xs text-ash-gray">Periodo histórico de referencia; no es un pronóstico.{totalMissing > 0 ? ` Se reportan ${totalMissing} valores diarios faltantes.` : " No se reportaron faltantes diarios."}</p></div><span className="w-fit rounded-full border border-cream/10 px-3 py-1 text-[11px] text-silver-mist">{response.climate.source === "sample" ? "Respaldo" : response.climate.source === "cache" ? "Caché" : "Fuente NASA"}</span></div>
