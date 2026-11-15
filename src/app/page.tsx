@@ -3,9 +3,10 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import LocationSearch from "../components/LocationSearch";
+import AnalysisFlow from "../components/AnalysisFlow";
 import { initialLocationFlow, locationFlowReducer } from "../lib/ui/locationFlow";
 import { getHeroIntroStage, HERO_INTRO_DURATION_MS, type HeroIntroStage } from "../lib/ui/heroTimeline";
-import type { LocationResult } from "../types";
+import type { Farm, LocationResult } from "../types";
 
 const GlobeScene = dynamic(() => import("../components/GlobeScene"), { ssr: false, loading: () => <div className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.03] text-sm text-ash-gray" role="status">Cargando globo…</div> });
 const MapScene = dynamic(() => import("../components/MapScene"), { ssr: false, loading: () => <div className="flex min-h-[360px] w-full items-center justify-center text-sm text-ash-gray" role="status">Cargando mapa…</div> });
@@ -17,6 +18,7 @@ const subscribePreview = () => () => {};
 const getDebugMode = () => new URLSearchParams(window.location.search).get("debug") === "1";
 export default function Home() {
   const [flow, dispatch] = useReducer(locationFlowReducer, initialLocationFlow);
+  const [confirmedFarm, setConfirmedFarm] = useState<Farm | null>(null);
   // Arranca en "scatter" para que el globo real NO parpadee antes de la intro.
   const [introStage, setIntroStage] = useState<HeroIntroStage>("scatter");
   const introStageRef = useRef<HeroIntroStage>("scatter");
@@ -31,7 +33,8 @@ export default function Home() {
     const canvas = document.createElement("canvas");
     return Boolean(window.WebGLRenderingContext && canvas.getContext("webgl"));
   });
-  const showMap = flow.status === "map" || flow.status === "confirmed";
+  const showMap = flow.status === "map";
+  const showAnalysis = flow.status === "confirmed" && confirmedFarm !== null;
   const location = flow.location;
   const gpsAccuracyMeters = "accuracyMeters" in flow ? flow.accuracyMeters : undefined;
 
@@ -83,7 +86,7 @@ export default function Home() {
 
   const onLocationSelected = (selected: LocationResult) => { dispatch({ type: "buscar", location: selected }); };
   const onGpsLocationSelected = (selected: LocationResult, accuracyMeters: number) => { dispatch({ type: "gpsOk", location: selected, accuracyMeters }); };
-  const onBackToGlobe = () => { dispatch({ type: "volver" }); };
+  const onBackToGlobe = () => { setConfirmedFarm(null); dispatch({ type: "volver" }); };
   const globeFading = flow.status === "transitioning";
   const introIsEarly = introStage === "scatter" || introStage === "gather" || introStage === "hold";
   const globeIntroOpacity = particlesPreview
@@ -94,7 +97,7 @@ export default function Home() {
   const globeInteractive = introStage === "globe" || introStage === "settled";
 
   return <main id="inicio" className="min-h-screen overflow-hidden bg-void text-bone-white">
-    {!showMap ? <section className="mx-auto grid min-h-[calc(100svh-76px)] w-full max-w-[1440px] grid-cols-1 items-center px-5 pb-8 pt-2 sm:px-10 lg:min-h-[calc(100svh-88px)] lg:grid-cols-[0.88fr_1.12fr] lg:gap-3 lg:px-12 lg:py-8">
+    {!showMap && !showAnalysis && <section className="mx-auto grid min-h-[calc(100svh-76px)] w-full max-w-[1440px] grid-cols-1 items-center px-5 pb-8 pt-2 sm:px-10 lg:min-h-[calc(100svh-88px)] lg:grid-cols-[0.88fr_1.12fr] lg:gap-3 lg:px-12 lg:py-8">
       <div aria-hidden={introIsEarly} inert={introIsEarly} style={{ opacity: introIsEarly ? 0 : 1 }} className={`relative z-10 order-2 mx-auto w-full max-w-[580px] text-center lg:order-1 lg:mx-0 lg:text-left hero-copy-${introStage}`}>
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-saffron-spark sm:text-sm">NASA · agricultura · futuro</p>
         <h1 className="font-display text-[clamp(3.5rem,9vw,7rem)] font-normal leading-[0.92] tracking-[-0.055em]">HEIMDALL</h1>
@@ -114,9 +117,11 @@ export default function Home() {
       {introStage !== "settled" && !particlesPreview && <button type="button" onClick={finishIntro} className="fixed right-5 top-24 z-30 rounded-full border border-white/30 bg-black px-4 py-2 text-xs text-white focus-visible:outline-2 focus-visible:outline-saffron-spark">Saltar</button>}
       {flow.status === "flying" && location && <p className="order-3 text-center text-sm text-saffron-spark" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
       <footer className="order-4 mt-2 space-y-1 text-center text-xs text-ash-gray lg:col-span-2"><p>© Colaboradores de OpenStreetMap</p><p>Imagen: NASA Blue Marble, con tratamiento de color propio</p></footer>
-    </section> : <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
-      <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-saffron-spark">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
-      {location && <MapScene key={`${location.lat}:${location.lon}:${gpsAccuracyMeters ?? "search"}`} location={location} gpsAccuracyMeters={gpsAccuracyMeters} onBack={onBackToGlobe} debugMode={debugMode} onFarmConfirmed={() => dispatch({ type: "confirmar" })} />}
     </section>}
+    {showMap && <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
+      <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-saffron-spark">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
+      {location && <MapScene key={`${location.lat}:${location.lon}:${gpsAccuracyMeters ?? "search"}`} location={location} gpsAccuracyMeters={gpsAccuracyMeters} onBack={onBackToGlobe} debugMode={debugMode} onFarmConfirmed={(farm) => { setConfirmedFarm(farm); dispatch({ type: "confirmar" }); }} />}
+    </section>}
+    {showAnalysis && confirmedFarm && <AnalysisFlow farm={confirmedFarm} onChangeFarm={onBackToGlobe} />}
   </main>;
 }

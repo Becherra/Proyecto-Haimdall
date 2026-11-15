@@ -130,7 +130,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
         {editor.mode === "polygon" && editor.vertices.map((point, index) => <Marker key={`vertex-${index}`} position={convertCoordinateOrder(point, "geojson")} icon={pinIcon} draggable eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const moved = marker.getLatLng(); dispatch({ type: "move-vertex", index, lat: moved.lat, lon: moved.lng }); } }} title={`Vértice ${index + 1}`} />)}
         <Marker position={[draftLocation.lat, draftLocation.lon]} icon={pinIcon} draggable={editor.mode !== "polygon" || requiresGpsPinAdjustment(editor)} eventHandlers={{ dragend: (event) => { const marker = event.target as L.Marker; const point = marker.getLatLng(); dispatch({ type: "set-location", location: validateMapLocation(point.lat, point.lng, draftLocation.label), locationSource: "map" }); }} } title="Pin de la finca" />
         <CircleMarker center={[draftLocation.lat, draftLocation.lon]} radius={8} pathOptions={{ color: "#fbbf24", fillColor: "#fbbf24", fillOpacity: 0.25 }} />
-        {gpsAccuracyMeters !== undefined && <Circle center={[location.lat, location.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
+        {gpsAccuracyMeters !== undefined && <Circle center={[draftLocation.lat, draftLocation.lon]} radius={gpsAccuracyMeters} pathOptions={{ color: "#67e8f9", fillColor: "#67e8f9", fillOpacity: 0.12 }} />}
       </MapContainer>
     </div>
     <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto grid max-h-[40svh] max-w-[1440px] grid-cols-[1fr_auto] gap-3 overflow-y-auto border-t border-white/15 bg-black/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-left shadow-[0_-12px_36px_rgba(0,0,0,0.6)] backdrop-blur sm:grid-cols-[1fr_auto] sm:p-4">
@@ -190,19 +190,24 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
         <button type="button" disabled={editor.vertices.length === 0} onClick={() => dispatch({ type: "clear" })} className="min-h-11 rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:border-saffron-spark focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Borrar</button>
         <button type="button" disabled={editor.vertices.length < 3} onClick={() => dispatch({ type: "finish" })} className="min-h-11 rounded-full border border-saffron-spark/70 px-4 text-sm font-semibold text-saffron-spark hover:bg-saffron-spark/10 focus-visible:outline-2 focus-visible:outline-saffron-spark disabled:opacity-40">Terminar</button>
       </div>}
+      {editor.mode === "polygon" && <p className="col-span-2 rounded-lg border border-saffron-spark/20 bg-saffron-spark/5 p-3 text-xs leading-5 text-slate-200" role="note">
+        Toca el mapa para marcar el contorno (mínimo 3 puntos). Puedes arrastrar cada punto y usar «Deshacer» o «Borrar». Cuando termines, pulsa «Terminar» para cerrar y validar el área; después podrás confirmar la finca.
+      </p>}
       {terrainStatus.areaHa !== null && <p className="col-span-2 text-sm text-white">Área: {terrainStatus.areaHa.toFixed(2)} ha{terrainStatus.areaHa >= FOOTBALL_PITCH_AREA_HA ? ` · ≈ ${Math.round(terrainStatus.areaHa / FOOTBALL_PITCH_AREA_HA)} canchas de fútbol` : ""}</p>}
       {editor.mode === "polygon" && terrainStatus.areaHa === null && <p className="col-span-2 text-xs text-slate-300">Añade al menos tres puntos para calcular el área. La vía accesible para indicar el tamaño es el modo aproximado con campo numérico.</p>}
       {(editor.error ?? terrainStatus.error) && <p className="col-span-2 text-sm text-amber-200" role="alert">{editor.error ?? terrainStatus.error}</p>}
       {terrainStatus.warnings.map((warning) => <p key={warning} className="col-span-2 text-sm text-amber-200" role="alert">{warning}</p>)}
       <div className="col-span-2 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button type="button" onClick={onBack} className="min-h-11 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-saffron-spark focus:outline-none focus:ring-2 focus:ring-saffron-spark">Volver al globo</button>
-        <button type="button" disabled={!terrainStatus.canConfirm} onClick={() => {
+        <button type="button" aria-describedby={!terrainStatus.canConfirm ? "farm-confirm-guidance" : undefined} disabled={!terrainStatus.canConfirm} onClick={() => {
           const candidate = buildFarmFromEditor(editor);
+          if (!candidate) { setConfirmationError(terrainStatus.error ?? "Completa y valida el terreno antes de confirmar."); return; }
           const result = validateFarmDraft(candidate);
           if (!result.valid) { setConfirmationError(result.errors.join(" ")); return; }
           setConfirmationError(null); setConfirmedFarm(result.farm); onFarmConfirmed(result.farm);
         }} className="min-h-11 rounded-full bg-electric-iris px-4 py-3 text-sm font-semibold text-white hover:bg-[#916dff] focus:outline-none focus:ring-2 focus:ring-saffron-spark disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
       </div>
+      {!terrainStatus.canConfirm && <p id="farm-confirm-guidance" className="col-span-2 -mt-1 text-xs leading-5 text-amber-200" role="status">Antes de confirmar: {terrainStatus.error ?? "Completa y valida el terreno."}</p>}
       {confirmationError && <p className="col-span-2 text-sm text-red-200" role="alert">No se pudo confirmar la finca: {confirmationError}</p>}
       {showConfirmedFarm && confirmedFarm && debugMode && <details className="col-span-2 rounded-lg border border-white/15 p-3 text-xs text-slate-200"><summary className="cursor-pointer font-semibold">Farm enviado (depuración)</summary><pre className="mt-2 overflow-auto">{JSON.stringify(confirmedFarm, null, 2)}</pre></details>}
       <p className="col-span-2 text-xs leading-5 text-slate-500">Atribuciones: {osmAttribution} · {satelliteAttribution} · {nasaAttribution}.</p>
