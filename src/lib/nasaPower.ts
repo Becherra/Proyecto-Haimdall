@@ -9,13 +9,18 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [100, 250] as const;
 const PEREIRA = { lat: 4.8133, lon: -75.6961, tolerance: 0.1 } as const;
-const responseSchema = z.object({ properties: z.object({ parameter: z.record(z.string(), z.record(z.string(), z.number())) }) });
+const responseSchema = z.object({
+  geometry: z.object({ coordinates: z.array(z.number()) }).optional(),
+  properties: z.object({ parameter: z.record(z.string(), z.record(z.string(), z.number())) }),
+});
 const requestSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
   startYear: z.number().int().gte(MIN_YEAR).lte(new Date().getFullYear() - 1), endYear: z.number().int().gte(MIN_YEAR).lte(new Date().getFullYear() - 1),
 }).refine((value) => value.startYear <= value.endYear, "startYear debe ser menor o igual que endYear")
   .refine((value) => value.endYear - value.startYear + 1 <= MAX_RANGE_YEARS, `El rango máximo es de ${MAX_RANGE_YEARS} años`);
 
+/** La solicitud climática es inválida (años fuera de rango, etc.): lo corrige quien llama, no es una falla de NASA POWER. */
+export class InvalidClimateRequestError extends Error {}
 class RetryableClimateError extends Error {}
 class ClimateServerError extends RetryableClimateError {}
 
@@ -45,7 +50,9 @@ function parseResponse(payload: unknown, source: ClimateResult["source"], input?
     }
     return record;
   });
-  return climateResultSchema.parse({ records, missingByParameter, source });
+  const rawElevation = parsed.data.geometry?.coordinates[2];
+  const cellElevationMeters = rawElevation !== undefined && Number.isFinite(rawElevation) && rawElevation !== -999 ? rawElevation : undefined;
+  return climateResultSchema.parse({ records, missingByParameter, source, ...(cellElevationMeters === undefined ? {} : { cellElevationMeters }) });
 }
 
 function wait(milliseconds: number): Promise<void> {
@@ -86,7 +93,7 @@ function sampleFor(input: ClimateRequest): ClimateResult | null {
 /** Obtiene clima diario con timeout, reintentos y respaldo precargado por zona. */
 export function fetchDailyClimate(input: ClimateRequest): Promise<ClimateResult> {
   const parsed = requestSchema.safeParse(input);
-  if (!parsed.success) throw new Error(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
+  if (!parsed.success) throw new InvalidClimateRequestError(`Solicitud climática inválida: ${parsed.error.issues[0]?.message ?? "revisa los parámetros"}`);
   const normalizedInput = parsed.data;
   const url = buildUrl(normalizedInput);
   const cached = cache.get(url);

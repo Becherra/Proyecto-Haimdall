@@ -18,6 +18,8 @@ export const monthlyClimateSchema = z.object({
   rootZoneWetness: z.number().min(0).max(1).nullable(), missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
   // Opcionales para no romper consumidores previos; aggregateMonthly siempre los entrega.
   minTemperatureC: z.number().nullable().optional(), maxTemperatureC: z.number().nullable().optional(),
+  /** Evaporación potencial estimada del mes (mm). Ausente si no se calculó (no se conocía la latitud); null si faltaron datos. */
+  potentialEvaporationMm: z.number().nullable().optional(),
 });
 export type MonthlyClimate = z.infer<typeof monthlyClimateSchema>;
 
@@ -43,6 +45,20 @@ export const indicatorsSchema = z.object({
   waterDeficitMm: z.number().nullable(), heatStressDays: z.number().int().nonnegative(), frostRiskDays: z.number().int().nonnegative(),
   extremeRainThresholdMm: z.number().nonnegative().nullable(), meanRootZoneWetness: z.number().min(0).max(1).nullable(),
   missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
+  /** Con qué se calculó `waterDeficitMm`: evaporación potencial estimada ("potential") o EVLAND de NASA ("evland", la real, que subestima la aridez). */
+  waterBalanceMethod: z.enum(["potential", "evland"]).optional(),
+  /** Temperatura media estimada para el sitio (°C); si se conocen las altitudes de la celda y del lote se corrige por piso térmico, si no es el promedio de T2M de la celda. */
+  meanTemperatureC: z.number().nullable().optional(),
+  /** Temperatura media sin corregir de la celda de NASA POWER (T2M, °C) cuando se aplicó corrección por altitud. */
+  cellMeanTemperatureC: z.number().nullable().optional(),
+  /** Altitud media de la celda de NASA POWER (m s. n. m.). */
+  cellElevationMeters: z.number().finite().optional(),
+  /** Altitud del lote (m s. n. m., SRTM o declarada) con la que se ajustó la temperatura. */
+  siteElevationMeters: z.number().finite().optional(),
+  /** Pendiente media del lote (%, SRTM o declarada) para evaluar erosión en ladera. */
+  slopePercent: z.number().finite().min(0).max(100).optional(),
+  /** Origen de los datos de terreno del lote: muestra precargada de NASA SRTM ("srtm-sample") o declarados por el usuario ("user"). */
+  terrainSource: z.enum(["srtm-sample", "user"]).optional(),
 });
 export type Indicators = z.infer<typeof indicatorsSchema>;
 
@@ -50,8 +66,18 @@ export const cropSchema = z.object({
   id: z.string().min(1), name: z.string().min(1), waterUse: score, nitrogenFixation: score, erosionReduction: score,
   organicMatter: score, forageValue: score, marketPotential: score, heatTolerance: score, droughtTolerance: score,
   cycleDays: z.number().int().positive(), sowingMonths: z.array(z.number().int().min(1).max(12)), source: z.string().min(1),
+  /** Familia botánica en español (p. ej. "Leguminosas"). Opcional para no romper catálogos previos; sin ella no se evalúa si la rotación alterna familias. */
+  family: z.string().min(1).optional(),
+  /**
+   * Temperatura media diaria (°C) según la fuente del cultivo: entre `goodMin` y `goodMax` crece bien; fuera de `limitMin`–`limitMax` no produce.
+   * Solo `goodMin` es obligatorio: un extremo ausente significa que la fuente no lo da. Sin este campo no se evalúa la aptitud térmica.
+   */
+  temperatureC: z.object({ goodMin: z.number(), goodMax: z.number().optional(), limitMin: z.number().optional(), limitMax: z.number().optional() }).optional(),
+  /** Helada corta más fría (°C) que el cultivo soporta según su fuente. Ausente = sin tolerancia documentada. */
+  frostToleranceC: z.number().optional(),
 });
 export type Crop = z.infer<typeof cropSchema>;
+export type CropTemperatureRange = NonNullable<Crop["temperatureC"]>;
 
 export const rotationSchema = z.object({ id: z.string().min(1), name: z.string().min(1), cropIds: z.array(z.string().min(1)).min(1), description: z.string().min(1) });
 export type Rotation = z.infer<typeof rotationSchema>;
@@ -59,8 +85,19 @@ export type Rotation = z.infer<typeof rotationSchema>;
 export const userPrioritiesSchema = z.object({
   waterSaving: score, extraIncome: score, soilImprovement: score, erosionReduction: score, lowRisk: score,
   currentCropId: z.string().min(1).optional(), waterAvailability: z.enum(["low", "medium", "high"]).optional(),
+  /** Altitud del lote declarada por el agricultor (m s. n. m.); permite corregir la temperatura de la celda de NASA POWER. */
+  elevationMeters: z.number().finite().min(-500).max(6000).optional(),
+  /** Pendiente media del lote declarada por el agricultor (%, 0–100); pondera el riesgo de erosión en ladera. */
+  slopePercent: z.number().finite().min(0).max(100).optional(),
 });
 export type UserPriorities = z.infer<typeof userPrioritiesSchema>;
+
+export const terrainSampleSchema = z.object({
+  id: z.string().min(1), name: z.string().min(1),
+  lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180), tolerance: z.number().positive(),
+  elevationMeters: z.number().finite().min(-500).max(6000), slopePercent: z.number().finite().min(0).max(100), source: z.string().min(1),
+});
+export type TerrainSample = z.infer<typeof terrainSampleSchema>;
 
 export const farmCoordinateSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90),
@@ -117,6 +154,8 @@ export const climateResultSchema = z.object({
   records: z.array(climateRecordSchema),
   missingByParameter: z.record(z.string(), z.number().int().nonnegative()),
   source: z.enum(["live", "cache", "sample"]),
+  /** Elevación media de la celda de NASA POWER (m s. n. m., geometry.coordinates[2]); ausente si la respuesta no la incluye. */
+  cellElevationMeters: z.number().finite().optional(),
 });
 export type ClimateResult = z.infer<typeof climateResultSchema>;
 

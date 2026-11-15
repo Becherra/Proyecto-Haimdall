@@ -24,6 +24,15 @@ describe("GET /api/climate", () => {
     expect(await response.json()).toEqual({ error: "Parámetros inválidos" });
   });
 
+  it("devuelve 400 con el motivo cuando el rango supera los 15 años", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const response = await GET(new Request("http://localhost/api/climate?lat=4.8133&lon=-75.6961&startYear=1981&endYear=1996"));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("15 años");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("devuelve 502 cuando el servicio externo falla sin muestra disponible", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     const response = await GET(new Request("http://localhost/api/climate?lat=0&lon=0&startYear=2020&endYear=2022"));

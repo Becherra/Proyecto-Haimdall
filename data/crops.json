@@ -1,0 +1,268 @@
+[
+  {
+    "id": "maiz",
+    "name": "Maíz (Zea mays)",
+    "family": "Gramíneas",
+    "waterUse": 3,
+    "nitrogenFixation": 0,
+    "erosionReduction": 2,
+    "organicMatter": 2,
+    "forageValue": 3,
+    "marketPotential": 4,
+    "heatTolerance": 4,
+    "droughtTolerance": 2,
+    "cycleDays": 145,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 10,
+      "goodMin": 15
+    },
+    "source": "FAO EcoCrop ficha id=238663 (óptimo 18–33 °C, 600–1200 mm/año); ciclo de 145 días: Cenicafé (maíz intercalado con café). Forraje, mercado y erosión: juicio sin fuente cuantitativa. Temperatura: se cultiva para grano con medias diarias sobre 15 °C; entre 10 y 15 °C casi solo como forraje; bajo 20 °C el ciclo se alarga; muy sensible a heladas (FAO Land & Water (copia archivada 2023), ficha de maíz; no da máximo de temperatura media). Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "frijol",
+    "name": "Fríjol (Phaseolus vulgaris)",
+    "family": "Leguminosas",
+    "waterUse": 2,
+    "nitrogenFixation": 2,
+    "erosionReduction": 2,
+    "organicMatter": 2,
+    "forageValue": 1,
+    "marketPotential": 4,
+    "heatTolerance": 2,
+    "droughtTolerance": 2,
+    "cycleDays": 90,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 10,
+      "goodMin": 15,
+      "goodMax": 20,
+      "limitMax": 27
+    },
+    "source": "Ciclo de 90 días: Cenicafé (fríjol intercalado con café). Fijación de N baja (3–57 kg N/ha en revisión; %Ndfa medio 38 %, Peoples et al. 2021, Plant and Soil). Sensible al calor en floración (literatura vista solo como resumen de búsqueda). Mercado y erosión: juicio. Temperatura: óptimo 15–20 °C de media diaria, mínimo 10 °C y máximo 27 °C (FAO Land & Water (copia archivada 2023), ficha de fríjol). Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "soya",
+    "name": "Soya (Glycine max)",
+    "family": "Leguminosas",
+    "waterUse": 3,
+    "nitrogenFixation": 4,
+    "erosionReduction": 3,
+    "organicMatter": 3,
+    "forageValue": 2,
+    "marketPotential": 3,
+    "heatTolerance": 3,
+    "droughtTolerance": 2,
+    "cycleDays": 120,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 15,
+      "goodMin": 18,
+      "goodMax": 35
+    },
+    "source": "FAO EcoCrop ficha id=1150 (óptimo 20–33 °C, 600–1500 mm/año, ciclo 75–180 días según variedad). Fijación de N alta (49–450 kg N/ha, %Ndfa 44–78 %, Peoples et al.). Mercado local: juicio sin dato. Idoneidad a la altitud de Pereira sin verificar. Temperatura: el crecimiento baja por debajo de 18 °C y por encima de 35 °C; mínimo para producir cerca de 15 °C (FAO Land & Water (copia archivada 2023), ficha de soya; no da máximo absoluto). Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "arveja",
+    "name": "Arveja (Pisum sativum)",
+    "family": "Leguminosas",
+    "waterUse": 2,
+    "nitrogenFixation": 2,
+    "erosionReduction": 1,
+    "organicMatter": 2,
+    "forageValue": 2,
+    "marketPotential": 4,
+    "heatTolerance": 1,
+    "droughtTolerance": 2,
+    "cycleDays": 95,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 10,
+      "goodMin": 17,
+      "goodMax": 17,
+      "limitMax": 23
+    },
+    "source": "FAO Land & Water, ficha de arveja (cultivo de clima frío: óptimo 17 °C medios, máx. 23 °C; estrés por calor 30.5–33 °C reduce rendimiento). Ciclo de 95 días: suma de etapas FAO de arveja fresca (65–95 días). Fijación de N: un solo valor de 46 kg N/ha en una revisión. Mercado: juicio. Temperatura: óptimo 17 °C de media diaria, mínimo 10 °C y máximo 23 °C; la planta joven tolera heladas ligeras pero flores y vainas se dañan (FAO Land & Water (copia archivada 2023), ficha de arveja, leída completa). Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "mucuna",
+    "name": "Mucuna (Mucuna pruriens)",
+    "family": "Leguminosas",
+    "waterUse": 3,
+    "nitrogenFixation": 4,
+    "erosionReduction": 5,
+    "organicMatter": 5,
+    "forageValue": 2,
+    "marketPotential": 1,
+    "heatTolerance": 4,
+    "droughtTolerance": 3,
+    "cycleDays": 180,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "goodMin": 19,
+      "goodMax": 27
+    },
+    "source": "Fijación de N de menos de 20 a más de 200 kg N/ha (Carsky et al. 1998, vía revisión); biomasa de 7–11 t MS/ha en ~6 meses; reduce escorrentía y erosión (ensayos en Benín). Tolerancia a sequía con fuentes en conflicto (algunas la llaman resistente, una guía sudafricana la describe sensible por raíz superficial). Sin mercado propio: abono verde. Temperatura: óptimo 19–27 °C; susceptible a heladas; rinde mejor entre 0 y 1600 m (Tropical Forages, ficha de Mucuna pruriens; no da límites, se usa el margen por defecto). Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "crotalaria",
+    "name": "Crotalaria (Crotalaria juncea)",
+    "family": "Leguminosas",
+    "waterUse": 2,
+    "nitrogenFixation": 5,
+    "erosionReduction": 4,
+    "organicMatter": 4,
+    "forageValue": 1,
+    "marketPotential": 1,
+    "heatTolerance": 4,
+    "droughtTolerance": 4,
+    "cycleDays": 135,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 8.4,
+      "goodMin": 15,
+      "goodMax": 27.5
+    },
+    "frostToleranceC": -2,
+    "source": "UF/IFAS (ficha de sunn hemp): ~7 t de biomasa fresca y ~359 kg N/ha en subtrópico de Florida (conversión propia de 320 lb N/acre). Biomasa máxima a los 135 días tras emergencia (estudio brasileño, Pesq. Agropec. Trop. 2020). Descrita como tolerante a sequía (Tropical Forages). Sin mercado propio: abono verde. Temperatura: sus zonas principales de cultivo tienen medias anuales de 15–27,5 °C (India) y 18–27 °C (Brasil); se cultiva hasta con 8,4 °C de media si hay 2–3 meses sin heladas; soporta heladas ligeras de hasta −2 °C (Feedipedia, ficha de sunn hemp, que cita a Cook et al. 2005). Es el rango donde se cultiva, no un óptimo medido; la fuente no da máximo. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "yuca",
+    "name": "Yuca (Manihot esculenta)",
+    "family": "Euforbiáceas",
+    "waterUse": 2,
+    "nitrogenFixation": 0,
+    "erosionReduction": 2,
+    "organicMatter": 2,
+    "forageValue": 2,
+    "marketPotential": 3,
+    "heatTolerance": 4,
+    "droughtTolerance": 5,
+    "cycleDays": 270,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 10,
+      "goodMin": 20,
+      "goodMax": 29,
+      "limitMax": 35
+    },
+    "source": "FAO EcoCrop ficha id=1420 (ciclo 180–365 días, óptimo 20–29 °C y 1000–1500 mm/año, límite absoluto 10–35 °C). Muy tolerante a sequía y habitual con menos de 800 mm/año (El-Sharkawy y Cock 2012). Erosión y mercado: juicio. Temperatura: rango tomado de la ficha EcoCrop citada arriba; Feedipedia (leída) da el óptimo sobre 18–20 °C de media anual y dice que soporta heladas ligeras en zonas altas. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "papa",
+    "name": "Papa (Solanum tuberosum)",
+    "family": "Solanáceas",
+    "waterUse": 3,
+    "nitrogenFixation": 0,
+    "erosionReduction": 1,
+    "organicMatter": 1,
+    "forageValue": 1,
+    "marketPotential": 4,
+    "heatTolerance": 1,
+    "droughtTolerance": 1,
+    "cycleDays": 135,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 10,
+      "goodMin": 18,
+      "goodMax": 20,
+      "limitMax": 30
+    },
+    "source": "FAO Land & Water, ficha de papa (copia archivada 2024): óptimo 18–20 °C de media diaria, el tubérculo crece mal por debajo de 10 °C y por encima de 30 °C; variedades de 90–180 días (medias 120–150; se toma 135); requiere 500–700 mm para 120–150 días; raíz superficial y relativamente sensible al déficit de agua; se recomienda rotación de 3 años o más con maíz, fríjol o alfalfa. La ficha no habla de heladas. Erosión, materia orgánica, forraje y mercado: juicio sin fuente cuantitativa. Meses de siembra: calendario general del catálogo, sin fuente propia para papa en el Eje Cafetero. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "avena",
+    "name": "Avena forrajera (Avena sativa)",
+    "family": "Gramíneas",
+    "waterUse": 2,
+    "nitrogenFixation": 0,
+    "erosionReduction": 4,
+    "organicMatter": 3,
+    "forageValue": 5,
+    "marketPotential": 2,
+    "heatTolerance": 1,
+    "droughtTolerance": 2,
+    "cycleDays": 140,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 5,
+      "goodMin": 12.6,
+      "goodMax": 17.4,
+      "limitMax": 26
+    },
+    "source": "Feedipedia, ficha de avena forrajera: crece entre 5 y 26 °C con más de 500 mm de lluvia; en el trópico se cultiva sobre 1600 m y rinde mejor sobre 2000 m; 4–15 t MS/ha; sirve de cobertura contra la erosión y de cultivo de rotación; proteína cruda 10,5 % de la MS. Ciclo: 111–165 días a cosecha de forraje verde en la variedad Altoandina, ensayos entre 2543 y 3184 m (Campuzano-Duque et al. 2020, Agronomía Mesoamericana 31(3), AGROSAVIA; se toma 140). Ninguna de las dos fuentes da tolerancia a heladas ni a sequía: la sequía es juicio. Mercado: juicio (forraje para uso propio o lechería). Meses de siembra: calendario general del catálogo, sin fuente propia para avena en el Eje Cafetero. Rango bueno de temperatura: medias anuales de los sitios de ensayo colombianos (12,6–17,4 °C), donde rindió bien; es evidencia de que ahí se da, no un óptimo medido. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  },
+  {
+    "id": "repollo",
+    "name": "Repollo (Brassica oleracea var. capitata)",
+    "family": "Crucíferas",
+    "waterUse": 2,
+    "nitrogenFixation": 0,
+    "erosionReduction": 1,
+    "organicMatter": 1,
+    "forageValue": 1,
+    "marketPotential": 3,
+    "heatTolerance": 1,
+    "droughtTolerance": 1,
+    "cycleDays": 130,
+    "sowingMonths": [
+      3,
+      4,
+      9,
+      10
+    ],
+    "temperatureC": {
+      "limitMin": 10,
+      "goodMin": 17,
+      "goodMax": 17,
+      "limitMax": 24
+    },
+    "frostToleranceC": -6,
+    "source": "FAO Land & Water, ficha de repollo (copia archivada 2024): clima fresco y húmedo, óptimo cerca de 17 °C de media diaria (máxima media 24 °C, mínima 10 °C); la mayoría de variedades soporta heladas cortas de −6 °C; ciclo de 90–200 días, 120–140 para buena producción (se toma 130); requiere 380–500 mm; raíz superficial (0,4–0,5 m); se recomienda rotación de al menos 3 años contra enfermedades del suelo. Erosión, materia orgánica, forraje, mercado y sequía: juicio sin fuente cuantitativa. Meses de siembra: calendario general del catálogo, sin fuente propia para repollo en el Eje Cafetero. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local."
+  }
+]

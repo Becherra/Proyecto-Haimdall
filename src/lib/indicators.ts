@@ -1,5 +1,14 @@
 import { CLIMATE_PARAMETERS, type ClimateParameter, type ClimateRecord, type Indicators, type IndicatorValue, type MonthlyClimate, type MonthlyWaterDeficit, type MonthlyWetnessAnomaly } from "../types";
+import { dayOfYear, extraterrestrialRadiation, hargreavesDailyPet } from "./evapotranspiration";
 import { EXTREME_RAIN_PERCENTILE, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, MIN_YEARS_FOR_ANOMALY_BASELINE } from "./config";
+import { adjustTemperatureForElevation } from "./terrain";
+
+export type TerrainIndicatorsInput = {
+  cellElevationMeters?: number;
+  siteElevationMeters?: number;
+  slopePercent?: number;
+  terrainSource?: "srtm-sample" | "user";
+};
 
 type NumericParameter = ClimateParameter;
 
@@ -33,7 +42,18 @@ function groupByMonth(records: readonly ClimateRecord[]): Map<string, ClimateRec
   return groups;
 }
 
-function aggregateMonth(key: string, days: readonly ClimateRecord[]): MonthlyClimate {
+/** Evaporación potencial de un día (Hargreaves–Samani) o null si falta alguna de las tres temperaturas. */
+function dailyPotentialEvaporation(record: ClimateRecord, latitude: number): number | null {
+  const { T2M, T2M_MIN, T2M_MAX } = record;
+  if (T2M === null || T2M_MIN === null || T2M_MAX === null) return null;
+  return hargreavesDailyPet(T2M, T2M_MIN, T2M_MAX, extraterrestrialRadiation(latitude, dayOfYear(record.date)));
+}
+
+function monthlyPotentialEvaporation(days: readonly ClimateRecord[], latitude: number): number | null {
+  return sum(days.flatMap((record) => dailyPotentialEvaporation(record, latitude) ?? []));
+}
+
+function aggregateMonth(key: string, days: readonly ClimateRecord[], latitude: number | undefined): MonthlyClimate {
   const data = Object.fromEntries(AGGREGATED_PARAMETERS.map((name) => [name, validValues(days, name)])) as Record<NumericParameter, IndicatorValue<number[]>>;
   return {
     year: Number(key.slice(0, 4)),
@@ -46,6 +66,7 @@ function aggregateMonth(key: string, days: readonly ClimateRecord[]): MonthlyCli
     evaporationMm: sum(data.EVLAND.value),
     rootZoneWetness: mean(data.GWETROOT.value),
     missingByParameter: Object.fromEntries(AGGREGATED_PARAMETERS.map((name) => [name, data[name].missing])),
+    ...(latitude === undefined ? {} : { potentialEvaporationMm: monthlyPotentialEvaporation(days, latitude) }),
   };
 }
 
@@ -53,23 +74,40 @@ function aggregateMonth(key: string, days: readonly ClimateRecord[]): MonthlyCli
  * Agrega los registros diarios por mes calendario, en orden cronológico.
  * Temperaturas y humedad: promedio de los días con dato (T2M_MIN/T2M_MAX: promedio de las mínimas/máximas diarias).
  * Lluvia y evaporación: suma (mm) de los días con dato. Un parámetro sin ningún dato en el mes queda en null.
+ * Con `latitude` (grados, sur negativo) agrega además `potentialEvaporationMm`: la evaporación potencial estimada
+ * (Hargreaves–Samani) sumada sobre los días con las tres temperaturas; sin latitud no se calcula y el campo no existe.
  */
-export function aggregateMonthly(records: readonly ClimateRecord[]): MonthlyClimate[] {
-  return [...groupByMonth(records).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, days]) => aggregateMonth(key, days));
+export function aggregateMonthly(records: readonly ClimateRecord[], latitude?: number): MonthlyClimate[] {
+  return [...groupByMonth(records).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, days]) => aggregateMonth(key, days, latitude));
 }
 
 /**
- * Balance hídrico mensual = lluvia − evaporación (mm). Negativo = la evaporación supera a la lluvia (déficit).
- * `missing` suma los días faltantes de lluvia y evaporación; con faltantes el balance es parcial porque
- * cada total solo cubre los días con dato.
+ * Balance hídrico de un mes = lluvia − demanda de agua (mm). La demanda es la evaporación potencial estimada si se
+ * calculó (`potentialEvaporationMm`) y, si no, EVLAND de NASA POWER. EVLAND es evaporación *real*: en un sitio árido
+ * queda limitada por la poca lluvia y el balance parece equilibrado aunque falte agua; por eso se prefiere la potencial.
+ * Devuelve null si falta la lluvia o la demanda.
+ */
+export function monthlyWaterBalance({ precipitationMm, evaporationMm, potentialEvaporationMm }: MonthlyClimate): number | null {
+  const demand = potentialEvaporationMm === undefined ? evaporationMm : potentialEvaporationMm;
+  return precipitationMm === null || demand === null ? null : precipitationMm - demand;
+}
+
+/**
+ * Balance hídrico mensual (ver `monthlyWaterBalance`). Negativo = la demanda de agua supera a la lluvia (déficit).
+ * `missing` suma los días faltantes de lluvia y de la demanda (EVLAND, o las temperaturas si se usó la potencial);
+ * con faltantes el balance es parcial porque cada total solo cubre los días con dato.
  */
 export function computeMonthlyWaterDeficit(monthly: readonly MonthlyClimate[]): MonthlyWaterDeficit[] {
-  return monthly.map(({ year, month, precipitationMm, evaporationMm, missingByParameter }) => ({
-    year,
-    month,
-    waterDeficitMm: precipitationMm === null || evaporationMm === null ? null : precipitationMm - evaporationMm,
-    missing: (missingByParameter.PRECTOTCORR ?? 0) + (missingByParameter.EVLAND ?? 0),
-  }));
+  return monthly.map((entry) => {
+    const missing = entry.missingByParameter;
+    const demandMissing = entry.potentialEvaporationMm === undefined ? (missing.EVLAND ?? 0) : Math.max(missing.T2M ?? 0, missing.T2M_MIN ?? 0, missing.T2M_MAX ?? 0);
+    return { year: entry.year, month: entry.month, waterDeficitMm: monthlyWaterBalance(entry), missing: (missing.PRECTOTCORR ?? 0) + demandMissing };
+  });
+}
+
+/** Años calendario distintos que cubre la serie (los parciales cuentan como uno). */
+export function countYears(records: readonly ClimateRecord[]): number {
+  return new Set(records.map((record) => record.date.slice(0, 4))).size;
 }
 
 function countDays(records: readonly ClimateRecord[], parameter: NumericParameter, isRisk: (value: number) => boolean): IndicatorValue<number> {
@@ -142,21 +180,33 @@ export function computeWetnessAnomalies(monthly: readonly MonthlyClimate[]): Mon
 
 /**
  * Arma el objeto `Indicators` completo a partir de los registros diarios.
- * - `waterDeficitMm`: promedio de los balances mensuales (lluvia − evaporación) en mm/mes; negativo = déficit.
+ * - `waterDeficitMm`: promedio de los balances mensuales (lluvia − demanda de agua) en mm/mes; negativo = déficit.
+ *   Con `latitude` la demanda es la evaporación potencial estimada (`waterBalanceMethod: "potential"`); sin ella, EVLAND ("evland").
  * - `heatStressDays` / `frostRiskDays`: total de días de toda la serie (no promedio anual).
  * - `extremeRainThresholdMm`: percentil 95 de lluvia diaria.
  * - `meanRootZoneWetness`: promedio de los días con dato de GWETROOT.
+ * - `meanTemperatureC`: promedio de T2M de los días con dato (temperatura de la celda de NASA POWER, no del lote).
  * - `missingByParameter`: días sin dato por cada uno de los parámetros NASA.
  * Un indicador sin datos suficientes queda en null (o 0 en los conteos de días).
  */
-export function computeIndicators(records: readonly ClimateRecord[]): Indicators {
-  const monthlyBalances = computeMonthlyWaterDeficit(aggregateMonthly(records)).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
+export function computeIndicators(records: readonly ClimateRecord[], latitude?: number, terrain?: TerrainIndicatorsInput): Indicators {
+  const monthlyBalances = computeMonthlyWaterDeficit(aggregateMonthly(records, latitude)).flatMap(({ waterDeficitMm }) => (waterDeficitMm === null ? [] : [waterDeficitMm]));
+  const cellMeanC = mean(validValues(records, "T2M").value);
+  const canAdjust = cellMeanC !== null && terrain?.cellElevationMeters !== undefined && terrain?.siteElevationMeters !== undefined;
+  const meanTemperatureC = canAdjust ? adjustTemperatureForElevation(cellMeanC, terrain.cellElevationMeters!, terrain.siteElevationMeters!) : cellMeanC;
   return {
     waterDeficitMm: mean(monthlyBalances),
     heatStressDays: countHeatStressDays(records).value,
     frostRiskDays: countFrostRiskDays(records).value,
     extremeRainThresholdMm: extremeRainThreshold(records).value,
     meanRootZoneWetness: mean(validValues(records, "GWETROOT").value),
+    meanTemperatureC,
+    ...(canAdjust ? { cellMeanTemperatureC: cellMeanC } : {}),
+    ...(terrain?.cellElevationMeters === undefined ? {} : { cellElevationMeters: terrain.cellElevationMeters }),
+    ...(terrain?.siteElevationMeters === undefined ? {} : { siteElevationMeters: terrain.siteElevationMeters }),
+    ...(terrain?.slopePercent === undefined ? {} : { slopePercent: terrain.slopePercent }),
+    ...(terrain?.terrainSource === undefined ? {} : { terrainSource: terrain.terrainSource }),
     missingByParameter: Object.fromEntries(CLIMATE_PARAMETERS.map((name) => [name, validValues(records, name).missing])),
+    waterBalanceMethod: latitude === undefined ? "evland" : "potential",
   };
 }

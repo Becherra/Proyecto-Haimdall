@@ -1,0 +1,72 @@
+import type { Crop, Rotation, RotationResult } from "../types";
+import { HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, NITROGEN_FIXER_THRESHOLD } from "./config";
+
+/** Rotaciones posibles por cada estrategia alternativa; el análisis las puntúa y se queda con la mejor de cada lista. */
+export type RotationCandidates = { legume: Rotation[]; coverDrought: Rotation[] };
+
+/** Nombre común sin el nombre científico: "Maíz (Zea mays)" → "Maíz". */
+export function commonName(crop: Crop): string {
+  return crop.name.split(" (")[0];
+}
+
+const sameFamily = (a: Crop, b: Crop) => a.family !== undefined && a.family === b.family;
+const fixesNitrogen = (crop: Crop) => crop.nitrogenFixation >= NITROGEN_FIXER_THRESHOLD;
+/** Tiene mercado propio: deja fuera los abonos verdes, que van en la alternativa de cobertura. */
+const hasMarket = (crop: Crop) => crop.marketPotential >= LOW_ATTRIBUTE_THRESHOLD;
+const isCover = (crop: Crop) => crop.erosionReduction >= HIGH_ATTRIBUTE_THRESHOLD;
+const isDroughtTolerant = (crop: Crop) => crop.droughtTolerance >= HIGH_ATTRIBUTE_THRESHOLD;
+
+function sequence(id: string, crops: readonly Crop[], description: string): Rotation {
+  return { id, name: crops.map(commonName).join(" → "), cropIds: crops.map((crop) => crop.id), description };
+}
+
+/** Línea base: el cultivo actual del agricultor repetido, sin rotación. */
+export function baselineRotation(current: Crop): Rotation {
+  return { id: "baseline", name: `Actual: ${current.name}`, cropIds: [current.id], description: "Mantiene la práctica declarada como línea base de comparación." };
+}
+
+/**
+ * Parejas para el cultivo actual que combinan un cultivo que fija nitrógeno con uno que no:
+ * si el actual no fija, se le suma una leguminosa de grano; si ya fija, un cultivo de otra familia que aproveche ese nitrógeno.
+ */
+function legumeCandidates(crops: readonly Crop[], current: Crop): Rotation[] {
+  const currentFixes = fixesNitrogen(current);
+  return crops
+    .filter((crop) => crop.id !== current.id && hasMarket(crop) && fixesNitrogen(crop) !== currentFixes && !sameFamily(crop, current))
+    .map((partner) => sequence("legume", [current, partner], currentFixes
+      ? `Alterna ${commonName(current)}, que fija nitrógeno, con ${commonName(partner)} para aprovechar ese nitrógeno y diversificar ingresos.`
+      : `Intercala ${commonName(partner)}, una leguminosa que fija nitrógeno, con ${commonName(current)} para aportar al suelo y diversificar ingresos.`));
+}
+
+/** Cultivo actual + una cobertura del suelo + un cultivo tolerante a sequía, los tres distintos (CONTEXT.md §8). */
+function coverDroughtCandidates(crops: readonly Crop[], current: Crop): Rotation[] {
+  const others = crops.filter((crop) => crop.id !== current.id);
+  return others.filter(isCover).flatMap((cover) => others.filter((crop) => isDroughtTolerant(crop) && crop.id !== cover.id)
+    .map((tolerant) => sequence("cover-drought", [current, cover, tolerant], `Mantiene ${commonName(current)}, agrega ${commonName(cover)} como cobertura del suelo y ${commonName(tolerant)} como cultivo resistente a la sequía.`)));
+}
+
+/**
+ * Arma las rotaciones candidatas alrededor del cultivo actual para las dos estrategias alternativas.
+ * No elige: devuelve todas las combinaciones válidas del catálogo para que el motor de puntuación decida según el sitio y las prioridades.
+ * Una lista vacía significa que el catálogo no alcanza para esa estrategia.
+ */
+export function candidateRotations(crops: readonly Crop[], current: Crop): RotationCandidates {
+  return { legume: legumeCandidates(crops, current), coverDrought: coverDroughtCandidates(crops, current) };
+}
+
+/**
+ * Fracción (0–1) de relevos de la secuencia que cambian de familia botánica, contando la vuelta del último cultivo al primero.
+ * Un monocultivo da 0; una rotación que nunca repite familia en relevos seguidos da 1.
+ * Devuelve null si la secuencia está vacía o algún cultivo no trae familia: sin ese dato no se puede evaluar.
+ */
+export function familyBreakShare(crops: readonly Crop[]): number | null {
+  if (crops.length === 0 || crops.some((crop) => crop.family === undefined)) return null;
+  const changes = crops.filter((crop, index) => crop.family !== crops[(index + 1) % crops.length].family).length;
+  return changes / crops.length;
+}
+
+/** El resultado de mayor puntaje; en empate, el primero. Lanza un Error si no hay candidatos. */
+export function pickBest(results: readonly RotationResult[]): RotationResult {
+  if (results.length === 0) throw new Error("No hay rotaciones candidatas para elegir");
+  return results.reduce((best, result) => (result.score > best.score ? result : best));
+}
