@@ -4,15 +4,15 @@ import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
 /** Un pedazo de texto para leer en voz alta; con `audioId` se usa la grabación `public/audio/<audioId>.mp3` si existe. */
 export type SpeechItem = { text: string; audioId?: string };
 
-export const MAX_LEAVES = 5;
+export const MAX_STARS = 5;
 export const BASELINE_ROTATION_ID = "baseline";
 
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"] as const;
 
-/** El puntaje del motor va de 0 a 5: se muestra como hojitas llenas. */
-export function scoreToLeaves(score: number): number {
+/** El puntaje del motor va de 0 a 5: se muestra como estrellas llenas. */
+export function scoreToStars(score: number): number {
   if (!Number.isFinite(score)) return 0;
-  return Math.min(MAX_LEAVES, Math.max(0, Math.round(score)));
+  return Math.min(MAX_STARS, Math.max(0, Math.round(score)));
 }
 
 /** Posición de la rotación con mayor puntaje (la primera si empatan); -1 si no hay ninguna. */

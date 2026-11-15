@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { bestRotationIndex, climateTopicSpeechItems, describeClimate, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToLeaves } from "../src/lib/ui/resultsCopy";
+import { bestRotationIndex, climateTopicSpeechItems, describeClimate, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
 import type { Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
 const rotation = (score: number, id = "x"): RotationResult => ({ rotation: { id, name: id, cropIds: ["maiz"], description: "d" }, score, whySuggested: "Porque sí.", evidence: ["Dato A"], benefits: ["Beneficio 1", "Beneficio 2."], informationGaps: ["Vacío"], risks: ["Riesgo"], validateWithLocalExpert: ["Validar"] });
 const month = (m: number, mm: number | null): MonthlyClimate => ({ year: 2020, month: m, meanTemperatureC: 20, precipitationMm: mm, evaporationMm: 1, rootZoneWetness: 0.5, missingByParameter: {} });
 
-describe("scoreToLeaves", () => {
+describe("scoreToStars", () => {
   it("redondea y limita de 0 a 5", () => {
-    expect(scoreToLeaves(3.4)).toBe(3);
-    expect(scoreToLeaves(4.6)).toBe(5);
-    expect(scoreToLeaves(9)).toBe(5);
-    expect(scoreToLeaves(-2)).toBe(0);
-    expect(scoreToLeaves(Number.NaN)).toBe(0);
+    expect(scoreToStars(3.4)).toBe(3);
+    expect(scoreToStars(4.6)).toBe(5);
+    expect(scoreToStars(9)).toBe(5);
+    expect(scoreToStars(-2)).toBe(0);
+    expect(scoreToStars(Number.NaN)).toBe(0);
   });
 });
 

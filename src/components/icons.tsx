@@ -5,8 +5,6 @@ function Svg({ children, className = "h-14 w-14" }: { children: ReactNode; class
   return <svg viewBox="0 0 48 48" className={className} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
 }
 
-const leaf = "M24 4 C31 11 31 20 24 28 C17 20 17 11 24 4 Z";
-
 const CROP_ICONS: Record<string, ReactNode> = {
   maiz: <><ellipse cx="24" cy="20" rx="7" ry="14" /><path d="M24 7v26M18 14h12M17.5 20h13M18 26h12" strokeWidth="1.8" /><path d="M24 36C14 36 11 27 13 21M24 36c10 0 13-9 11-15M24 36v8" /></>,
   frijol: <><g transform="translate(18 17) rotate(-20)"><path d="M-11 0C-11-7-4-9.500 3-7.500 10-5.500 12-1 9 2 6 4.500 4 1 1 3.500-2 6-11 7-11 0Z" /><path d="M5-3c-1.500 1-2.500 2-3 3.500" strokeWidth="1.8" /></g><g transform="translate(30 31) rotate(15)"><path d="M-11 0C-11-7-4-9.500 3-7.500 10-5.500 12-1 9 2 6 4.500 4 1 1 3.500-2 6-11 7-11 0Z" /><path d="M5-3c-1.500 1-2.500 2-3 3.500" strokeWidth="1.8" /></g></>,
@@ -45,7 +43,6 @@ const UI_ICONS = {
   stop: <rect x="11" y="11" width="26" height="26" rx="4" fill="currentColor" />,
   speaker: <><path d="M6 19h8l11-9v28l-11-9H6Z" fill="currentColor" /><path d="M32 17c3 4 3 10 0 14M37 12c6 7 6 17 0 24" /></>,
   star: <path d="M24 5l5.500 11.500 12.500 1.700-9.200 8.700 2.300 12.400L24 33l-11.100 6.300 2.300-12.400L6 18.200l12.500-1.700Z" fill="currentColor" />,
-  leaf: <path d="M8 40C8 20 20 8 42 6c0 22-12 34-34 34ZM8 40 28 20" fill="currentColor" />,
   arrow: <path d="M6 24h32M28 14l10 10-10 10" />,
   back: <path d="M42 24H10M20 14 10 24l10 10" />,
   field: <><path d="M4 38 14 16h20l10 22Z" /><path d="M9 28h30M12 22h24" strokeWidth="1.800" /></>,

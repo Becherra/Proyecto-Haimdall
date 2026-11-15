@@ -6,7 +6,7 @@ import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import { useSpeaker } from "./useSpeaker";
-import { bestRotationIndex, climateTopicSpeechItems, describeClimate, isCurrentRotation, MAX_LEAVES, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToLeaves } from "../lib/ui/resultsCopy";
+import { bestRotationIndex, climateTopicSpeechItems, describeClimate, isCurrentRotation, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToStars } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, RotationSection } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, Farm, RotationResult } from "../types";
 
@@ -26,10 +26,10 @@ function PlayButton({ playing, onClick, size = "small" }: PlayProps) {
   </button>;
 }
 
-function Leaves({ score, className = "h-7 w-7" }: { score: number; className?: string }) {
-  const full = scoreToLeaves(score);
-  return <span className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_LEAVES}`}>
-    {Array.from({ length: MAX_LEAVES }, (_, index) => <span key={index} className={index < full ? "" : "opacity-25"}><UiIcon name="leaf" className={className} /></span>)}
+function Stars({ score, className = "h-7 w-7" }: { score: number; className?: string }) {
+  const full = scoreToStars(score);
+  return <span className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
+    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "" : "opacity-25"}><UiIcon name="star" className={className} /></span>)}
   </span>;
 }
 
@@ -52,7 +52,7 @@ function RotationCard({ result, best, onOpen }: { result: RotationResult; best: 
     <div className="flex items-start justify-between gap-2"><Badges result={result} best={best} /><UiIcon name="arrow" className="h-7 w-7 shrink-0 text-cream" /></div>
     <CropChain cropIds={result.rotation.cropIds} />
     <p className="text-lg font-bold text-bone-white">{result.rotation.name}</p>
-    <Leaves score={result.score} />
+    <Stars score={result.score} />
   </button>;
 }
 
@@ -71,7 +71,7 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
         <Badges result={result} best={best} />
         <CropChain cropIds={result.rotation.cropIds} />
         <p className="text-xl font-bold text-bone-white">{result.rotation.name}</p>
-        <Leaves score={result.score} />
+        <Stars score={result.score} />
       </div>
       {rotationSections(result).map((section) => <article key={section.id} className="rounded-3xl border border-olive/40 bg-spruce p-4">
         <h3 className="mb-3 flex items-center gap-3 text-xl font-bold text-cream"><UiIcon name={SECTION_ICONS[section.id]} className="h-9 w-9 shrink-0" />{section.title}</h3>
@@ -119,14 +119,14 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
   const bestIndex = bestRotationIndex(response.rotations);
   const open = openIndex === null ? null : response.rotations[openIndex] ?? null;
 
-  return <main className="min-h-screen bg-meadow">
+  return <main className="fixed inset-0 z-40 overflow-y-auto bg-meadow">
     <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4">
       <header className="flex items-center justify-between gap-3">
         <Logo variant="horizontal" size={36} />
         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-cream/60 shadow-lg" role="img" aria-label={`Mapa de ${farm.placeLabel ?? "tu finca"}`}><FarmMiniMap farm={farm} /></div>
       </header>
 
-      <h2 className="flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="leaf" className="h-8 w-8 text-cream" />Tus 3 caminos</h2>
+      <h2 className="flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-cream" />Tus 3 caminos</h2>
       {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} onOpen={() => setOpenIndex(index)} />)}
 
       <h2 className="mt-4 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-cream" />El clima de tu zona</h2>
