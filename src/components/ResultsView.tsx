@@ -58,6 +58,7 @@ function RotationCard({ result, best, onOpen }: { result: RotationResult; best: 
 
 function RotationDetail({ result, best, onClose }: { result: RotationResult; best: boolean; onClose: () => void }) {
   const { playingKey, play, stop } = useSpeaker();
+  const [openId, setOpenId] = useState<RotationSection["id"] | null>(null);
   const key = `rotation-${result.rotation.id}`;
   const close = () => { stop(); onClose(); };
   return <section className="fixed inset-0 z-50 overflow-y-auto bg-meadow" aria-label={result.rotation.name}>
@@ -73,10 +74,19 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
         <p className="text-xl font-bold text-bone-white">{result.rotation.name}</p>
         <Stars score={result.score} />
       </div>
-      {rotationSections(result).map((section) => <article key={section.id} className="rounded-3xl border border-olive/40 bg-spruce p-4">
-        <h3 className="mb-3 flex items-center gap-3 text-xl font-bold text-cream"><UiIcon name={SECTION_ICONS[section.id]} className="h-9 w-9 shrink-0" />{section.title}</h3>
-        <ul className="space-y-2 text-lg leading-7 text-bone-white">{section.texts.map((text) => <li key={text}>{text}</li>)}</ul>
-      </article>)}
+      <div className="flex flex-col gap-3">
+        {rotationSections(result).map((section) => {
+          const isOpen = openId === section.id;
+          return <article key={section.id} className={`rounded-3xl border bg-spruce transition ${isOpen ? "border-cream" : "border-olive/40"}`}>
+            <button type="button" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : section.id)} className="flex min-h-20 w-full items-center gap-4 rounded-3xl px-4 text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50">
+              <UiIcon name={SECTION_ICONS[section.id]} className="h-10 w-10 shrink-0 text-cream" />
+              <span className="flex-1 text-xl font-bold text-bone-white">{section.title}</span>
+              <UiIcon name={isOpen ? "up" : "down"} className="h-7 w-7 shrink-0 text-cream" />
+            </button>
+            {isOpen && <ul className="space-y-2 px-4 pb-4 text-lg leading-7 text-bone-white">{section.texts.map((text) => <li key={text}>{text}</li>)}</ul>}
+          </article>;
+        })}
+      </div>
     </div>
   </section>;
 }
@@ -123,7 +133,7 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
     <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4">
       <header className="flex items-center justify-between gap-3">
         <Logo variant="horizontal" size={36} />
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-cream/60 shadow-lg" role="img" aria-label={`Mapa de ${farm.placeLabel ?? "tu finca"}`}><FarmMiniMap farm={farm} /></div>
+        <div className="relative isolate z-0 h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-cream/60 shadow-lg" role="img" aria-label={`Mapa de ${farm.placeLabel ?? "tu finca"}`}><FarmMiniMap farm={farm} /></div>
       </header>
 
       <h2 className="flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-cream" />Tus 3 caminos</h2>

@@ -43,6 +43,8 @@ const UI_ICONS = {
   stop: <rect x="11" y="11" width="26" height="26" rx="4" fill="currentColor" />,
   speaker: <><path d="M6 19h8l11-9v28l-11-9H6Z" fill="currentColor" /><path d="M32 17c3 4 3 10 0 14M37 12c6 7 6 17 0 24" /></>,
   star: <path d="M24 5l5.500 11.500 12.500 1.700-9.200 8.700 2.300 12.400L24 33l-11.100 6.300 2.300-12.400L6 18.200l12.500-1.700Z" fill="currentColor" />,
+  down: <path d="M10 18l14 14 14-14" />,
+  up: <path d="M10 30l14-14 14 14" />,
   arrow: <path d="M6 24h32M28 14l10 10-10 10" />,
   back: <path d="M42 24H10M20 14 10 24l10 10" />,
   field: <><path d="M4 38 14 16h20l10 22Z" /><path d="M9 28h30M12 22h24" strokeWidth="1.800" /></>,
