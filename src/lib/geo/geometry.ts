@@ -157,9 +157,11 @@ export function validateTerrain(terrain: FarmTerrain): TerrainValidation {
   if (terrain.kind === "point") return { valid: true, errors: [], warnings: [] };
   if (terrain.kind === "approx_size") {
     const errors = areaErrors(terrain.areaHa);
-    const knownRange = APPROXIMATE_AREA_RANGES_HA.some(([minimum, maximum]) => minimum === terrain.areaRangeHa[0] && maximum === terrain.areaRangeHa[1]);
-    if (!knownRange) errors.push("El rango de área aproximada no está permitido.");
-    else if (Math.abs(terrain.areaHa - representativeAreaHa(terrain.areaRangeHa)) > 1e-9) errors.push("El área representativa debe ser el punto medio del rango.");
+    if (terrain.areaRangeHa) {
+      const knownRange = APPROXIMATE_AREA_RANGES_HA.some(([minimum, maximum]) => minimum === terrain.areaRangeHa?.[0] && maximum === terrain.areaRangeHa?.[1]);
+      if (!knownRange) errors.push("El rango de área aproximada no está permitido.");
+      else if (Math.abs(terrain.areaHa - representativeAreaHa(terrain.areaRangeHa)) > 1e-9) errors.push("El área representativa debe ser el punto medio del rango.");
+    }
     const warnings = terrain.areaHa > LARGE_TERRAIN_WARNING_HA ? ["El área supera 1.000 ha; confirma que el tamaño sea correcto."] : [];
     return { valid: errors.length === 0, errors, warnings };
   }
