@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearClimateCache, fetchDailyClimate, fetchRecentClimate, InvalidClimateRequestError } from "../src/lib/nasaPower";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CLIMATE_CACHE } from "../src/lib/config";
+import { clearClimateCache, fetchDailyClimate, fetchRecentClimate, InvalidClimateRequestError, snapToPowerCell } from "../src/lib/nasaPower";
 
 const fixture = JSON.parse(readFileSync("tests/fixtures/power-pereira.json", "utf8")) as unknown;
 const request = { lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022 };
@@ -151,5 +152,117 @@ describe("fetchRecentClimate", () => {
   it("no usa la muestra precargada como respaldo: si NASA falla, falla", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
     await expect(fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, NOW)).rejects.toThrow("HTTP 503");
+  });
+});
+
+describe("celda de NASA POWER", () => {
+  it("lleva cualquier punto al centro de su celda de 0,5° × 0,625°", () => {
+    expect(snapToPowerCell(4.8133, -75.6961)).toEqual({ lat: 5, lon: -75.625 });
+    expect(snapToPowerCell(5.0689, -75.5174)).toEqual({ lat: 5, lon: -75.625 });
+    expect(snapToPowerCell(4.5339, -75.6811)).toEqual({ lat: 4.5, lon: -75.625 });
+    expect(snapToPowerCell(-33.9, 18.4)).toEqual({ lat: -34, lon: 18.125 });
+  });
+
+  it("no se sale de los límites en los polos ni en el antimeridiano", () => {
+    expect(snapToPowerCell(90, 0)).toEqual({ lat: 90, lon: 0 });
+    expect(snapToPowerCell(-90, -180)).toEqual({ lat: -90, lon: -180 });
+    expect(snapToPowerCell(10, 180)).toEqual({ lat: 10, lon: -180 });
+    expect(snapToPowerCell(10, 179.9)).toEqual({ lat: 10, lon: -180 });
+  });
+});
+
+describe("caché del clima", () => {
+  const sevenParameters = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
+  beforeEach(() => { clearClimateCache(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("dos puntos de la misma celda comparten una sola consulta a NASA, hecha al centro de la celda", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => sevenParameters(fixture));
+    vi.stubGlobal("fetch", fetchMock);
+    const pereira = await fetchDailyClimate(request);
+    const manizales = await fetchDailyClimate({ ...request, lat: 5.0689, lon: -75.5174 });
+    const nearby = await fetchDailyClimate({ ...request, lat: 4.81331, lon: -75.69611 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect([url.searchParams.get("latitude"), url.searchParams.get("longitude")]).toEqual(["5", "-75.625"]);
+    expect([pereira.source, manizales.source, nearby.source]).toEqual(["live", "cache", "cache"]);
+  });
+
+  it("celdas distintas hacen consultas distintas", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => sevenParameters(fixture));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchDailyClimate(request);
+    await fetchDailyClimate({ ...request, lat: 4.5339, lon: -75.6811 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("una respuesta en vivo vence después del tiempo de vida y se vuelve a pedir", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+    const fetchMock = vi.fn().mockImplementation(async () => sevenParameters(fixture));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchDailyClimate(request);
+    vi.setSystemTime(Date.now() + CLIMATE_CACHE.historicalTtlMs - 1);
+    await fetchDailyClimate(request);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(Date.now() + 1);
+    await fetchDailyClimate(request);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("la muestra guardada sigue rotulada como muestra en las consultas siguientes, no como caché", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    const first = await fetchDailyClimate(request);
+    const second = await fetchDailyClimate(request);
+    expect(first.source).toBe("sample");
+    expect(second.source).toBe("sample");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("vuelve a intentar con NASA cuando pasa la ventana corta del respaldo", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    expect((await fetchDailyClimate(request)).source).toBe("sample");
+    vi.setSystemTime(Date.now() + CLIMATE_CACHE.fallbackTtlMs);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => sevenParameters(fixture)));
+    expect((await fetchDailyClimate(request)).source).toBe("live");
+  });
+
+  it("el clima reciente vence a las horas, no a los días", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const now = new Date("2026-11-15T12:00:00Z");
+    vi.setSystemTime(now);
+    const fetchMock = vi.fn().mockImplementation(async () => sevenParameters({ properties: { parameter: Object.fromEntries(["T2M", "T2M_MIN", "T2M_MAX", "PRECTOTCORR", "EVLAND", "GWETROOT", "ALLSKY_SFC_SW_DWN"].map((name) => [name, { "20261112": 1 }])) } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, now);
+    vi.setSystemTime(Date.now() + CLIMATE_CACHE.recentTtlMs);
+    await fetchRecentClimate({ lat: 4.8133, lon: -75.6961, days: 10 }, now);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("límite de uso de NASA POWER (HTTP 429)", () => {
+  beforeEach(() => { clearClimateCache(); vi.restoreAllMocks(); });
+
+  it("usa la muestra precargada sin reintentar cuando NASA limita las consultas", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("", { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await fetchDailyClimate(request);
+    expect(result.source).toBe("sample");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin muestra para el sitio falla con un mensaje claro y tampoco reintenta", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("", { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchDailyClimate({ ...request, lat: 6.25, lon: -75.56 })).rejects.toThrow("HTTP 429");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("otros errores 4xx siguen siendo errores: no se esconden detrás de la muestra", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 422 })));
+    await expect(fetchDailyClimate(request)).rejects.toThrow("HTTP 422");
   });
 });

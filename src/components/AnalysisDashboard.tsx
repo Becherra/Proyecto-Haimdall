@@ -5,8 +5,9 @@ import { useReveal } from "./motion";
 import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
+import { StarGlyphs } from "./StarGlyphs";
 import { useSpeaker } from "./useSpeaker";
-import { activeScenarioPreset, bestRotationIndex, cropLink, describeNasaSupport, describeSimpleSources, isCurrentRotation, MAX_STARS, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import { activeScenarioPreset, bestRotationIndex, compareScores, cropLink, describeNasaSupport, describeSimpleSources, isCurrentRotation, MAX_STARS, SCENARIO_PRESETS, scenarioPresets } from "../lib/ui/resultsCopy";
 import type { NasaSupportItemId, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, Farm, RotationResult } from "../types";
 
@@ -38,10 +39,7 @@ function PlaySmall({ playing, onClick }: { playing: boolean; onClick: () => void
 }
 
 function Stars({ score }: { score: number }) {
-  const full = scoreToStars(score);
-  return <span className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
-    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "" : "opacity-25"}><UiIcon name="star" className="h-6 w-6" /></span>)}
-  </span>;
+  return <StarGlyphs score={score} iconClassName="h-6 w-6" />;
 }
 
 /** Los ids de rotación son "ranuras" (p. ej. "legume"): con otro clima la misma ranura puede traer otro camino, así que también se comparan los cultivos. */
@@ -49,9 +47,9 @@ const sameRotation = (a: RotationResult, b: RotationResult) => a.rotation.id ===
 
 function changePhrase(current: number, base: number | undefined): { text: string; tone: string } {
   if (base === undefined) return { text: "Este camino aparece con este clima: no estaba entre los 3 con clima normal", tone: "text-cream" };
-  const diff = scoreToStars(current) - scoreToStars(base);
-  if (diff > 0) return { text: "Con este clima le va mejor que con el normal", tone: "text-olive-light" };
-  if (diff < 0) return { text: "Con este clima le va peor que con el normal", tone: "text-clay-light" };
+  const change = compareScores(current, base);
+  if (change === "better") return { text: "Con este clima le va mejor que con el normal", tone: "text-olive-light" };
+  if (change === "worse") return { text: "Con este clima le va peor que con el normal", tone: "text-clay-light" };
   return { text: "Con este clima le va igual que con el normal", tone: "text-silver-mist" };
 }
 
@@ -77,7 +75,8 @@ export default function AnalysisDashboard({ farm, response, baseline, mockMode, 
   const { playingKey, play } = useSpeaker();
   const supportItems = useMemo(() => describeNasaSupport(response), [response]);
   const sources = useMemo(() => describeSimpleSources(response.dataSources), [response.dataSources]);
-  const active = activeScenarioPreset(response.scenario);
+  const presets = scenarioPresets(response.extremeYears);
+  const active = activeScenarioPreset(response.scenario, presets);
   const bestIndex = bestRotationIndex(response.rotations);
   const showChange = active.id !== "normal";
   const reveal = useReveal<HTMLElement>();
@@ -103,7 +102,7 @@ export default function AnalysisDashboard({ farm, response, baseline, mockMode, 
           <div><h2 className="text-xl font-bold text-bone-white">¿Y si cambia el tiempo?</h2><p className="text-sm text-silver-mist">Toca un botón para poner a prueba tus 3 caminos.</p></div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {SCENARIO_PRESETS.map((preset) => {
+          {presets.map((preset) => {
             const selected = preset.id === active.id;
             return <button key={preset.id} type="button" aria-pressed={selected} disabled={applyingScenario || (mockMode && preset.id !== "normal")} onClick={() => pickPreset(preset.scenario)} className={`flex flex-col items-start gap-1.5 rounded-2xl border-2 p-3 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 disabled:opacity-40 ${selected ? "border-cream bg-olive/50 text-bone-white" : "border-olive/40 bg-meadow/40 text-silver-mist hover:border-cream/60"}`}>
               <UiIcon name={SCENARIO_ICONS[preset.id]} className={`h-8 w-8 ${selected ? "text-cream" : "text-olive-light"}`} />

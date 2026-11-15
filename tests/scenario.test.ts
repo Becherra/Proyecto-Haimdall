@@ -7,6 +7,10 @@ import { clearClimateCache } from "../src/lib/nasaPower";
 import { applyScenario, describeScenario, isNeutralScenario } from "../src/lib/scenario";
 import { analysisResponseSchema, type ClimateRecord, type ClimateResult, type UserPriorities } from "../src/types";
 
+
+// El terreno en vivo llama a otro servicio con el mismo fetch global: aquí se apaga para que estos tests solo cuenten las llamadas a NASA POWER.
+vi.mock("../src/lib/terrainLive", () => ({ fetchLiveTerrain: vi.fn().mockResolvedValue(null), clearLiveTerrainCache: vi.fn() }));
+
 const record = (date: string, overrides: Partial<ClimateRecord> = {}): ClimateRecord => ({ date, T2M: 20, T2M_MIN: 14, T2M_MAX: 27, PRECTOTCORR: 10, EVLAND: 3, GWETROOT: 0.7, ALLSKY_SFC_SW_DWN: 15, ...overrides });
 
 describe("applyScenario", () => {

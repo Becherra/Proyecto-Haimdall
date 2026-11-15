@@ -1,6 +1,6 @@
-import type { AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, Indicators, MonthlyClimate, RotationResult } from "../../types";
-import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C } from "../config";
-import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
+import type { AnalysisClimate, AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, ExtremeYear, ExtremeYears, Indicators, MonthlyClimate, RotationResult } from "../../types";
+import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C, FROST_THRESHOLD_C, HEAT_STRESS_THRESHOLD_C, ROOT_WETNESS_DRY_BELOW, ROOT_WETNESS_HUMID_FROM, SCORE_DIFFERENCE_NOTICE, WATER_SHORT_YEAR_SHARE } from "../config";
+import { summarizeMonthlyClimate, waterShortMonths } from "./monthlyClimateSummary";
 
 /** Un pedazo de texto para leer en voz alta; con `audioId` se usa la grabación `public/audio/<audioId>.mp3` si existe. */
 export type SpeechItem = { text: string; audioId?: string };
@@ -10,10 +10,27 @@ export const BASELINE_ROTATION_ID = "baseline";
 
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"] as const;
 
-/** El puntaje del motor va de 0 a 5: se muestra como estrellas llenas. */
-export function scoreToStars(score: number): number {
-  if (!Number.isFinite(score)) return 0;
-  return Math.min(MAX_STARS, Math.max(0, Math.round(score)));
+/** Medias estrellas (0–10) del puntaje: media estrella por cada 0,5 puntos, para que una diferencia chica no salte una estrella entera. */
+function halfSteps(score: number): number {
+  return Number.isFinite(score) ? Math.min(MAX_STARS * 2, Math.max(0, Math.round(score * 2))) : 0;
+}
+
+/** El puntaje del motor va de 0 a 5: cuánto se llena cada una de las 5 estrellas (0, media o llena). */
+export function starFills(score: number): Array<0 | 0.5 | 1> {
+  const halves = halfSteps(score);
+  return Array.from({ length: MAX_STARS }, (_, index) => (Math.min(2, Math.max(0, halves - 2 * index)) / 2) as 0 | 0.5 | 1);
+}
+
+/** Texto de las estrellas para lectores de pantalla, con las medias: "2,5 de 5". */
+export function starsLabel(score: number): string {
+  return `${fmt(halfSteps(score) / 2, 1)} de ${MAX_STARS}`;
+}
+
+/** ¿Es una opción mejor, peor o igual que otra? Compara los puntajes y no las estrellas, y solo habla de diferencia si llega a `SCORE_DIFFERENCE_NOTICE`. */
+export function compareScores(current: number, base: number): "better" | "worse" | "same" {
+  const difference = current - base;
+  if (difference >= SCORE_DIFFERENCE_NOTICE) return "better";
+  return difference <= -SCORE_DIFFERENCE_NOTICE ? "worse" : "same";
 }
 
 /** Posición de la rotación con mayor puntaje (la primera si empatan); -1 si no hay ninguna. */
@@ -51,29 +68,69 @@ export const CLIMATE_EXPLANATIONS: Record<ClimateTopicId, Pick<ClimateTopic, "si
 
 const daysPhrase = (count: number, singular: string, plural: string) => `${count} ${count === 1 ? singular : plural}`;
 
-function zoneSentence(id: ClimateTopicId, indicators: Indicators): string {
+/** Lo que se sabe de la serie mensual; sin ella las frases conservan su forma simple. `years` son los años de la serie; `shortMonths`, los meses con falta de agua frecuente (null = no se pudo evaluar). */
+type ZoneContext = { shortMonths: number[] | null; years: number | null };
+
+/** "cerca de 3 días al año" o "menos de 1 día al año": el total de la serie no dice nada si no se sabe de cuántos años es. */
+function perYearPhrase(total: number, years: number): string {
+  const perYear = total / years;
+  if (perYear < 1) return "menos de 1 día al año";
+  const rounded = Math.round(perYear);
+  return `cerca de ${rounded} ${rounded === 1 ? "día" : "días"} al año`;
+}
+
+function waterSentence(balance: number, { shortMonths }: ZoneContext): string {
+  const names = (shortMonths ?? []).map((month) => MONTH_NAMES[month - 1] as string);
+  if (balance < 0) {
+    const where = names.length === MONTH_NAMES.length ? " Y falta durante todo el año." : names.length > 0 ? ` Sobre todo en ${listWords(names)}.` : "";
+    return `Aquí se pierde más agua de la que cae: puede faltar agua.${where}`;
+  }
+  if (shortMonths === null) return "Aquí la lluvia alcanza: cae más agua de la que se pierde.";
+  if (names.length === 0) return "Aquí la lluvia alcanza: cae más agua de la que se pierde, también en los meses más secos.";
+  return `En promedio la lluvia alcanza, pero en ${listWords(names)} falta agua: en al menos 1 de cada ${Math.round(1 / WATER_SHORT_YEAR_SHARE)} años cayó menos de la que se pierde por el calor.`;
+}
+
+function rootsSentence(wetness: number): string {
+  const level = wetness < ROOT_WETNESS_DRY_BELOW ? "es bastante seca" : wetness < ROOT_WETNESS_HUMID_FROM ? "tiene humedad media" : "suele estar húmeda";
+  return `La tierra de tu zona ${level}: el índice de humedad es ${fmt(wetness, 2)} de 1, medido por satélite en una zona grande.`;
+}
+
+function zoneSentence(id: ClimateTopicId, indicators: Indicators, context: ZoneContext): string {
   switch (id) {
     case "water":
-      if (indicators.waterDeficitMm === null) return NO_DATA;
-      return indicators.waterDeficitMm >= 0 ? "Aquí la lluvia alcanza: cae más agua de la que se pierde." : "Aquí se pierde más agua de la que cae: puede faltar agua.";
-    case "heat":
-      return indicators.heatStressDays === 0 ? "En los años analizados no hubo días de calor fuerte." : `Hubo ${daysPhrase(indicators.heatStressDays, "día", "días")} de calor fuerte en los años analizados.`;
-    case "frost":
-      return indicators.frostRiskDays === 0 ? "En los años analizados no hubo riesgo de helada." : `Hubo ${daysPhrase(indicators.frostRiskDays, "día", "días")} con riesgo de helada en los años analizados.`;
+      return indicators.waterDeficitMm === null ? NO_DATA : waterSentence(indicators.waterDeficitMm, context);
+    case "heat": {
+      const limit = `más de ${HEAT_STRESS_THRESHOLD_C} °C`;
+      if (indicators.heatStressDays === 0) return `En los años analizados no hubo días de calor fuerte (${limit}).`;
+      return context.years === null ? `Hubo ${daysPhrase(indicators.heatStressDays, "día", "días")} de calor fuerte (${limit}) en los años analizados.`
+        : `Hubo ${perYearPhrase(indicators.heatStressDays, context.years)} de calor fuerte (${limit}): ${indicators.heatStressDays} en ${context.years} años.`;
+    }
+    case "frost": {
+      const limit = `menos de ${FROST_THRESHOLD_C} °C`;
+      if (indicators.frostRiskDays === 0) return `En los años analizados no hubo riesgo de helada (${limit}).`;
+      return context.years === null ? `Hubo ${daysPhrase(indicators.frostRiskDays, "día", "días")} con riesgo de helada (${limit}) en los años analizados.`
+        : `Hubo ${perYearPhrase(indicators.frostRiskDays, context.years)} con riesgo de helada (${limit}): ${indicators.frostRiskDays} en ${context.years} años.`;
+    }
     case "rain":
       return indicators.extremeRainThresholdMm === null ? NO_DATA : `Se considera lluvia muy fuerte la que pasa de ${fmt(indicators.extremeRainThresholdMm)} milímetros en un día.`;
     case "temperature":
       return indicators.meanTemperatureC === null || indicators.meanTemperatureC === undefined ? NO_DATA : `El promedio es de ${fmt(indicators.meanTemperatureC, 1)} grados.`;
     case "roots":
-      return indicators.meanRootZoneWetness === null ? NO_DATA : `La humedad promedio es del ${Math.round(indicators.meanRootZoneWetness * 100)} por ciento.`;
+      return indicators.meanRootZoneWetness === null ? NO_DATA : rootsSentence(indicators.meanRootZoneWetness);
   }
 }
 
 const CLIMATE_ORDER: readonly ClimateTopicId[] = ["water", "heat", "frost", "rain", "temperature", "roots"];
 
-/** Indicadores del análisis explicados con palabras simples: qué son y qué dicen en la zona. */
-export function describeClimate(indicators: Indicators): ClimateTopic[] {
-  return CLIMATE_ORDER.map((id) => ({ id, ...CLIMATE_EXPLANATIONS[id], explanationAudioId: `clima-${id}`, yourZone: zoneSentence(id, indicators) }));
+/**
+ * Indicadores del análisis explicados con palabras simples: qué son y qué dicen en la zona.
+ * Con `monthlyClimate` (la serie mensual del análisis) el agua nombra los meses en que falta con frecuencia y el calor y la helada
+ * se dicen por año; sin ella se conservan las frases simples.
+ */
+export function describeClimate(indicators: Indicators, monthlyClimate: readonly MonthlyClimate[] = []): ClimateTopic[] {
+  const years = new Set(monthlyClimate.map((row) => row.year)).size;
+  const context: ZoneContext = { shortMonths: waterShortMonths(monthlyClimate), years: years > 0 ? years : null };
+  return CLIMATE_ORDER.map((id) => ({ id, ...CLIMATE_EXPLANATIONS[id], explanationAudioId: `clima-${id}`, yourZone: zoneSentence(id, indicators, context) }));
 }
 
 export type RainMonth = { month: number; label: string; level: 1 | 2 | 3 | null };
@@ -186,10 +243,18 @@ const SEASON_STATUS: Record<CurrentSeasonStatus, { label: string; tone: CurrentS
 };
 
 const SEASON_ADVICE: Record<CurrentSeasonTone, string> = {
-  dry: "En tu lote: tapa el suelo con hojarasca o rastrojo para guardar la poca humedad que queda.",
-  normal: "En tu lote: la temporada va pareja; aprovecha los días húmedos para sembrar o abonar.",
-  wet: "En tu lote: cuidado con los hongos en las hojas, los charcos y que el agua no te lave la tierra ni el abono.",
+  dry: "Qué vigilar: revisa la humedad del suelo y señales de marchitez; el efecto depende del cultivo, su etapa y si tienes riego.",
+  normal: "Qué vigilar: la lluvia normal no garantiza humedad suficiente en el suelo. Revisa el terreno antes de decidir labores.",
+  wet: "Qué vigilar: observa charcos, escorrentía y manchas en las hojas; el riesgo depende del drenaje, la pendiente y el cultivo.",
 };
+
+/** En cuántos de los años de la serie llovió menos que hoy en esta misma época; vacío si la respuesta no trae el dato (respuestas antiguas). */
+function rankSentence({ baselineYears: years, baselineYearsDrier: drier }: Pick<CurrentSeason, "baselineYears" | "baselineYearsDrier">): string[] {
+  if (drier === undefined) return [];
+  if (drier === 0) return [`Es la época más seca de los ${years} años que miramos.`];
+  if (drier === years) return [`Es la época más lluviosa de los ${years} años que miramos.`];
+  return [`Para esta época ha llovido más que en ${drier} de los ${years} años que miramos.`];
+}
 
 /** "20261112" → "12 de noviembre". */
 const dayAndMonth = (date: string) => `${Number(date.slice(6, 8))} de ${MONTH_NAMES[Number(date.slice(4, 6)) - 1]}`;
@@ -213,6 +278,7 @@ export function describeCurrentSeason(season: CurrentSeason): CurrentSeasonCard 
     ...CURRENT_SEASON_EXPLANATION, explanationAudioId: CURRENT_SEASON_EXPLANATION.audioId,
     statusLabel: status.label, tone: status.tone, headline: status.headline,
     details: [
+      ...rankSentence(season),
       ...temperatureSentence(season.temperatureAnomalyC),
       ...(season.currentDryStreakDays >= CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS ? ["Llevas varios días seguidos sin que caiga un buen aguacero."] : []),
       SEASON_ADVICE[status.tone],
@@ -247,40 +313,70 @@ export type ScenarioPreset = {
 /** Botones simples para que el agricultor pruebe qué pasa con sus cultivos si cambia el tiempo, sin usar porcentajes ni grados. */
 export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   { id: "normal", label: "Clima normal", subtitle: "Como suele ser aquí", scenario: { tempDeltaC: 0, rainFactor: 1 }, notice: "Estás viendo tus cultivos con el clima habitual de tu zona." },
-  { id: "drought", label: "Si viene sequía", subtitle: "Poca agua y más sol", scenario: { tempDeltaC: 1, rainFactor: 0.7 }, notice: "Estás probando qué pasaría en un año seco. Mira cómo cambian las estrellas de cada camino." },
-  { id: "wet", label: "Si llueve mucho", subtitle: "Temporada de mucha agua", scenario: { tempDeltaC: 0, rainFactor: 1.35 }, notice: "Estás probando qué pasaría en un año de mucha agua. Mira qué cultivos aguantan mejor." },
-  { id: "heat", label: "Si hace más calor", subtitle: "Días más bochornosos", scenario: { tempDeltaC: 2, rainFactor: 1 }, notice: "Estás probando qué pasaría si los días se ponen más calientes que de costumbre." },
+  { id: "drought", label: "Si viene sequía", subtitle: "Supuesto: poca agua y más sol", scenario: { tempDeltaC: 1, rainFactor: 0.7 }, notice: "Estás probando qué pasaría en un año seco. Mira cómo cambian las estrellas de cada camino." },
+  { id: "wet", label: "Si llueve mucho", subtitle: "Supuesto: mucha agua", scenario: { tempDeltaC: 0, rainFactor: 1.35 }, notice: "Estás probando qué pasaría en un año de mucha agua. Mira qué cultivos aguantan mejor." },
+  { id: "heat", label: "Si hace más calor", subtitle: "Supuesto: 2 °C más", scenario: { tempDeltaC: 2, rainFactor: 1 }, notice: "Estás probando qué pasaría si los días se ponen más calientes que de costumbre." },
 ] as const;
 
+const rainChangeWords = (percent: number) => `${Math.abs(Math.round(percent))} % ${percent < 0 ? "menos" : "más"} lluvia que el promedio`;
+
+/**
+ * Los cuatro botones de clima. Con los años reales del sitio (`extremeYears`), sequía, mucha lluvia y calor son "como el año X": el más seco, el más
+ * lluvioso y el más cálido de la serie de NASA, con su lluvia y temperatura reales. Sin ellos se usan los botones fijos de `SCENARIO_PRESETS`.
+ */
+export function scenarioPresets(extremeYears?: ExtremeYears): readonly ScenarioPreset[] {
+  if (!extremeYears) return SCENARIO_PRESETS;
+  const { driest, wettest, warmest, yearsCompared } = extremeYears;
+  const scenarioOf = ({ tempDeltaC, rainFactor }: ExtremeYear) => ({ tempDeltaC, rainFactor });
+  return [
+    SCENARIO_PRESETS[0]!,
+    { id: "drought", label: "Si viene sequía", subtitle: `Como ${driest.year}, el año más seco`, scenario: scenarioOf(driest), notice: `Estás probando qué pasaría en un año como ${driest.year}, el más seco de los últimos ${yearsCompared} años: ${rainChangeWords(driest.rainChangePercent)}. Mira cómo cambian las estrellas de cada camino.` },
+    { id: "wet", label: "Si llueve mucho", subtitle: `Como ${wettest.year}, el año más lluvioso`, scenario: scenarioOf(wettest), notice: `Estás probando qué pasaría en un año como ${wettest.year}, el más lluvioso de los últimos ${yearsCompared} años: ${rainChangeWords(wettest.rainChangePercent)}. Mira qué cultivos aguantan mejor.` },
+    { id: "heat", label: "Si hace más calor", subtitle: `Como ${warmest.year}, el año más cálido`, scenario: scenarioOf(warmest), notice: `Estás probando qué pasaría en un año como ${warmest.year}, el más cálido de los últimos ${yearsCompared} años (${fmt(warmest.tempDeltaC, 1)} °C sobre el promedio).` },
+  ];
+}
+
 /** Identifica cuál botón de clima está activo; si no hay escenario o vuelve a 0/1, es "normal". */
-export function activeScenarioPreset(scenario: ClimateScenario | undefined): ScenarioPreset {
+export function activeScenarioPreset(scenario: ClimateScenario | undefined, presets: readonly ScenarioPreset[] = SCENARIO_PRESETS): ScenarioPreset {
   const temp = scenario?.tempDeltaC ?? 0;
   const rain = scenario?.rainFactor ?? 1;
-  return SCENARIO_PRESETS.find((preset) => preset.scenario.tempDeltaC === temp && preset.scenario.rainFactor === rain) ?? SCENARIO_PRESETS[0]!;
+  return presets.find((preset) => preset.scenario.tempDeltaC === temp && preset.scenario.rainFactor === rain) ?? presets[0]!;
 }
 
 export type NasaSupportItemId = "history" | "drought" | "worstYear" | "terrain";
 export type NasaSupportItem = { id: NasaSupportItemId; title: string; body: string };
 
+/** Cómo empieza la frase según de dónde salió la pendiente: medida en el lote, de un punto de referencia de la zona o contada por el agricultor. */
+const TERRAIN_LEAD: Record<NonNullable<Indicators["terrainSource"]> | "unknown", string> = {
+  "srtm-live": "Con datos de la NASA medimos que tu terreno ",
+  "srtm-sample": "Cerca de tu finca, en un punto de referencia de tu zona, el terreno ",
+  user: "Según lo que nos contaste, tu terreno ",
+  unknown: "Tu terreno ",
+};
+
 function terrainSupportText(indicators: Indicators): string | null {
   if (indicators.slopePercent === undefined && indicators.siteElevationMeters === undefined) return null;
-  if ((indicators.slopePercent ?? 0) >= 20) return "Tu terreno tiene loma fuerte. Cuando llueve duro el agua corre rápido y puede llevarse la tierra buena y el abono.";
-  if ((indicators.slopePercent ?? 0) >= 8) return "Tu terreno tiene algo de falda o inclinación. Sembrar atravesado a la loma y tapar el suelo ayuda a que el agua no arrastre la tierra.";
-  return "Tu terreno es bastante parejo, así que el agua de lluvia se aprovecha mejor y casi no arrastra la tierra.";
+  const lead = TERRAIN_LEAD[indicators.terrainSource ?? "unknown"];
+  if ((indicators.slopePercent ?? 0) >= 20) return `${lead}tiene loma fuerte. Cuando llueve duro el agua corre rápido y puede llevarse la tierra buena y el abono.`;
+  if ((indicators.slopePercent ?? 0) >= 8) return `${lead}tiene algo de falda o inclinación. Sembrar atravesado a la loma y tapar el suelo ayuda a que el agua no arrastre la tierra.`;
+  return `${lead}es bastante parejo, así que el agua de lluvia se aprovecha mejor y casi no arrastra la tierra.`;
 }
 
 /** Traduce el respaldo del análisis a tarjetas simples sin números raros ni jerga estadística. */
-export function describeNasaSupport({ indicators }: Pick<AnalysisResponse, "indicators">): NasaSupportItem[] {
+export function describeNasaSupport({ indicators, climate }: Pick<AnalysisResponse, "indicators"> & { climate?: Pick<AnalysisClimate, "firstDate" | "lastDate"> }): NasaSupportItem[] {
   const drySpell = indicators.longestDrySpellDays;
   const terrain = terrainSupportText(indicators);
+  const firstYear = climate?.firstDate === undefined ? null : Number(climate.firstDate.slice(0, 4));
+  const lastYear = climate?.lastDate === undefined ? null : Number(climate.lastDate.slice(0, 4));
+  const span = firstYear !== null && lastYear !== null ? `${lastYear - firstYear + 1} años (${firstYear}–${lastYear})` : "muchos años hacia atrás";
   return [
-    { id: "history", title: "Muchos años de memoria", body: "Miramos las lluvias, el calor y la humedad de muchos años hacia atrás con satélites de la NASA, para no guiarnos por un solo año bueno o malo." },
+    { id: "history", title: "Muchos años de memoria", body: `Miramos las lluvias, el calor y la humedad de ${span} con un modelo de la NASA que combina satélites y mediciones, para no guiarnos por un solo año bueno o malo.` },
     ...(drySpell === undefined ? [] : [{
       id: "drought" as const,
       title: "Cuando aprieta el verano",
       body: drySpell >= 15
-        ? "En los años difíciles han pasado varias semanas seguidas sin un buen aguacero. Por eso ayuda tener cultivos que tapen y guarden la humedad de la tierra."
-        : "Incluso en épocas secas, en esta zona no suelen pasar demasiados días seguidos sin que caiga algo de agua.",
+        ? `En los años difíciles han pasado varias semanas seguidas sin un buen aguacero (el tramo más largo fue de ${drySpell} días). Por eso ayuda tener cultivos que tapen y guarden la humedad de la tierra.`
+        : `Incluso en épocas secas, en esta zona no suelen pasar demasiados días seguidos sin que caiga algo de agua (el tramo más largo sin lluvia fue de ${drySpell} ${drySpell === 1 ? "día" : "días"}).`,
     }]),
     ...(indicators.worstYear ? [{
       id: "worstYear" as const,
@@ -295,12 +391,13 @@ type SimpleSourceCard = { title: string; body: string };
 
 /** Tarjetas sencillas por tema. Varias fuentes técnicas (p. ej. T2M, T2M_MIN, T2M_MAX) se cuentan como una sola tarjeta. */
 const SIMPLE_SOURCE_CARDS = {
-  temperature: { title: "Calor y frío de tu región", body: "Satélites de la NASA que anotan todos los días qué tan caliente y qué tan frío estuvo, para saber si hay riesgo de heladas o de calor fuerte." },
-  rain: { title: "Lluvias de tu región", body: "Satélites de la NASA que anotan todos los días cuánto llovió en tu zona, para saber en qué meses cae más agua." },
+  temperature: { title: "Calor y frío de tu región", body: "Un modelo de la NASA que combina satélites y mediciones y calcula todos los días qué tan caliente y qué tan frío estuvo, para saber si hay riesgo de heladas o de calor fuerte." },
+  rain: { title: "Lluvias de tu región", body: "Un modelo de la NASA que estima todos los días cuánto llovió en tu zona (un promedio de unos 50 kilómetros), para saber en qué meses cae más agua." },
   evaporation: { title: "Agua que se pierde por el sol", body: "Calculamos cuánta agua se evapora con el calor para saber si la lluvia alcanza para los cultivos." },
-  roots: { title: "Humedad de la tierra", body: "Medida desde el espacio de qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
-  recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
+  roots: { title: "Humedad de la tierra", body: "Calculada por un modelo de la NASA: qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
+  recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del modelo de la NASA para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
   terrain: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu zona y si tiene mucha pendiente. Es de un punto cercano, no de tu lote exacto." },
+  terrainLive: { title: "Altura y loma de tu terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu terreno y qué tan inclinado es, justo donde marcaste. La inclinación cambia de un tramo a otro, por eso es un promedio." },
   terrainUser: { title: "Altura y loma que tú contaste", body: "La altura y la inclinación de tu lote vienen de lo que tú nos dijiste." },
   crops: { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo. Son datos de partida: conviene revisarlos con un técnico de tu zona." },
 } as const satisfies Record<string, SimpleSourceCard>;
@@ -312,7 +409,7 @@ const SOURCE_TO_CARD: Record<string, SimpleSourceCardId | null> = {
   "power-t2m": "temperature", "power-t2m_min": "temperature", "power-t2m_max": "temperature",
   "power-prectotcorr": "rain", "power-evland": "evaporation", "power-gwetroot": "roots",
   "power-allsky_sfc_sw_dwn": null,
-  "power-recent": "recent", "power-cell-elevation": "terrain", "terrain-srtm": "terrain", "terrain-user": "terrainUser",
+  "power-recent": "recent", "power-cell-elevation": "terrain", "terrain-srtm": "terrain", "terrain-srtm-live": "terrainLive", "terrain-user": "terrainUser",
   "crops-catalog": "crops",
 };
 

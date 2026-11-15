@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURRENT_SEASON_PERCENT, MIN_YEARS_FOR_CURRENT_SEASON } from "../src/lib/config";
+import { CURRENT_SEASON_PERCENTILE, MIN_YEARS_FOR_CURRENT_SEASON } from "../src/lib/config";
 import { computeCurrentSeason } from "../src/lib/currentSeason";
 import type { ClimateRecord } from "../src/types";
 
@@ -17,6 +17,10 @@ function baseline(years: number[], rain = 5, temperature = 20): ClimateRecord[] 
   return years.flatMap((year) => days(`${year}-01-01`, 366, () => ({ PRECTOTCORR: rain, T2M: temperature })).filter((record) => record.date.startsWith(String(year))));
 }
 const YEARS = Array.from({ length: MIN_YEARS_FOR_CURRENT_SEASON + 3 }, (_, index) => 2017 + index);
+/** Serie histórica con `rains[i]` mm/día en el año `2017 + i`. */
+function varied(rains: number[]): ClimateRecord[] {
+  return rains.flatMap((rain, index) => baseline([2017 + index], rain));
+}
 const recentWith = (rain: number, count = 30, start = "2026-10-01") => days(start, count, () => ({ PRECTOTCORR: rain }));
 
 describe("computeCurrentSeason: lluvia reciente frente a lo normal", () => {
@@ -25,13 +29,49 @@ describe("computeCurrentSeason: lluvia reciente frente a lo normal", () => {
     expect(season).toMatchObject({ windowDays: 30, daysWithData: 30, firstDate: "20261001", lastDate: "20261030", rainMm: 60, normalRainMm: 150, rainPercentOfNormal: 40, status: "much-drier", baselineYears: YEARS.length });
   });
 
-  it("clasifica la temporada según los cortes de porcentaje de la normal", () => {
-    const statusFor = (percent: number) => computeCurrentSeason(recentWith((5 * percent) / 100), baseline(YEARS, 5))?.status;
-    expect(statusFor(CURRENT_SEASON_PERCENT.muchDrier - 1)).toBe("much-drier");
-    expect(statusFor(CURRENT_SEASON_PERCENT.muchDrier + 1)).toBe("drier");
-    expect(statusFor(100)).toBe("normal");
-    expect(statusFor(CURRENT_SEASON_PERCENT.wetter + 1)).toBe("wetter");
-    expect(statusFor(CURRENT_SEASON_PERCENT.muchWetter + 1)).toBe("much-wetter");
+  it("clasifica la temporada por el lugar que ocupa entre los años de la serie, no por un porcentaje fijo", () => {
+    // Ocho años con 2 a 9 mm/día en esa época; el estado depende de cuántos años fueron más secos que hoy.
+    const history = varied([2, 3, 4, 5, 6, 7, 8, 9]);
+    const statusFor = (rainPerDay: number) => computeCurrentSeason(recentWith(rainPerDay), history)?.status;
+    expect(statusFor(1)).toBe("much-drier");
+    expect(statusFor(2.5)).toBe("drier");
+    expect(statusFor(5.5)).toBe("normal");
+    expect(statusFor(7.5)).toBe("wetter");
+    expect(statusFor(9.5)).toBe("much-wetter");
+  });
+
+  it("dice en cuántos años de la serie llovió menos que hoy y el lugar que ocupa (0 a 1)", () => {
+    const season = computeCurrentSeason(recentWith(5.5), varied([2, 3, 4, 5, 6, 7, 8, 9]));
+    expect(season).toMatchObject({ baselineYears: 8, baselineYearsDrier: 4, rainPercentile: 0.5 });
+    expect(computeCurrentSeason(recentWith(1), varied([2, 3, 4, 5, 6, 7, 8, 9]))).toMatchObject({ baselineYearsDrier: 0, rainPercentile: 0 });
+    expect(computeCurrentSeason(recentWith(20), varied([2, 3, 4, 5, 6, 7, 8, 9]))).toMatchObject({ baselineYearsDrier: 8, rainPercentile: 1 });
+  });
+
+  it("los empates con un año de la serie cuentan la mitad y no son 'más lluvioso que' ese año", () => {
+    const season = computeCurrentSeason(recentWith(5), baseline(YEARS, 5));
+    expect(season).toMatchObject({ baselineYearsDrier: 0, rainPercentile: 0.5, status: "normal" });
+  });
+
+  it("una misma lluvia es normal en un sitio de lluvia muy variable y muy seca en uno de lluvia estable", () => {
+    const steady = varied([4.8, 4.9, 5, 5.1, 5.2, 5.3, 5.4, 5.5]);
+    const erratic = varied([1, 3, 5, 7, 9, 11, 13, 15]);
+    expect(computeCurrentSeason(recentWith(4.5), steady)?.status).toBe("drier");
+    expect(computeCurrentSeason(recentWith(8), erratic)?.status).toBe("normal");
+  });
+
+  it("'muy seca' o 'muy lluviosa' piden además alejarse al menos un tercio de lo normal, aunque sea la más seca de la serie", () => {
+    const steady = varied([4.8, 4.9, 5, 5.1, 5.2, 5.3, 5.4, 5.5]);
+    expect(computeCurrentSeason(recentWith(4.5), steady)).toMatchObject({ rainPercentile: 0, status: "drier" }); // -13 %: la más seca, pero no "casi no ha llovido"
+    expect(computeCurrentSeason(recentWith(6.2), steady)).toMatchObject({ rainPercentile: 1, status: "wetter" });
+    expect(computeCurrentSeason(recentWith(2), steady)?.status).toBe("much-drier"); // -61 %
+    expect(computeCurrentSeason(recentWith(9), steady)?.status).toBe("much-wetter"); // +75 %
+  });
+
+  it("los cortes del lugar entre los años son crecientes", () => {
+    const { muchDrier, drier, wetter, muchWetter } = CURRENT_SEASON_PERCENTILE;
+    expect(muchDrier).toBeLessThan(drier);
+    expect(drier).toBeLessThan(wetter);
+    expect(wetter).toBeLessThan(muchWetter);
   });
 
   it("ignora los registros de la propia ventana si la serie histórica los trae", () => {

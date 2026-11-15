@@ -6,10 +6,12 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { prefersReducedMotion, useReveal } from "./motion";
 import { CropIcon, UiIcon } from "./icons";
+import { StarGlyphs } from "./StarGlyphs";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
+import EnsoContextCard from "./EnsoContextCard";
 import { useSpeaker } from "./useSpeaker";
-import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scenarioPresets } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, CurrentSeasonTone, RotationSection, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, CurrentSeason, Farm, RotationResult } from "../types";
 
@@ -41,15 +43,12 @@ function PlayButton({ playing, onClick, size = "small" }: PlayProps) {
 }
 
 function Stars({ score, className = "h-7 w-7" }: { score: number; className?: string }) {
-  const full = scoreToStars(score);
   const stars = useRef<HTMLSpanElement>(null);
   useGSAP(() => {
     if (prefersReducedMotion()) return;
     gsap.from(".star-on", { scale: 0, rotation: -40, duration: 0.55, ease: "back.out(2.6)", stagger: 0.11, delay: 0.35, clearProps: "transform" });
   }, { scope: stars });
-  return <span ref={stars} className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
-    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "star-on" : "opacity-25"}><UiIcon name="star" className={className} /></span>)}
-  </span>;
+  return <span ref={stars} className="inline-flex"><StarGlyphs score={score} iconClassName={className} litClassName="star-on" /></span>;
 }
 
 function CropChain({ cropIds, link = "then", className = "h-14 w-14" }: { cropIds: readonly string[]; link?: "then" | "with"; className?: string }) {
@@ -181,7 +180,7 @@ function SeasonCard({ season }: { season: CurrentSeason }) {
 
 function ClimateList({ response }: { response: AnalysisResponse }) {
   const { playingKey, play } = useSpeaker();
-  const topics = useMemo(() => describeClimate(response.indicators), [response.indicators]);
+  const topics = useMemo(() => describeClimate(response.indicators, response.monthlyClimate), [response.indicators, response.monthlyClimate]);
   return <>{topics.map((topic) => <article key={topic.id} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
     <div className="flex items-center gap-3">
       <UiIcon name={CLIMATE_ICONS[topic.id]} className="h-12 w-12 shrink-0 text-olive-light" />
@@ -195,14 +194,15 @@ function ClimateList({ response }: { response: AnalysisResponse }) {
 
 function ScenarioBar({ response, applyingScenario, scenarioError, mockMode, onSelectScenario }: Pick<ResultsViewProps, "response" | "applyingScenario" | "scenarioError" | "mockMode" | "onSelectScenario">) {
   if (!onSelectScenario) return null;
-  const active = activeScenarioPreset(response.scenario);
+  const presets = scenarioPresets(response.extremeYears);
+  const active = activeScenarioPreset(response.scenario, presets);
   return <section data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 lg:col-span-3" aria-label="¿Y si cambia el tiempo?">
     <div className="flex items-center gap-3">
       <UiIcon name="sun" className="h-10 w-10 shrink-0 text-olive-light" />
       <div><h3 className="text-xl font-bold text-bone-white">¿Y si cambia el tiempo?</h3><p className="text-sm text-silver-mist">Toca un botón para ver cómo aguantan tus 3 caminos.</p></div>
     </div>
     <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-      {SCENARIO_PRESETS.map((preset) => {
+      {presets.map((preset) => {
         const selected = preset.id === active.id;
         return <button key={preset.id} type="button" aria-pressed={selected} disabled={applyingScenario || (mockMode && preset.id !== "normal")} onClick={() => onSelectScenario(preset.scenario)} className={`flex flex-col items-start gap-1.5 rounded-2xl border-2 p-3 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 disabled:opacity-40 ${selected ? "border-cream bg-olive/50 text-bone-white" : "border-olive/40 bg-meadow/40 text-silver-mist hover:border-cream/60"}`}>
           <UiIcon name={SCENARIO_ICONS[preset.id]} className={`h-8 w-8 ${selected ? "text-cream" : "text-olive-light"}`} />
@@ -236,6 +236,7 @@ export default function ResultsView({ farm, response, applyingScenario, scenario
       <ScenarioBar response={response} applyingScenario={applyingScenario} scenarioError={scenarioError} mockMode={mockMode} onSelectScenario={onSelectScenario} />
 
       <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
+      <EnsoContextCard season={response.currentSeason} coordinates={farm.centroid} locationLabel={farm.placeLabel ?? "tu finca"} mockMode={mockMode ?? false} />
       {response.currentSeason && <SeasonCard season={response.currentSeason} />}
       <ClimateList response={response} />
       <RainCalendar response={response} />

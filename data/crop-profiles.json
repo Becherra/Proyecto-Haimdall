@@ -1,0 +1,687 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-15",
+  "sources": [
+    {
+      "id": "cenicafe-at476",
+      "institution": "Cenicafé – Federación Nacional de Cafeteros",
+      "title": "Guía para la caracterización de las variedades de café: claves para su identificación (Avances Técnicos 476)",
+      "date": "2017-02",
+      "url": "https://doi.org/10.38141/10779/0476",
+      "documentType": "avance-tecnico",
+      "crops": "Café (Coffea arabica): Típica, Borbón, Caturra, Colombia, Tabi, Castillo, Castillo Regionales, Cenicafé 1 y otras",
+      "geographicScope": "Colombia",
+      "license": "©FNC-Cenicafé; no se indica licencia abierta",
+      "limitations": "Documento leído completo (texto extraído del PDF). La tabla 2 pierde su alineación al extraer el texto, así que solo se usan datos que el texto o la figura 12 dicen sin ambigüedad. Las regiones de Castillo Regionales salen de los títulos de los Avances Técnicos 338–342 citados en la bibliografía; esos documentos no se abrieron."
+    },
+    {
+      "id": "cenicafe-at566",
+      "institution": "Cenicafé – Federación Nacional de Cafeteros",
+      "title": "Castillo 2.0. Variedad mejorada: más resistencia, más resiliencia (Avances Técnicos 566)",
+      "date": "2024-08",
+      "url": "https://doi.org/10.38141/10779/0566",
+      "documentType": "avance-tecnico",
+      "crops": "Café: Castillo 2.0, Castillo, Cenicafé 1, Caturra",
+      "geographicScope": "Colombia",
+      "license": "No indicada",
+      "limitations": "Documento leído completo. Los resultados de producción son de condiciones experimentales de Cenicafé."
+    },
+    {
+      "id": "cenicafe-at570",
+      "institution": "Cenicafé – Federación Nacional de Cafeteros",
+      "title": "Panorama de razas y variantes de Hemileia vastatrix desde su llegada a Colombia (Avances Técnicos 570)",
+      "date": "2024-12-01",
+      "url": "https://doi.org/10.38141/10779/0570",
+      "documentType": "avance-tecnico",
+      "crops": "Café: más de 107 genotipos con genes de resistencia a la roya",
+      "geographicScope": "Estaciones experimentales de Cenicafé en Colombia (1999–2024)",
+      "license": "No indicada",
+      "limitations": "Documento leído completo. No describe los síntomas visibles de la roya."
+    },
+    {
+      "id": "cenicafe-brocarta45",
+      "institution": "Cenicafé – Federación Nacional de Cafeteros",
+      "title": "Brocarta 45: Vuelos de la broca del café durante la cosecha principal",
+      "date": "Sin fecha visible; usa datos de 2011",
+      "url": "https://doi.org/10.38141/10785/045",
+      "documentType": "boletin",
+      "crops": "Café",
+      "geographicScope": "Zona central cafetera y regiones del sur de Colombia",
+      "license": "No indicada",
+      "limitations": "Documento leído completo. Los rangos de temperatura por altitud son de la zona central cafetera y del sur del país; no se deben aplicar sin más a otras zonas."
+    },
+    {
+      "id": "cenicafe-at531",
+      "institution": "Cenicafé – Federación Nacional de Cafeteros",
+      "title": "Dispersión de la broca del café (Avances Técnicos 531)",
+      "date": "2021-09",
+      "url": "https://doi.org/10.38141/10779/0531",
+      "documentType": "avance-tecnico",
+      "crops": "Café",
+      "geographicScope": "Zona cafetera colombiana",
+      "license": "No indicada",
+      "limitations": "Se leyeron las tres primeras páginas (introducción, zoqueo y colonización de lotes)."
+    },
+    {
+      "id": "ica-alerta-moko-uraba",
+      "institution": "ICA, Ministerio de Agricultura y AUGURA",
+      "title": "Alerta temprana fitosanitaria: prevención y manejo de moko en banano y plátano",
+      "date": "2022",
+      "url": "https://www.ica.gov.co/getattachment/ICAComunica/alertasfito/Alerta-temprana-Fitosanitaria-Proteja-su-cosecha-1.pdf.aspx?lang=es-CO",
+      "documentType": "alerta",
+      "crops": "Plátano y banano",
+      "geographicScope": "Región de Urabá (Apartadó, Carepa, Chigorodó y Turbo)",
+      "license": "No indicada",
+      "limitations": "Documento leído completo. La alerta es para Urabá; sus medidas remiten a la Resolución ICA 092770 de 2021. No se usan sus medidas químicas."
+    },
+    {
+      "id": "ica-res-092770-2021",
+      "institution": "Instituto Colombiano Agropecuario (ICA)",
+      "title": "Resolución ICA 092770 del 17 de marzo de 2021 (medidas fitosanitarias para el moko)",
+      "date": "2021-03-17",
+      "url": "https://www.ica.gov.co/",
+      "documentType": "resolucion",
+      "crops": "Plátano y banano",
+      "geographicScope": "No verificado: no se pudo leer el texto",
+      "license": "Norma pública",
+      "limitations": "No se leyó el texto (el enlace del normograma respondió 404). Solo se cita porque la alerta del ICA la nombra; su alcance y sus artículos están sin verificar."
+    },
+    {
+      "id": "agrosavia-semilla-dh-2023",
+      "institution": "AGROSAVIA",
+      "title": "Consideraciones para la producción de semilla de calidad de plátano cv. Dominico Hartón (cap. I del Manual técnico para producir semilla asexual de calidad de plátano cv. Dominico Hartón por macropropagación)",
+      "date": "2023",
+      "url": "http://hdl.handle.net/20.500.12324/39751",
+      "documentType": "manual",
+      "crops": "Plátano cv. Dominico Hartón",
+      "geographicScope": "Colombia; datos de producción de colinos del Eje Cafetero",
+      "license": "CC BY-NC-SA 4.0",
+      "limitations": "Se leyó el capítulo I completo. Las listas de viveros registrados están vigentes a enero de 2023."
+    },
+    {
+      "id": "agrosavia-semilla-llanos-2019",
+      "institution": "AGROSAVIA",
+      "title": "Modelo productivo: tecnologías eficientes para la producción de semilla de plátano en los Llanos Orientales",
+      "date": "2019",
+      "url": "http://hdl.handle.net/20.500.12324/35061",
+      "documentType": "manual",
+      "crops": "Plátano cv. Hartón",
+      "geographicScope": "Llanos Orientales de Colombia",
+      "license": "CC BY-NC-SA 4.0",
+      "limitations": "Se leyeron las secciones de morfología, calidad de semilla, plagas transmitidas por semilla y propagación in vitro. Los tiempos de desarrollo son del clon Hartón en los Llanos y pueden variar en otras zonas."
+    },
+    {
+      "id": "agrosavia-sigatoka-1989",
+      "institution": "Repositorio AGROSAVIA (autor: L. F. Sandoval, I. A. Rohm and Haas Colombia S. A.)",
+      "title": "Reconocimiento, manejo y control de sigatoka amarilla (Mycosphaerella musicola) y sigatoka negra (Mycosphaerella fijiensis var. difformis) en el cultivo del plátano",
+      "date": "1989",
+      "url": "http://hdl.handle.net/20.500.12324/19168",
+      "documentType": "articulo",
+      "crops": "Plátano",
+      "geographicScope": "Colombia (detección inicial en Urabá, 1981)",
+      "license": "CC BY-NC-SA 4.0 (según el registro del repositorio)",
+      "limitations": "PDF escaneado; se leyeron las tres primeras páginas como imagen. Es antiguo, usa la nomenclatura de su época y el autor trabajaba para una empresa de agroquímicos; solo se usan síntomas y ciclo del hongo, no sus recomendaciones de control."
+    },
+    {
+      "id": "agrosavia-mp-sigatokas-2021",
+      "institution": "AGROSAVIA",
+      "title": "Modelo productivo de plátano: reconocimiento y manejo de sigatokas",
+      "date": "2021",
+      "url": "http://hdl.handle.net/20.500.12324/40512",
+      "documentType": "registro-repositorio",
+      "crops": "Plátano",
+      "geographicScope": "Colombia",
+      "license": "CC BY-NC-SA 4.0",
+      "limitations": "El contenido es un pódcast que no se escuchó; solo se usa el resumen del registro."
+    },
+    {
+      "id": "agrosavia-mp-moko-2021",
+      "institution": "AGROSAVIA",
+      "title": "Modelo productivo de plátano: reconocimiento y manejo de moko",
+      "date": "2021",
+      "url": "http://hdl.handle.net/20.500.12324/40513",
+      "documentType": "registro-repositorio",
+      "crops": "Plátano",
+      "geographicScope": "Colombia",
+      "license": "CC BY-NC-SA 4.0",
+      "limitations": "El contenido es un pódcast que no se escuchó; solo se usa el resumen del registro."
+    },
+    {
+      "id": "agrosavia-mp-picudo-2021",
+      "institution": "AGROSAVIA",
+      "title": "Modelo productivo de plátano: reconocimiento de especies y daños asociados al complejo de picudo",
+      "date": "2021",
+      "url": "http://hdl.handle.net/20.500.12324/39413",
+      "documentType": "registro-repositorio",
+      "crops": "Plátano",
+      "geographicScope": "Colombia",
+      "license": "CC BY-NC-SA 4.0",
+      "limitations": "El contenido es un pódcast que no se escuchó; solo se usa el resumen del registro."
+    },
+    {
+      "id": "agrosavia-mp-fenologia-2021",
+      "institution": "AGROSAVIA",
+      "title": "Modelo productivo de plátano: etapa fenológica",
+      "date": "2021",
+      "url": "http://hdl.handle.net/20.500.12324/40517",
+      "documentType": "registro-repositorio",
+      "crops": "Plátano Hartón",
+      "geographicScope": "Colombia",
+      "license": "CC BY-NC-SA 4.0",
+      "limitations": "El contenido es un pódcast que no se escuchó; solo se usa el resumen del registro."
+    },
+    {
+      "id": "agrosavia-almacigo-dh-1994",
+      "institution": "AGROSAVIA (Gómez, Arcila y Hernández)",
+      "title": "Comportamiento agroeconómico de plántulas de plátano clon Dominico-Hartón Musa AAB Simmonds manejadas bajo condiciones de almácigo",
+      "date": "1994",
+      "url": "http://hdl.handle.net/20.500.12324/16640",
+      "documentType": "registro-repositorio",
+      "crops": "Plátano cv. Dominico Hartón",
+      "geographicScope": "No indicado en el registro",
+      "license": "CC BY-NC-SA 4.0 (según RedCol)",
+      "limitations": "Solo se leyó el título y el resumen del registro."
+    }
+  ],
+  "profiles": [
+    {
+      "cropId": "cafe",
+      "scientificName": { "statement": "Coffea arabica", "sources": [{ "sourceId": "cenicafe-at476", "locator": "pp. 2–3" }] },
+      "commonNames": ["Café"],
+      "scope": "Variedades cultivadas en Colombia según Cenicafé",
+      "cultivars": [
+        {
+          "id": "castillo-general",
+          "name": "Castillo® General",
+          "kind": "variedad",
+          "propagation": { "status": "documented", "value": "Semilla certificada por el ICA", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 12, recuadro «Señor caficultor»" }], "context": "Resolución ICA 4266 de 2014, citada por Cenicafé" },
+          "attributes": [
+            { "statement": "Liberada por la Federación Nacional de Cafeteros, a través de Cenicafé, hacia 2005–2006.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 1" }] },
+            { "statement": "Variedad compuesta (multilínea): mezcla progenies con distintos genes de resistencia a la roya para que la resistencia dure más.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "pp. 5–6, figura 5" }] },
+            { "statement": "Porte bajo; en un mismo lote hay plantas con brotes bronce y brotes verdes.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 8, figuras 11 y 12" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no da regiones para Castillo General; las regiones están en los Castillo Regionales." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "resistente", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figura 5" }, { "sourceId": "cenicafe-at570", "locator": "p. 3" }], "context": "Resistencia incompleta: la roya puede aparecer en las hojas de abajo sin afectar la producción." } }
+          ]
+        },
+        {
+          "id": "castillo-regionales",
+          "name": "Castillo® Regional",
+          "kind": "variedad",
+          "propagation": { "status": "documented", "value": "Semilla certificada por el ICA", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 12, recuadro «Señor caficultor»" }] },
+          "attributes": [
+            { "statement": "Incluye Castillo Naranjal, Paraguacito, El Rosario, Pueblo Bello, Santa Bárbara y La Trinidad.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "Literatura citada, refs. 2–7" }] },
+            { "statement": "Compuestos regionales de la variedad Castillo, liberados hacia 2005–2006.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 1" }] },
+            { "statement": "Variedad compuesta (multilínea) resistente a la roya.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figura 5" }] }
+          ],
+          "recommendedRegions": {
+            "status": "documented",
+            "value": [
+              "Naranjal: Caldas, Quindío, Risaralda y Valle",
+              "Paraguacito: Quindío y Valle del Cauca",
+              "El Rosario: Antioquia, Risaralda y Caldas",
+              "Pueblo Bello: Magdalena, Cesar, La Guajira y Norte de Santander",
+              "La Trinidad: Tolima"
+            ],
+            "sources": [{ "sourceId": "cenicafe-at476", "locator": "Literatura citada, refs. 2–7" }],
+            "context": "Tomado de los títulos de los Avances Técnicos 338–342; para Santa Bárbara el título no nombra región."
+          },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "resistente", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figura 5" }], "context": "Resistencia incompleta: la roya puede aparecer en las hojas de abajo." } }
+          ]
+        },
+        {
+          "id": "castillo-2-0",
+          "name": "Castillo® 2.0",
+          "kind": "variedad",
+          "propagation": { "status": "documented", "value": "Semilla seleccionada y certificada entregada por la Federación de Cafeteros", "sources": [{ "sourceId": "cenicafe-at566", "locator": "p. 3" }] },
+          "attributes": [
+            { "statement": "Entregada a los caficultores en 2024; compuesta por 40 progenies.", "sources": [{ "sourceId": "cenicafe-at566", "locator": "pp. 4–6" }] },
+            { "statement": "Porte intermedio, árboles compactos con brotes mayormente bronce.", "sources": [{ "sourceId": "cenicafe-at566", "locator": "p. 6" }] },
+            { "statement": "Suma por primera vez fuentes de resistencia a la roya distintas del Híbrido de Timor 1343.", "sources": [{ "sourceId": "cenicafe-at566", "locator": "p. 6" }] }
+          ],
+          "recommendedRegions": { "status": "documented", "value": ["Regiones cafeteras de Colombia"], "sources": [{ "sourceId": "cenicafe-at566", "locator": "Conclusiones" }], "context": "La fuente habla de adaptación general, sin regiones específicas." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "resistente", "sources": [{ "sourceId": "cenicafe-at566", "locator": "pp. 3 y 6" }], "context": "Resistencia incompleta: pierde efecto si la planta está en desequilibrio y el clima favorece al hongo." } }
+          ]
+        },
+        {
+          "id": "cenicafe-1",
+          "name": "Cenicafé 1",
+          "kind": "variedad",
+          "propagation": { "status": "documented", "value": "Semilla certificada por el ICA", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 12, recuadro «Señor caficultor»" }] },
+          "attributes": [
+            { "statement": "Entregada a los caficultores en diciembre de 2016.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 1" }] },
+            { "statement": "Porte bajo y variedad compuesta (multilínea).", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figuras 5 y 12" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no indica regiones para Cenicafé 1." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "resistente", "sources": [{ "sourceId": "cenicafe-at476", "locator": "ref. 12 (título del Avance Técnico 469)" }] } }
+          ]
+        },
+        {
+          "id": "tabi",
+          "name": "Tabi",
+          "kind": "variedad",
+          "propagation": { "status": "documented", "value": "Semilla certificada por el ICA", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 12, recuadro «Señor caficultor»" }] },
+          "attributes": [
+            { "statement": "Porte alto y variedad compuesta (multilínea).", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figuras 5 y 12" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no indica regiones para Tabi." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "resistente", "sources": [{ "sourceId": "cenicafe-at476", "locator": "ref. 14 (título del Avance Técnico 300)" }] } }
+          ]
+        },
+        {
+          "id": "colombia",
+          "name": "Colombia",
+          "kind": "variedad",
+          "propagation": { "status": "undocumented", "reason": "Cenicafé no la incluye entre las variedades con semilla certificada por el ICA." },
+          "attributes": [
+            { "statement": "Primera variedad compuesta resistente a la roya de la Federación; Cenicafé da 1983 como año de liberación en 2017 y 1982 en 2024.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 6" }, { "sourceId": "cenicafe-at566", "locator": "p. 1" }] },
+            { "statement": "Porte bajo.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "figura 12" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no indica regiones." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "resistente", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 6" }], "context": "En 2017 Cenicafé la reportaba resistente después de más de 30 años en campo." } }
+          ]
+        },
+        {
+          "id": "caturra",
+          "name": "Caturra",
+          "kind": "variedad",
+          "propagation": { "status": "undocumented", "reason": "Cenicafé no la incluye entre las variedades con semilla certificada por el ICA." },
+          "attributes": [
+            { "statement": "Porte bajo y entrenudos cortos; permite altas densidades de siembra.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 4, figura 4" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no indica regiones." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "susceptible", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 4" }], "context": "Cenicafé la describe como altamente susceptible." } }
+          ]
+        },
+        {
+          "id": "tipica",
+          "name": "Típica",
+          "kind": "variedad",
+          "propagation": { "status": "undocumented", "reason": "Cenicafé no la incluye entre las variedades con semilla certificada por el ICA." },
+          "attributes": [
+            { "statement": "Porte alto; dejó de cultivarse de forma intensiva en Colombia.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "pp. 1 y 3" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no indica regiones." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "susceptible", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 3, figura 3" }] } }
+          ]
+        },
+        {
+          "id": "borbon",
+          "name": "Borbón",
+          "kind": "variedad",
+          "propagation": { "status": "undocumented", "reason": "Cenicafé no la incluye entre las variedades con semilla certificada por el ICA." },
+          "attributes": [
+            { "statement": "Porte alto; dejó de cultivarse de forma intensiva en Colombia.", "sources": [{ "sourceId": "cenicafe-at476", "locator": "pp. 1 y 3" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída no indica regiones." },
+          "threatResponses": [
+            { "threatId": "roya", "response": { "status": "documented", "value": "susceptible", "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 3, figura 3" }] } }
+          ]
+        }
+      ],
+      "plantingMaterials": [],
+      "growthStages": [
+        {
+          "id": "almacigo",
+          "label": "Semillero o almácigo",
+          "technicalName": "Germinador y almácigo",
+          "description": { "statement": "Etapas iniciales antes de llevar las plantas al lote; se planifican según las épocas de siembra recomendadas.", "sources": [{ "sourceId": "cenicafe-at566", "locator": "p. 6, Manejo agronómico" }] }
+        },
+        {
+          "id": "produccion",
+          "label": "Cafetal dando cosecha",
+          "technicalName": "Cafetal en producción (cosecha principal y mitaca)",
+          "description": { "statement": "El cafetal da cosecha principal y mitaca; después de cada una se hace el repase.", "sources": [{ "sourceId": "cenicafe-brocarta45", "locator": "p. 3" }] }
+        },
+        {
+          "id": "renovacion-zoca",
+          "label": "Renovando por zoca",
+          "technicalName": "Renovación por zoca",
+          "description": { "statement": "Se recomienda al quinto o sexto año después de la siembra, idealmente después de recoger la cosecha principal.", "sources": [{ "sourceId": "cenicafe-at531", "locator": "p. 2" }] }
+        }
+      ],
+      "threats": [
+        {
+          "id": "roya",
+          "commonName": "Roya del cafeto",
+          "agents": [{ "scientificName": "Hemileia vastatrix", "commonName": "Roya" }],
+          "agentType": "hongo",
+          "colombianRelevance": { "statement": "Cenicafé la llama la enfermedad más limitante del café en el mundo; está en Colombia desde 1983.", "sources": [{ "sourceId": "cenicafe-at566", "locator": "p. 1" }] },
+          "geographicScope": { "statement": "Zona cafetera colombiana; Cenicafé la monitorea en estaciones de Antioquia, Tolima, Quindío, Risaralda y Caldas.", "sources": [{ "sourceId": "cenicafe-at570", "locator": "p. 3" }] },
+          "symptoms": { "status": "undocumented", "reason": "Las fuentes leídas no describen los síntomas visibles; pide a tu extensionista que confirme lo que ves." },
+          "favoringConditions": {
+            "status": "documented",
+            "value": [
+              "Las lluvias frecuentes a lo largo del año facilitan su dispersión.",
+              "En la parte baja de la planta hay un microclima favorable para la enfermedad."
+            ],
+            "sources": [{ "sourceId": "cenicafe-at566", "locator": "p. 1" }, { "sourceId": "cenicafe-at570", "locator": "p. 3" }]
+          },
+          "regulation": { "status": "undocumented", "reason": "No se revisó si tiene medidas oficiales del ICA." },
+          "requiresOfficialConfirmation": false,
+          "measures": [
+            {
+              "id": "roya-variedad-resistente",
+              "kind": "material-de-siembra",
+              "action": "Al sembrar o renovar, usa una variedad resistente con semilla certificada (Castillo, Castillo Regionales, Cenicafé 1 o Tabi).",
+              "stageIds": ["almacigo", "renovacion-zoca"],
+              "condition": "Cuando vas a sembrar un lote nuevo o renovarlo.",
+              "reason": "Cenicafé busca controlar la roya con variedades resistentes en lugar de químicos; en variedades introducidas no hay garantía sobre su identidad.",
+              "verification": "Pide el certificado de la semilla; en 2017 Cenicafé indicaba que Tabi, Castillo y Cenicafé 1 eran las únicas variedades de café con semilla certificada por el ICA.",
+              "sources": [{ "sourceId": "cenicafe-at476", "locator": "p. 12" }, { "sourceId": "cenicafe-at566", "locator": "p. 1" }]
+            },
+            {
+              "id": "roya-revisar-estratos",
+              "kind": "monitoreo",
+              "action": "Mira en qué parte de la planta aparece: en las hojas de abajo es esperable; en el medio o arriba indica que el hongo está superando la resistencia.",
+              "stageIds": ["produccion"],
+              "condition": "Si crees ver roya, aunque tu variedad sea resistente.",
+              "reason": "Cenicafé ha visto la roya subir a la parte media y alta de plantas resistentes desde 2010–2015.",
+              "verification": "Si la ves en el medio o arriba, cuéntaselo a tu extensionista de la Federación de Cafeteros.",
+              "sources": [{ "sourceId": "cenicafe-at570", "locator": "p. 3" }]
+            }
+          ]
+        },
+        {
+          "id": "broca",
+          "commonName": "Broca del café",
+          "agents": [{ "scientificName": "Hypothenemus hampei", "commonName": "Broca" }],
+          "agentType": "insecto",
+          "colombianRelevance": { "statement": "Una de las plagas más limitantes del café: daña la producción y la calidad al criar dentro del grano.", "sources": [{ "sourceId": "cenicafe-at531", "locator": "p. 1" }] },
+          "geographicScope": { "statement": "Zona cafetera colombiana; su impacto depende de la temperatura y, por tanto, de la altitud.", "sources": [{ "sourceId": "cenicafe-at531", "locator": "p. 1" }, { "sourceId": "cenicafe-brocarta45", "locator": "p. 2" }] },
+          "symptoms": {
+            "status": "documented",
+            "value": [
+              "Frutos perforados por el insecto.",
+              "Almendras dañadas («beso de broca» o «broca de punto») que se clasifican como café brocado."
+            ],
+            "sources": [{ "sourceId": "cenicafe-brocarta45", "locator": "p. 2" }]
+          },
+          "favoringConditions": {
+            "status": "documented",
+            "value": [
+              "En épocas secas se reproduce más dentro de los frutos secos del árbol y del suelo.",
+              "Las poblaciones crecen más rápido con temperatura media sobre 21 °C; por debajo de 19 °C su impacto es mínimo.",
+              "Prefiere los frutos maduros sobre los pintones y los verdes.",
+              "El zoqueo de cafetales infestados dispersa mucha broca hacia los lotes vecinos."
+            ],
+            "sources": [{ "sourceId": "cenicafe-brocarta45", "locator": "pp. 1–3" }, { "sourceId": "cenicafe-at531", "locator": "p. 2" }],
+            "context": "Los umbrales de temperatura y altitud son de la zona central cafetera y del sur del país."
+          },
+          "regulation": { "status": "undocumented", "reason": "No se revisó si tiene medidas oficiales del ICA." },
+          "requiresOfficialConfirmation": false,
+          "measures": [
+            {
+              "id": "broca-repase",
+              "kind": "cultural",
+              "action": "Haz el repase: recoge los frutos secos, sobremaduros, maduros y pintones del árbol (y del suelo si hace falta) al terminar la cosecha principal y la mitaca.",
+              "stageIds": ["produccion"],
+              "condition": "Apenas termina cada cosecha, cuando los frutos que quedan están en periodo crítico de ataque.",
+              "reason": "Los frutos que quedan en el árbol y en el suelo son donde la broca se reproduce.",
+              "verification": "Revisa con tu extensionista el nivel de broca del lote.",
+              "sources": [{ "sourceId": "cenicafe-brocarta45", "locator": "p. 3" }]
+            },
+            {
+              "id": "broca-recolectar-antes-zoca",
+              "kind": "cultural",
+              "action": "Recoge los frutos antes de zoquear.",
+              "stageIds": ["renovacion-zoca"],
+              "condition": "Antes de renovar por zoca un lote con broca.",
+              "reason": "Ayuda a reducir la infestación de los cafetales de alrededor.",
+              "verification": "Confirma con tu extensionista que no quedan frutos en los árboles a zoquear.",
+              "sources": [{ "sourceId": "cenicafe-at531", "locator": "p. 2" }]
+            },
+            {
+              "id": "broca-no-quimicos-en-cosecha",
+              "kind": "precaucion",
+              "action": "No asperjes insecticidas químicos durante la cosecha principal.",
+              "stageIds": ["produccion"],
+              "condition": "Siempre durante la cosecha principal.",
+              "reason": "Puede dañar la calidad en taza, poner en riesgo la venta del café y exponer a los recolectores a sustancias tóxicas.",
+              "verification": "Cualquier control distinto al cultural debe decidirlo un extensionista.",
+              "sources": [{ "sourceId": "cenicafe-brocarta45", "locator": "p. 3" }]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cropId": "platano",
+      "scientificName": { "statement": "Musa AAB", "sources": [{ "sourceId": "agrosavia-almacigo-dh-1994" }] },
+      "commonNames": ["Plátano"],
+      "scope": "Clones y material de siembra descritos por AGROSAVIA para Colombia",
+      "cultivars": [
+        {
+          "id": "dominico-harton",
+          "name": "Dominico Hartón",
+          "kind": "clon",
+          "propagation": { "status": "documented", "value": "Asexual (vegetativa): colinos, cormos o plántulas de rebrotes", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 30" }] },
+          "attributes": [
+            { "statement": "En el Eje Cafetero una planta puede dar entre cinco y trece colinos.", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 30" }] },
+            { "statement": "Antes de comprar semilla conviene visitar el huerto y verificar que las plantas tengan las características del Dominico Hartón.", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 36" }] }
+          ],
+          "recommendedRegions": { "status": "undocumented", "reason": "La fuente leída describe el Eje Cafetero, pero no da una lista de regiones recomendadas." },
+          "threatResponses": []
+        },
+        {
+          "id": "harton",
+          "name": "Hartón",
+          "kind": "clon",
+          "propagation": { "status": "documented", "value": "Asexual (vegetativa)", "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "cap. III" }] },
+          "attributes": [
+            { "statement": "Es el clon más cultivado y adaptado en los Llanos Orientales.", "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "cap. III, p. 22" }] },
+            { "statement": "Su ciclo hasta la cosecha es de unos 11 a 12 meses.", "sources": [{ "sourceId": "agrosavia-mp-fenologia-2021" }, { "sourceId": "agrosavia-semilla-llanos-2019", "locator": "p. 23" }], "context": "Dato de los Llanos Orientales." }
+          ],
+          "recommendedRegions": { "status": "documented", "value": ["Llanos Orientales"], "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "cap. III, p. 22" }], "context": "Es la región que estudia la fuente; no excluye otras." },
+          "threatResponses": []
+        }
+      ],
+      "plantingMaterials": [
+        { "id": "colino", "name": "Colino o hijuelo", "description": { "statement": "Brote que nace del cormo de la planta madre; es la semilla tradicional.", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 30" }] } },
+        { "id": "cormo", "name": "Cormo", "description": { "statement": "El tallo verdadero, bajo tierra; al inducirlo da muchas plantas nuevas de sus yemas.", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 30" }] } },
+        { "id": "plantula-rebrote", "name": "Plántula de rebrote (vivero)", "description": { "statement": "Planta que sale de rebrotes de cormos en camas de multiplicación; permite revisar sus hojas y descartar las enfermas antes de sembrar.", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, pp. 31–32" }] } },
+        { "id": "vitroplanta", "name": "Vitroplanta (laboratorio)", "description": { "statement": "Planta multiplicada en laboratorio; da plantas sanas, pero cuesta más y puede tener variaciones respecto a la planta madre.", "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "pp. 41–43" }] } }
+      ],
+      "growthStages": [
+        {
+          "id": "semilla-vivero",
+          "label": "Semilla o plántula en vivero",
+          "technicalName": "Producción de semilla y plántula",
+          "description": { "statement": "Colinos, cormos o plántulas antes de sembrarlos en el lote.", "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I" }] }
+        },
+        {
+          "id": "vegetativo",
+          "label": "Creciendo, sin racimo",
+          "technicalName": "Fase vegetativa",
+          "description": { "statement": "La planta saca hojas; en el Hartón la inflorescencia se forma hacia las 20 hojas (semanas 20 a 22 en los Llanos).", "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "p. 18" }] }
+        },
+        {
+          "id": "floracion",
+          "label": "Ya salió la bellota",
+          "technicalName": "Emisión de la inflorescencia (bellota)",
+          "description": { "statement": "Unos tres meses después de formarse, la planta emite la bellota y deja de sacar hojas.", "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "p. 18" }] }
+        },
+        {
+          "id": "llenado-racimo",
+          "label": "Racimo llenándose",
+          "technicalName": "Formación y llenado del racimo",
+          "description": { "statement": "De la floración a la cosecha pasan normalmente entre 80 y 90 días.", "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "pp. 19–20" }] }
+        }
+      ],
+      "threats": [
+        {
+          "id": "moko",
+          "commonName": "Moko o maduraviche",
+          "agents": [{ "scientificName": "Ralstonia solanacearum (raza 2)", "commonName": "Bacteria del moko" }],
+          "agentType": "bacteria",
+          "colombianRelevance": { "statement": "AGROSAVIA la llama la enfermedad más limitante del plátano en Colombia por su amplia distribución y su fácil diseminación por el suelo.", "sources": [{ "sourceId": "agrosavia-mp-moko-2021" }] },
+          "geographicScope": { "statement": "Presente en zonas plataneras de Colombia; la alerta del ICA de 2022 es específica para Urabá (Apartadó, Carepa, Chigorodó y Turbo).", "sources": [{ "sourceId": "agrosavia-mp-moko-2021" }, { "sourceId": "ica-alerta-moko-uraba", "locator": "p. 1" }], "context": "No asumas que tu finca está en zona de alerta: la alerta solo nombra Urabá." },
+          "symptoms": {
+            "status": "documented",
+            "value": [
+              "Amarillamiento y luego marchitez, que suele empezar en la hoja bandera.",
+              "Hojas que se secan y quiebran sin caerse de la planta.",
+              "Hijos que se marchitan o no crecen.",
+              "Racimos y dedos deformes, que parecen madurar antes de tiempo, con pulpa que se pudre y ennegrece.",
+              "Al cortar el tallo o el raquis se ven puntos o hilos rojizos o pardos."
+            ],
+            "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 2" }]
+          },
+          "favoringConditions": {
+            "status": "documented",
+            "value": [
+              "Semilla contaminada con la bacteria.",
+              "Contacto de raíces sanas con plantas enfermas o residuos de cosecha.",
+              "Agua contaminada (ríos, acequias, canales de drenaje).",
+              "Herramientas (machete, pala, palín, tijeras) usadas en plantas enfermas.",
+              "Insectos como picudos, abejas o avispas, y aves de corral.",
+              "Suelo contaminado llevado en ropa, botas o herramientas."
+            ],
+            "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 2" }]
+          },
+          "regulation": { "status": "documented", "value": { "authority": "ICA", "norm": "Resolución ICA 092770 de 2021" }, "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 3" }, { "sourceId": "ica-res-092770-2021" }], "context": "El texto de la resolución no se pudo leer; su alcance exacto está sin verificar." },
+          "requiresOfficialConfirmation": true,
+          "measures": [
+            {
+              "id": "moko-confirmar-ica",
+              "kind": "consulta-oficial",
+              "action": "Pide la confirmación al ICA o a tu extensionista antes de hacer cualquier cosa con la planta.",
+              "stageIds": [],
+              "condition": "Si crees ver síntomas de moko.",
+              "reason": "Es una enfermedad con medidas oficiales; los síntomas por sí solos no la confirman.",
+              "verification": "El ICA hace la prueba de diagnóstico de moko gratis en sus laboratorios.",
+              "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 37" }, { "sourceId": "ica-alerta-moko-uraba", "locator": "p. 3" }]
+            },
+            {
+              "id": "moko-no-mover-material",
+              "kind": "bioseguridad",
+              "action": "No saques plantas ni suelo de la zona sospechosa, y no los tires a caños ni fuentes de agua.",
+              "stageIds": [],
+              "condition": "Mientras se confirma una sospecha.",
+              "reason": "La bacteria viaja con el suelo, el agua y el material de siembra.",
+              "verification": "Sigue las indicaciones del ICA una vez confirmen el caso.",
+              "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "pp. 2 y 4" }]
+            },
+            {
+              "id": "moko-semilla-registrada",
+              "kind": "material-de-siembra",
+              "action": "Siembra semilla de viveros o huertos con registro ICA vigente y guarda la licencia de movilización.",
+              "stageIds": ["semilla-vivero"],
+              "condition": "Cada vez que compres o muevas semilla.",
+              "reason": "La semilla contaminada es una de las formas de llevar la bacteria a un lote sano.",
+              "verification": "Pide al proveedor la copia de la resolución de registro y la licencia de movilización del ICA.",
+              "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 3" }, { "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, pp. 34–37" }]
+            },
+            {
+              "id": "moko-desinfectar-herramientas",
+              "kind": "bioseguridad",
+              "action": "Desinfecta las herramientas que entran al cultivo y no dejes entrar personas ajenas ni animales.",
+              "stageIds": [],
+              "condition": "Como prevención, siempre.",
+              "reason": "Las herramientas, el calzado y los animales llevan la bacteria de una planta a otra.",
+              "verification": "Pregunta al ICA o a tu extensionista qué desinfectante usar.",
+              "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 3" }]
+            },
+            {
+              "id": "moko-cortar-bellota",
+              "kind": "cultural",
+              "action": "Corta la bellota del racimo apenas forme su última mano.",
+              "stageIds": ["floracion", "llenado-racimo"],
+              "condition": "Cuando el racimo forma su última mano.",
+              "reason": "Evita que los insectos lleven la enfermedad.",
+              "verification": "Revisión del lote en el censo mensual.",
+              "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 3" }]
+            }
+          ]
+        },
+        {
+          "id": "sigatoka-negra",
+          "commonName": "Sigatoka negra",
+          "agents": [{ "scientificName": "Mycosphaerella fijiensis var. difformis", "commonName": "Hongo de la sigatoka negra" }],
+          "agentType": "hongo",
+          "colombianRelevance": { "statement": "AGROSAVIA la cuenta entre las enfermedades más limitantes y frecuentes del plátano.", "sources": [{ "sourceId": "agrosavia-mp-sigatokas-2021" }] },
+          "geographicScope": { "statement": "Se detectó en Colombia en 1981, en la zona bananera de Urabá.", "sources": [{ "sourceId": "agrosavia-sigatoka-1989", "locator": "p. 1" }], "context": "Dato histórico; la fuente leída no da su distribución actual." },
+          "symptoms": {
+            "status": "documented",
+            "value": [
+              "Rayas o pizcas café oscuro y alargadas en la hoja.",
+              "Manchas más oscuras en la cara de abajo de la hoja, a menudo a lado y lado de la vena central.",
+              "Menos hojas sanas en la planta."
+            ],
+            "sources": [{ "sourceId": "agrosavia-sigatoka-1989", "locator": "p. 66" }, { "sourceId": "agrosavia-semilla-llanos-2019", "locator": "p. 52" }],
+            "context": "Con algunos climas no se distingue fácilmente de la sigatoka amarilla."
+          },
+          "favoringConditions": {
+            "status": "documented",
+            "value": ["Las lluvias dispersan sus esporas dentro del lote; las primeras pizcas aparecen entre 10 y 13 días después."],
+            "sources": [{ "sourceId": "agrosavia-sigatoka-1989", "locator": "p. 66" }]
+          },
+          "regulation": { "status": "undocumented", "reason": "No se revisó si tiene medidas oficiales del ICA." },
+          "requiresOfficialConfirmation": false,
+          "measures": [
+            {
+              "id": "sigatoka-contar-hojas",
+              "kind": "monitoreo",
+              "action": "Cuenta las hojas sanas: la planta debe llegar a la floración con al menos ocho hojas.",
+              "stageIds": ["vegetativo", "floracion"],
+              "condition": "Durante el crecimiento, antes de que salga la bellota.",
+              "reason": "Con menos hojas el racimo no cumple la calidad para la venta, y la sigatoka es la principal causa de pérdida de hojas que reporta AGROSAVIA.",
+              "verification": "Si pierdes hojas rápido, consulta a tu extensionista; las fuentes leídas no dan medidas culturales verificadas.",
+              "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "pp. 17 y 52" }]
+            }
+          ]
+        },
+        {
+          "id": "picudos",
+          "commonName": "Picudos del plátano",
+          "agents": [
+            { "scientificName": "Cosmopolites sordidus", "commonName": "Picudo negro" },
+            { "scientificName": "Metamasius hemipterus", "commonName": "Picudo rayado" },
+            { "scientificName": "Metamasius hebetatus", "commonName": "Picudo amarillo" }
+          ],
+          "agentType": "insecto",
+          "colombianRelevance": { "statement": "AGROSAVIA considera al picudo negro la plaga de mayor importancia económica del plátano: reduce hasta el 60 % del peso del racimo.", "sources": [{ "sourceId": "agrosavia-mp-picudo-2021" }] },
+          "geographicScope": { "statement": "Plaga del cultivo de plátano en Colombia que se puede transmitir con la semilla.", "sources": [{ "sourceId": "agrosavia-mp-picudo-2021" }, { "sourceId": "agrosavia-semilla-llanos-2019", "locator": "p. 27" }] },
+          "symptoms": { "status": "documented", "value": ["Racimos de menor peso."], "sources": [{ "sourceId": "agrosavia-mp-picudo-2021" }], "context": "Las fuentes leídas no describen el daño visible en la planta." },
+          "favoringConditions": {
+            "status": "documented",
+            "value": ["Semilla infestada: los picudos viajan con el material de siembra."],
+            "sources": [{ "sourceId": "agrosavia-semilla-llanos-2019", "locator": "p. 27" }]
+          },
+          "regulation": { "status": "undocumented", "reason": "No se revisó si tienen medidas oficiales del ICA." },
+          "requiresOfficialConfirmation": false,
+          "measures": [
+            {
+              "id": "picudos-semilla-limpia",
+              "kind": "material-de-siembra",
+              "action": "Usa semilla libre de picudos, de viveros o huertos registrados ante el ICA.",
+              "stageIds": ["semilla-vivero"],
+              "condition": "Al comprar o sembrar semilla.",
+              "reason": "La sanidad de la semilla define cuánta plaga tendrá después el cultivo.",
+              "verification": "Pide el diagnóstico sanitario y la resolución de registro del vivero.",
+              "sources": [{ "sourceId": "agrosavia-semilla-dh-2023", "locator": "cap. I, p. 37" }]
+            },
+            {
+              "id": "picudos-control-por-moko",
+              "kind": "consulta-oficial",
+              "action": "Consulta con tu extensionista cómo vigilar y controlar los picudos en tu lote.",
+              "stageIds": [],
+              "condition": "Si ves picudos o daños en el racimo.",
+              "reason": "Además del daño propio, el ICA los señala como posibles vectores del moko. Las fuentes leídas no detallan un método de monitoreo verificado.",
+              "verification": "Plan de manejo acordado con un extensionista.",
+              "sources": [{ "sourceId": "ica-alerta-moko-uraba", "locator": "p. 3" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

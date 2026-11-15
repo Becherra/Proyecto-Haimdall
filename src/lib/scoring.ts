@@ -1,7 +1,7 @@
 import type { Crop, Indicators, MonthlyClimate, Rotation, RotationCalendar, RotationResult, UserPriorities } from "../types";
 import { buildRotationCalendar, calendarEvidence, calendarGap, calendarRisks } from "./calendar";
 import {
-  SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, DRY_DAY_RAIN_MM, DRY_SPELL_ALERT_DAYS, MIN_YEARS_FOR_WORST_YEAR, WORST_YEAR_DROUGHT_WEIGHT, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
+  LIVE_TERRAIN, SEASON_DRY_RAIN_RATIO, DRYNESS_REFERENCE_MM, DRY_DAY_RAIN_MM, DRY_SPELL_ALERT_DAYS, MIN_YEARS_FOR_WORST_YEAR, WORST_YEAR_DROUGHT_WEIGHT, FROST_THRESHOLD_C, HEAT_DAYS_REFERENCE, HEAT_STRESS_THRESHOLD_C, HIGH_ATTRIBUTE_THRESHOLD, LOW_ATTRIBUTE_THRESHOLD, MAX_FROST_PENALTY,
   MAX_PEST_CYCLE_PENALTY, MAX_RISK_PENALTY, MAX_SLOPE_EROSION_PENALTY, MAX_TEMPERATURE_PENALTY, MAX_WATER_SCARCITY_PENALTY, SLOPE_CAUTION_THRESHOLD_PERCENT, WATER_AVAILABILITY_DROUGHT_FACTOR,
 } from "./config";
 import { formatTemperatureRange, frostExposure, frostUnprotected, temperatureMismatch, temperatureSuitability } from "./climateFit";
@@ -215,21 +215,31 @@ function durationEvidence(crops: readonly Crop[]): string {
 
 const WATER_AVAILABILITY_LABELS: Record<WaterAvailability, string> = { low: "baja", medium: "media", high: "alta" };
 
+const ELEVATION_ORIGIN = {
+  user: "altitud declarada por el agricultor",
+  "srtm-live": "altitud medida en vivo con NASA SRTM en tu lote",
+  "srtm-sample": "altitud leída de NASA SRTM en el punto piloto más cercano",
+} as const;
+
 /** Temperatura media del sitio y rango de cada cultivo; incluye el ajuste por altitud (estimada o declarada) cuando se aplicó. */
 function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMeanTemperatureC, cellElevationMeters, siteElevationMeters, terrainSource }: Indicators): string[] {
   if (meanTemperatureC === undefined || meanTemperatureC === null) return [];
   const ranges = crops.flatMap((crop) => (crop.temperatureC ? [`${commonName(crop)} ${formatTemperatureRange(crop.temperatureC)}`] : []));
   const detail = ranges.length > 0 ? ` Rango en que crece bien según el catálogo: ${ranges.join("; ")}.` : "";
   const adjusted = cellMeanTemperatureC !== undefined && cellMeanTemperatureC !== null && cellElevationMeters !== undefined && siteElevationMeters !== undefined;
-  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "altitud leída de NASA SRTM en el punto piloto más cercano";
+  const origin = ELEVATION_ORIGIN[terrainSource ?? "srtm-sample"];
   const sourceNote = adjusted
     ? `(NASA POWER, T2M de ${cellMeanTemperatureC.toFixed(1)} °C en celda a ${cellElevationMeters.toFixed(0)} m, ajustada a ${siteElevationMeters.toFixed(0)} m con ${origin})`
     : "(NASA POWER, T2M)";
   return [`Temperatura media del sitio: ${meanTemperatureC.toFixed(1)} °C ${sourceNote}.${detail}`];
 }
 
-function terrainEvidence({ slopePercent, terrainSource }: Indicators): string[] {
+function terrainEvidence({ slopePercent, terrainSource, slopeRangePercent, terrainCellMeters }: Indicators): string[] {
   if (slopePercent === undefined) return [];
+  if (terrainSource === "srtm-live") {
+    const range = slopeRangePercent ? `; entre ${slopeRangePercent[0].toFixed(0)} % y ${slopeRangePercent[1].toFixed(0)} % según la celda` : "";
+    return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (NASA SRTM, medida en vivo en celdas de ${terrainCellMeters ?? LIVE_TERRAIN.cellMeters} m${range}).`];
+  }
   const origin = terrainSource === "user" ? "declarada por el agricultor" : "NASA SRTM, punto piloto más cercano";
   return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (${origin}).`];
 }
@@ -384,12 +394,22 @@ function isElevationAdjusted({ cellElevationMeters, siteElevationMeters }: Indic
   return cellElevationMeters !== undefined && siteElevationMeters !== undefined;
 }
 
+/** La medición en vivo es del lote, pero la pendiente varía mucho de un tramo a otro y el satélite no ve obras del terreno. */
+function liveTerrainGaps({ terrainCellMeters }: Indicators): string[] {
+  const cell = terrainCellMeters ?? LIVE_TERRAIN.cellMeters;
+  return [
+    "La altitud y la pendiente se midieron en vivo con NASA SRTM (~30 m) en el lote: la pendiente cambia mucho de un tramo a otro y el satélite no ve muros, zanjas ni terrazas.",
+    ...(cell > LIVE_TERRAIN.cellMeters ? [`El lote es grande: la pendiente se midió con celdas de ${cell} m, así que sale más suave que en los tramos empinados.`] : []),
+  ];
+}
+
 /**
  * Las muestras de terreno precargadas son lecturas reales de NASA SRTM, pero de un punto piloto (hasta ~9 km del lote), no del lote.
  * Y la corrección por altitud usa un gradiente promedio también para mínimas, máximas y evaporación: es un supuesto.
  */
 function terrainGaps(indicators: Indicators): string[] {
   return [
+    ...(indicators.terrainSource === "srtm-live" ? liveTerrainGaps(indicators) : []),
     ...(indicators.terrainSource === "srtm-sample" ? ["La altitud y la pendiente son lecturas de NASA SRTM (~30 m) en el punto piloto más cercano de la zona, no del lote: si tu lote está en otra ladera pueden diferir."] : []),
     ...(isElevationAdjusted(indicators) ? ["La corrección por altitud aplica el mismo gradiente andino promedio (~0,6 °C por cada 100 m) a la media, las mínimas y las máximas, y de ahí sale la evaporación estimada: es un supuesto, no una medición en el lote."] : []),
   ];
