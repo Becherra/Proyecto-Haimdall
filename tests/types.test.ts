@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisResponseSchema, climateRecordSchema, currentSeasonSchema, indicatorsSchema, rotationResultSchema, userPrioritiesSchema } from "../src/types";
+import { analysisResponseSchema, climateRecordSchema, cropSchema, currentSeasonSchema, indicatorsSchema, rotationResultSchema, userPrioritiesSchema } from "../src/types";
 
 const rotation = { id: "base", name: "Actual", cropIds: ["maiz"], description: "Línea base" };
 
@@ -31,6 +31,21 @@ describe("userPrioritiesSchema · noCurrentCrop", () => {
   });
   it("rechaza un valor que no sea booleano", () => {
     expect(userPrioritiesSchema.safeParse({ ...base, noCurrentCrop: "si" }).success).toBe(false);
+  });
+});
+
+describe("cropSchema: cultivos permanentes", () => {
+  const base = { id: "cafe", name: "Café (Coffea arabica)", waterUse: 3, nitrogenFixation: 0, erosionReduction: 3, organicMatter: 3, forageValue: 0, marketPotential: 4, heatTolerance: 2, droughtTolerance: 2, cycleDays: 365, sowingMonths: [], source: "prueba" };
+
+  it("acepta un cultivo permanente sin meses de siembra y la lista de permanentes con los que se asocia un anual", () => {
+    expect(cropSchema.safeParse({ ...base, perennial: true }).success).toBe(true);
+    expect(cropSchema.safeParse({ ...base, id: "frijol", sowingMonths: [3, 9], intercropsWith: ["cafe"] }).success).toBe(true);
+  });
+
+  it("los dos campos son opcionales para no romper catálogos anteriores y rechaza ids vacíos", () => {
+    expect(cropSchema.safeParse(base).success).toBe(true);
+    expect(cropSchema.safeParse({ ...base, intercropsWith: [""] }).success).toBe(false);
+    expect(cropSchema.safeParse({ ...base, perennial: "si" }).success).toBe(false);
   });
 });
 

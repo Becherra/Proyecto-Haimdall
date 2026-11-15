@@ -18,6 +18,8 @@ export type PlainInput = {
   sowing: readonly { crop: Crop; assessment: { dryMonths: readonly number[]; unknownMonths: readonly number[] } }[] | null;
   calendar: RotationCalendar | null;
   familyBreak: number | null;
+  /** La rotación incluye un cultivo permanente (café, plátano): no se rota y no tiene meses de siembra. */
+  permanent?: boolean;
   waterAvailability: UserPriorities["waterAvailability"];
 };
 
@@ -107,7 +109,7 @@ function risks(input: PlainInput): string[] {
   return [...found, "El puntaje es una guía sencilla: no mira plagas, precios ni costos reales."];
 }
 
-function gaps({ crops, indicators, sowing, calendar, familyBreak }: PlainInput): string[] {
+function gaps({ crops, indicators, sowing, calendar, familyBreak, permanent }: PlainInput): string[] {
   const noTemperatureRange = crops.filter((crop) => !crop.temperatureC).map(commonName);
   const unknownMonths = (sowing ?? []).filter(({ assessment }) => assessment.unknownMonths.length > 0).map(({ crop }) => commonName(crop));
   const missingData = Object.values(indicators.missingByParameter).some((days) => days > 0);
@@ -117,10 +119,11 @@ function gaps({ crops, indicators, sowing, calendar, familyBreak }: PlainInput):
     indicators.meanTemperatureC === undefined || indicators.meanTemperatureC === null ? "No pudimos saber la temperatura de tu zona." : "La temperatura es un promedio de una zona grande; en la montaña cambia con la altura.",
     ...(noTemperatureRange.length > 0 && indicators.meanTemperatureC !== undefined && indicators.meanTemperatureC !== null ? [`De ${joinWords(noTemperatureRange)} no sabemos qué temperatura aguanta.`] : []),
     ...(indicators.terrainSource === "srtm-sample" ? ["La altura y la pendiente vienen de un satélite de la NASA en un punto cercano de tu zona, no de tu terreno exacto."] : []),
-    sowing === null ? "El calendario de siembra solo está listo para el Eje Cafetero." : "Los meses de siembra son generales: no tienen en cuenta años muy secos o muy lluviosos (El Niño y La Niña).",
+    ...(sowing?.length === 0 ? [] : [sowing === null ? "El calendario de siembra solo está listo para el Eje Cafetero." : "Los meses de siembra son generales: no tienen en cuenta años muy secos o muy lluviosos (El Niño y La Niña)."]),
     ...(unknownMonths.length > 0 ? [`No sabemos si algunos meses de siembra de ${joinWords(unknownMonths)} son secos.`] : []),
     ...(calendar ? ["El calendario es solo un ejemplo con épocas típicas, no tus fechas reales."] : []),
-    familyBreak === null ? "No sabemos si esta mezcla cambia de familia de planta." : "No sabemos si tu terreno tiene plagas o enfermedades.",
+    permanent ? "Sembrar entre las calles solo sirve mientras la planta grande, como el café o el plátano, es joven; después ya no. Un técnico debe confirmarlo para tu finca."
+      : familyBreak === null ? "No sabemos si esta mezcla cambia de familia de planta." : "No sabemos si tu terreno tiene plagas o enfermedades.",
     ...(indicators.waterDeficitMm === null ? ["No pudimos saber si el agua alcanza; solo miramos cuánta agua gasta cada cultivo."] : []),
     ...(missingData ? ["Al clima le faltaron algunos días de datos."] : []),
   ];

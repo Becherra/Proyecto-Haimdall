@@ -121,7 +121,7 @@ describe("buildAnalysis", () => {
   });
 
   it("lanza AnalysisInputError si el cultivo actual no existe", () => {
-    expect(() => buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: { ...priorities, currentCropId: "cafe" }, location: PEREIRA })).toThrow(AnalysisInputError);
+    expect(() => buildAnalysis({ climate: climateWith(), crops: CROPS, priorities: { ...priorities, currentCropId: "quinua" }, location: PEREIRA })).toThrow(AnalysisInputError);
   });
 });
 

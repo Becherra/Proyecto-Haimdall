@@ -9,6 +9,11 @@ export function commonName(crop: Crop): string {
   return crop.name.split(" (")[0];
 }
 
+/** Cultivo permanente (café, plátano): no se rota ni se sugiere; solo puede ser el cultivo actual del agricultor. */
+const isPermanent = (crop: Crop) => crop.perennial === true;
+/** El anual declara (con fuente) que se puede asociar en las calles de ese permanente. */
+const intercropsWith = (crop: Crop, permanent: Crop) => crop.intercropsWith?.includes(permanent.id) === true;
+
 const sameFamily = (a: Crop, b: Crop) => a.family !== undefined && a.family === b.family;
 const fixesNitrogen = (crop: Crop) => crop.nitrogenFixation >= NITROGEN_FIXER_THRESHOLD;
 /** Tiene mercado propio: deja fuera los abonos verdes, que van en la alternativa de cobertura. */
@@ -20,6 +25,13 @@ function sequence(id: string, crops: readonly Crop[], description: string): Rota
   return { id, name: crops.map(commonName).join(" → "), cropIds: crops.map((crop) => crop.id), description };
 }
 
+/** Un permanente con un anual en sus calles: se lee "café + fríjol" y no "café → fríjol" porque no es una rotación. */
+function intercropSequence(id: string, permanent: Crop, partner: Crop, description: string): Rotation {
+  return { id, name: `${commonName(permanent)} + ${commonName(partner)}`, cropIds: [permanent.id, partner.id], description };
+}
+
+const YOUNG_STAGE = "mientras el cultivo es joven (establecimiento o renovación)";
+
 /** Línea base: el cultivo actual del agricultor repetido, sin rotación. */
 export function baselineRotation(current: Crop): Rotation {
   return { id: "baseline", name: `Actual: ${current.name}`, cropIds: [current.id], description: "Mantiene la práctica declarada como línea base de comparación." };
@@ -30,9 +42,14 @@ export function baselineRotation(current: Crop): Rotation {
  * si el actual no fija, se le suma una leguminosa de grano; si ya fija, un cultivo de otra familia que aproveche ese nitrógeno.
  */
 function legumeCandidates(crops: readonly Crop[], current: Crop): Rotation[] {
+  if (isPermanent(current)) {
+    return crops
+      .filter((crop) => !isPermanent(crop) && fixesNitrogen(crop) && intercropsWith(crop, current))
+      .map((partner) => intercropSequence("legume", current, partner, `Intercala ${commonName(partner)}, una leguminosa que fija nitrógeno, en las calles de ${commonName(current)} ${YOUNG_STAGE}, para aportar al suelo y tener una cosecha mientras tanto.`));
+  }
   const currentFixes = fixesNitrogen(current);
   return crops
-    .filter((crop) => crop.id !== current.id && hasMarket(crop) && fixesNitrogen(crop) !== currentFixes && !sameFamily(crop, current))
+    .filter((crop) => !isPermanent(crop) && crop.id !== current.id && hasMarket(crop) && fixesNitrogen(crop) !== currentFixes && !sameFamily(crop, current))
     .map((partner) => sequence("legume", [current, partner], currentFixes
       ? `Alterna ${commonName(current)}, que fija nitrógeno, con ${commonName(partner)} para aprovechar ese nitrógeno y diversificar ingresos.`
       : `Intercala ${commonName(partner)}, una leguminosa que fija nitrógeno, con ${commonName(current)} para aportar al suelo y diversificar ingresos.`));
@@ -40,7 +57,12 @@ function legumeCandidates(crops: readonly Crop[], current: Crop): Rotation[] {
 
 /** Cultivo actual + una cobertura del suelo + un cultivo tolerante a sequía, los tres distintos (CONTEXT.md §8). */
 function coverDroughtCandidates(crops: readonly Crop[], current: Crop): Rotation[] {
-  const others = crops.filter((crop) => crop.id !== current.id);
+  if (isPermanent(current)) {
+    return crops
+      .filter((crop) => !isPermanent(crop) && !fixesNitrogen(crop) && intercropsWith(crop, current))
+      .map((partner) => intercropSequence("cover-drought", current, partner, `Asocia ${commonName(partner)} en las calles de ${commonName(current)} ${YOUNG_STAGE}, para diversificar ingresos sin dejar el suelo desnudo.`));
+  }
+  const others = crops.filter((crop) => crop.id !== current.id && !isPermanent(crop));
   return others.filter(isCover).flatMap((cover) => others.filter((crop) => isDroughtTolerant(crop) && crop.id !== cover.id)
     .map((tolerant) => sequence("cover-drought", [current, cover, tolerant], `Mantiene ${commonName(current)}, agrega ${commonName(cover)} como cobertura del suelo y ${commonName(tolerant)} como cultivo resistente a la sequía.`)));
 }
@@ -66,7 +88,9 @@ export type StartingRotations = RotationCandidates & { single: Rotation[] };
  * Arma los candidatos cuando no hay cultivo actual: todos los cultivos solos y todas las parejas/tríos válidos
  * (cada cultivo del catálogo hace de punto de partida). El motor de puntuación elige la mejor de cada lista.
  */
-export function startingRotations(crops: readonly Crop[]): StartingRotations {
+export function startingRotations(allCrops: readonly Crop[]): StartingRotations {
+  // Recomendar un cultivo permanente a quien hoy no tiene nada es una inversión de años: solo se ofrecen cultivos anuales.
+  const crops = allCrops.filter((crop) => !isPermanent(crop));
   const fromEach = crops.map((crop) => candidateRotations(crops, crop));
   const neutral = (rotations: Rotation[]) => rotations.map((rotation) => ({ ...rotation, description: rotation.description.replace(/^Mantiene /, "Empieza con ") }));
   return { single: crops.map(singleCropRotation), legume: fromEach.flatMap((candidates) => candidates.legume), coverDrought: neutral(fromEach.flatMap((candidates) => candidates.coverDrought)) };

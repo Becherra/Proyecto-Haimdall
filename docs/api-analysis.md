@@ -102,7 +102,7 @@ Si NASA POWER no responde, hay respaldo para Pereira (cubre también Santa Rosa 
 
 - **Resolución del clima.** Pereira, Manizales y Santa Rosa de Cabal caen en la misma celda de NASA POWER y reciben temperatura y lluvia idénticas; entre esos sitios solo cambia la corrección por altitud. Dibujar el lote no mejora esa resolución.
 - **Terreno.** Solo cinco puntos del Eje Cafetero tienen altitud y pendiente precargadas (lecturas SRTM del punto, no del lote). Fuera de ellos no hay corrección por altitud salvo que el agricultor la declare.
-- **Catálogo.** Diez cultivos anuales; no hay perennes (café, plátano, pastos). Los puntajes 0–5 son preliminares y no los ha validado un agrónomo. Los meses de siembra son los mismos para todos los cultivos y no tienen fuente propia para papa, avena y repollo.
+- **Catálogo.** Diez cultivos anuales y dos permanentes (café y plátano). Los permanentes solo se aceptan como cultivo actual (`currentCropId: "cafe"` o `"platano"`): sus alternativas son asociarles fríjol o maíz en las calles mientras son jóvenes, sin calendario de rotación, y nunca se sugieren como punto de partida. No hay pastos ni otros permanentes. Los puntajes 0–5 son preliminares y no los ha validado un agrónomo. Los meses de siembra son los mismos para todos los cultivos y no tienen fuente propia para papa, avena y repollo.
 - **Calendario.** Es ilustrativo: usa meses de siembra y ciclos típicos, no las fechas reales del agricultor.
 - **Escenarios.** Son un cambio uniforme sobre la serie histórica, no una proyección climática; la humedad del suelo no se recalcula.
 - **Clima reciente.** Solo lluvia y temperatura de NASA POWER de los últimos días; no hay pronóstico. IMERG, SMAP y NDVI recientes no están integrados.

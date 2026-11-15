@@ -72,9 +72,9 @@ describe("POST /api/analysis", () => {
 
   it("devuelve 400 si el cultivo actual no está en el catálogo", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(fixture, { status: 200 })));
-    const response = await POST(post({ ...pereira, priorities: { ...priorities, currentCropId: "cafe" } }));
+    const response = await POST(post({ ...pereira, priorities: { ...priorities, currentCropId: "quinua" } }));
     expect(response.status).toBe(400);
-    expect((await response.json()).error).toContain("cafe");
+    expect((await response.json()).error).toContain("quinua");
   });
 
   it("con Farm consulta NASA POWER en farm.centroid y declara los vacíos del lote en cada rotación", async () => {
