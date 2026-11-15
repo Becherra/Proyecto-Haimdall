@@ -203,7 +203,7 @@ function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMea
   const ranges = crops.flatMap((crop) => (crop.temperatureC ? [`${commonName(crop)} ${formatTemperatureRange(crop.temperatureC)}`] : []));
   const detail = ranges.length > 0 ? ` Rango en que crece bien según el catálogo: ${ranges.join("; ")}.` : "";
   const adjusted = cellMeanTemperatureC !== undefined && cellMeanTemperatureC !== null && cellElevationMeters !== undefined && siteElevationMeters !== undefined;
-  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "una estimación de referencia de la zona";
+  const origin = terrainSource === "user" ? "altitud declarada por el agricultor" : "altitud leída de NASA SRTM en el punto piloto más cercano";
   const sourceNote = adjusted
     ? `(NASA POWER, T2M de ${cellMeanTemperatureC.toFixed(1)} °C en celda a ${cellElevationMeters.toFixed(0)} m, ajustada a ${siteElevationMeters.toFixed(0)} m con ${origin})`
     : "(NASA POWER, T2M)";
@@ -212,7 +212,7 @@ function temperatureEvidence(crops: readonly Crop[], { meanTemperatureC, cellMea
 
 function terrainEvidence({ slopePercent, terrainSource }: Indicators): string[] {
   if (slopePercent === undefined) return [];
-  const origin = terrainSource === "user" ? "declarada por el agricultor" : "estimación de referencia de la zona";
+  const origin = terrainSource === "user" ? "declarada por el agricultor" : "NASA SRTM, punto piloto más cercano";
   return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (${origin}).`];
 }
 
@@ -325,12 +325,12 @@ function isElevationAdjusted({ cellElevationMeters, siteElevationMeters }: Indic
 }
 
 /**
- * Las muestras de terreno precargadas son cifras de referencia de la zona: aún no se leyeron del ráster de NASA SRTM.
+ * Las muestras de terreno precargadas son lecturas reales de NASA SRTM, pero de un punto piloto (hasta ~9 km del lote), no del lote.
  * Y la corrección por altitud usa un gradiente promedio también para mínimas, máximas y evaporación: es un supuesto.
  */
 function terrainGaps(indicators: Indicators): string[] {
   return [
-    ...(indicators.terrainSource === "srtm-sample" ? ["La altitud y la pendiente son estimaciones de referencia de la zona: no son mediciones del lote ni lecturas verificadas de NASA SRTM."] : []),
+    ...(indicators.terrainSource === "srtm-sample" ? ["La altitud y la pendiente son lecturas de NASA SRTM (~30 m) en el punto piloto más cercano de la zona, no del lote: si tu lote está en otra ladera pueden diferir."] : []),
     ...(isElevationAdjusted(indicators) ? ["La corrección por altitud aplica el mismo gradiente andino promedio (~0,6 °C por cada 100 m) a la media, las mínimas y las máximas, y de ahí sale la evaporación estimada: es un supuesto, no una medición en el lote."] : []),
   ];
 }

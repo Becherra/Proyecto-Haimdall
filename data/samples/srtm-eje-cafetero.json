@@ -5,9 +5,9 @@
     "lat": 4.8133,
     "lon": -75.6961,
     "tolerance": 0.08,
-    "elevationMeters": 1411,
-    "slopePercent": 18,
-    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): altitud media urbana/periurbana de Pereira (~1411 m s. n. m.) y pendiente típica de ladera cafetera (~18 %)."
+    "elevationMeters": 1413,
+    "slopePercent": 12,
+    "source": "Leído del tile N04W076 del producto oficial NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC; 3601×3601 celdas, ~30 m). Altitud: promedio de una ventana de 7×7 celdas (~210 m) alrededor del punto. Pendiente: promedio del método de Horn en esa ventana. Es el valor del punto, no de todo el lote."
   },
   {
     "id": "cerritos-valle",
@@ -15,9 +15,9 @@
     "lat": 4.805,
     "lon": -75.84,
     "tolerance": 0.08,
-    "elevationMeters": 1150,
-    "slopePercent": 6,
-    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): terraza baja entre Cerritos y el valle del río Cauca (~1150 m s. n. m., relieve suavemente ondulado ~6 %)."
+    "elevationMeters": 1190,
+    "slopePercent": 10,
+    "source": "Leído del tile N04W076 del producto oficial NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC; 3601×3601 celdas, ~30 m). Altitud: promedio de una ventana de 7×7 celdas (~210 m) alrededor del punto. Pendiente: promedio del método de Horn en esa ventana. Es el valor del punto, no de todo el lote."
   },
   {
     "id": "santa-rosa-alta",
@@ -25,9 +25,9 @@
     "lat": 4.868,
     "lon": -75.605,
     "tolerance": 0.06,
-    "elevationMeters": 1950,
-    "slopePercent": 28,
-    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): vertiente occidental de la Cordillera Central (~1950 m s. n. m., ladera pronunciada ~28 %)."
+    "elevationMeters": 1782,
+    "slopePercent": 10,
+    "source": "Leído del tile N04W076 del producto oficial NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC; 3601×3601 celdas, ~30 m). Altitud: promedio de una ventana de 7×7 celdas (~210 m) alrededor del punto. Pendiente: promedio del método de Horn en esa ventana. Es el valor del punto, no de todo el lote."
   },
   {
     "id": "manizales-ladera",
@@ -35,9 +35,9 @@
     "lat": 5.0689,
     "lon": -75.5174,
     "tolerance": 0.08,
-    "elevationMeters": 2150,
-    "slopePercent": 32,
-    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): altitud media de Manizales (~2150 m s. n. m.) en relieve quebrado de alta pendiente (~32 %)."
+    "elevationMeters": 2119,
+    "slopePercent": 15,
+    "source": "Leído del tile N05W076 del producto oficial NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC; 3601×3601 celdas, ~30 m). Altitud: promedio de una ventana de 7×7 celdas (~210 m) alrededor del punto. Pendiente: promedio del método de Horn en esa ventana. Es el valor del punto, no de todo el lote."
   },
   {
     "id": "armenia-quindio",
@@ -45,8 +45,8 @@
     "lat": 4.5339,
     "lon": -75.6811,
     "tolerance": 0.08,
-    "elevationMeters": 1480,
-    "slopePercent": 12,
-    "source": "Estimación de referencia, sin verificar contra el ráster NASA SRTMGL1 v003 (30 m): abanico fluviovolcánico del Quindío (~1480 m s. n. m., pendiente moderada ~12 %)."
+    "elevationMeters": 1475,
+    "slopePercent": 9,
+    "source": "Leído del tile N04W076 del producto oficial NASA SRTMGL1 versión 003 (NASA/USGS, LP DAAC; 3601×3601 celdas, ~30 m). Altitud: promedio de una ventana de 7×7 celdas (~210 m) alrededor del punto. Pendiente: promedio del método de Horn en esa ventana. Es el valor del punto, no de todo el lote."
   }
 ]
