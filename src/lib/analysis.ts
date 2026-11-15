@@ -23,7 +23,11 @@ function bestOf(results: readonly RotationResult[], strategy: string): RotationR
   return pickBest(results);
 }
 
-export type AnalysisInput = { climate: ClimateResult; crops: readonly Crop[]; priorities: UserPriorities; location: { lat: number; lon: number } };
+export type AnalysisInput = {
+  climate: ClimateResult; crops: readonly Crop[]; priorities: UserPriorities; location: { lat: number; lon: number };
+  /** Vacíos de información sobre el lote (p. ej. solo se conoce un punto); se agregan a todas las rotaciones. */
+  siteGaps?: readonly string[];
+};
 
 /** ¿Cae el sitio dentro de la zona donde vale el calendario de siembra del catálogo (Eje Cafetero)? */
 export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
@@ -39,7 +43,7 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  * calendario de siembra del catálogo (solo en el Eje Cafetero) y pasar los conteos de días a días por año.
  * Es pura (sin red ni archivos). Lanza `AnalysisInputError` si no hay registros o si el cultivo actual es desconocido.
  */
-export function buildAnalysis({ climate, crops, priorities, location }: AnalysisInput): AnalysisResponse {
+export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [] }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   const current = resolveCurrentCrop(crops, priorities.currentCropId);
   const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined);
@@ -53,5 +57,5 @@ export function buildAnalysis({ climate, crops, priorities, location }: Analysis
   const score = (rotations: readonly Rotation[]) => scoreRotations({ rotations, crops, indicators, priorities, seasonality, yearsAnalyzed });
   const candidates = candidateRotations(crops, current);
   const rotations = [...score([baselineRotation(current)]), bestOf(score(candidates.legume), "leguminosa"), bestOf(score(candidates.coverDrought), "cobertura y sequía")];
-  return { climate, monthlyClimate, indicators, rotations };
+  return { climate, monthlyClimate, indicators, rotations: rotations.map((result) => ({ ...result, informationGaps: [...result.informationGaps, ...siteGaps] })) };
 }
