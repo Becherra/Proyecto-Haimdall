@@ -62,7 +62,7 @@ export default function LocationSearch({ onLocationSelected, onGpsStart, onGpsLo
     </form>
     <div className="mt-3 text-left">
       <p className="text-xs text-ash-gray">Usaremos tu ubicación para mostrarte tu zona. No la guardamos.</p>
-      <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="mt-3 flex min-h-14 w-full items-center justify-center rounded-full bg-olive px-5 py-3 text-base font-semibold text-bone-white transition hover:bg-[#8A9742] focus:outline-none focus:ring-2 focus:ring-cream focus:ring-offset-2 focus:ring-offset-black disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
+      <button type="button" onClick={useCurrentLocation} disabled={locating || loading} className="mt-3 flex min-h-14 w-full items-center justify-center rounded-full bg-cream px-5 py-3 text-base font-semibold text-meadow transition hover:bg-bone-white focus:outline-none focus:ring-2 focus:ring-cream focus:ring-offset-2 focus:ring-offset-black disabled:cursor-wait disabled:opacity-60">{locating ? "Obteniendo ubicación…" : "Usar mi ubicación actual"}</button>
     </div>
     {error && <p id="location-error" className="mt-3 text-left text-sm text-clay-light" role="alert">{error}</p>}
   </div>;

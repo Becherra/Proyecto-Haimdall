@@ -205,7 +205,7 @@ export default function MapScene({ location, gpsAccuracyMeters, onBack, onFarmCo
           const result = validateFarmDraft(candidate);
           if (!result.valid) { setConfirmationError(result.errors.join(" ")); return; }
           setConfirmationError(null); setConfirmedFarm(result.farm); onFarmConfirmed(result.farm);
-        }} className="min-h-11 rounded-full bg-olive px-4 py-3 text-sm font-semibold text-bone-white hover:bg-[#8A9742] focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
+        }} className="min-h-11 rounded-full bg-cream px-4 py-3 text-sm font-semibold text-meadow hover:bg-bone-white focus:outline-none focus:ring-2 focus:ring-cream disabled:cursor-not-allowed disabled:opacity-40">Confirmar finca</button>
       </div>
       {!terrainStatus.canConfirm && <p id="farm-confirm-guidance" className="col-span-2 -mt-1 text-xs leading-5 text-cream" role="status">Antes de confirmar: {terrainStatus.error ?? "Completa y valida el terreno."}</p>}
       {confirmationError && <p className="col-span-2 text-sm text-clay-light" role="alert">No se pudo confirmar la finca: {confirmationError}</p>}

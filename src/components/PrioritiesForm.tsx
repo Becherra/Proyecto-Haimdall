@@ -28,7 +28,7 @@ const priorityFields = [
   ["lowRisk", "Evitar riesgos", "Favorecer opciones más conservadoras."],
 ] as const satisfies readonly (readonly [keyof Pick<UserPriorities, "waterSaving" | "extraIncome" | "soilImprovement" | "erosionReduction" | "lowRisk">, string, string])[];
 
-const inputClass = "min-h-12 w-full rounded-xl border border-cream/15 bg-[#0D3C16] px-4 text-sm text-bone-white outline-none transition focus:border-cream focus:ring-2 focus:ring-cream/30";
+const inputClass = "min-h-12 w-full rounded-xl border border-olive/60 bg-meadow px-4 text-sm text-bone-white outline-none transition focus:border-cream focus:ring-2 focus:ring-cream/30";
 
 export default function PrioritiesForm({ farm, initialValues, error, submitting, onSubmit, onChangeFarm }: PrioritiesFormProps) {
   const [values, setValues] = useState(initialValues);
@@ -75,7 +75,7 @@ export default function PrioritiesForm({ farm, initialValues, error, submitting,
 
     <form onSubmit={handleSubmit} className="grid gap-5 lg:grid-cols-[0.86fr_1.14fr]">
       <div className="space-y-5">
-        <div className="rounded-2xl border border-cream/10 bg-[#0D3C16] p-5 sm:p-6">
+        <div className="rounded-2xl border border-olive/40 bg-spruce p-5 sm:p-6">
           <label htmlFor="current-crop" className="block text-sm font-semibold text-bone-white">¿Qué cultivo tienes actualmente?</label>
           <p className="mt-1 text-xs leading-5 text-ash-gray">Nos sirve como punto de comparación, no como recomendación.</p>
           <select id="current-crop" value={values.currentCropId ?? "maiz"} onChange={(event) => setValues((current) => ({ ...current, currentCropId: event.target.value }))} className={`${inputClass} mt-4`}>
@@ -83,7 +83,7 @@ export default function PrioritiesForm({ farm, initialValues, error, submitting,
           </select>
         </div>
 
-        <div className="rounded-2xl border border-cream/10 bg-[#0D3C16] p-5 sm:p-6">
+        <div className="rounded-2xl border border-olive/40 bg-spruce p-5 sm:p-6">
           <label htmlFor="water-availability" className="block text-sm font-semibold text-bone-white">¿Cómo está la disponibilidad de agua?</label>
           <p className="mt-1 text-xs leading-5 text-ash-gray">Tu respuesta ayuda a interpretar los indicadores climáticos.</p>
           <select id="water-availability" value={values.waterAvailability ?? "medium"} onChange={(event) => setValues((current) => ({ ...current, waterAvailability: event.target.value as UserPriorities["waterAvailability"] }))} className={`${inputClass} mt-4`}>
@@ -101,7 +101,7 @@ export default function PrioritiesForm({ farm, initialValues, error, submitting,
         </details>
       </div>
 
-      <fieldset className="rounded-2xl border border-cream/10 bg-[#0D3C16] p-5 sm:p-6">
+      <fieldset className="rounded-2xl border border-olive/40 bg-spruce p-5 sm:p-6">
         <legend className="px-2 text-sm font-semibold text-bone-white">Elige qué pesa más para ti</legend>
         <p className="mb-6 text-xs leading-5 text-ash-gray">Mueve cada control de 0 (no es prioridad) a 5 (máxima prioridad).</p>
         <div className="space-y-6">
@@ -116,7 +116,7 @@ export default function PrioritiesForm({ farm, initialValues, error, submitting,
       {(validationError || error) && <p className="lg:col-span-2 rounded-xl border border-clay/30 bg-clay/30 p-3 text-sm text-clay-light" role="alert">{validationError ?? error}</p>}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between lg:col-span-2">
         <p className="text-xs leading-5 text-ash-gray">El análisis es apoyo para decidir; no reemplaza la orientación de un agrónomo local.</p>
-        <button type="submit" disabled={submitting} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-olive px-6 text-sm font-semibold text-bone-white shadow-[0_8px_32px_rgba(128,82,255,0.22)] transition hover:bg-[#8A9742] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream disabled:cursor-wait disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-cream px-6 text-sm font-semibold text-meadow shadow-[0_8px_32px_rgba(128,82,255,0.22)] transition hover:bg-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream disabled:cursor-wait disabled:opacity-60">
           {submitting ? "Analizando tu finca…" : "Ver análisis de mi finca"}<span aria-hidden="true">→</span>
         </button>
       </div>
