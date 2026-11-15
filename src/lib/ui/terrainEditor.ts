@@ -1,5 +1,5 @@
 import type { FarmTerrain, LocationResult } from "../../types";
-import { convertCoordinateOrder, polygonAreaHa, polygonCentroid, representativeAreaHa, validateTerrain } from "../geo";
+import { convertCoordinateOrder, polygonAreaHa, polygonCentroid, representativeAreaHa, squareFromArea, validateTerrain } from "../geo";
 import type { GeoJsonPosition, GeoJsonRing, TerrainValidation } from "../geo";
 
 export type TerrainEditorMode = "point" | "approx_size" | "polygon";
@@ -18,6 +18,7 @@ export type TerrainEditorEvent =
   | { type: "set-mode"; mode: TerrainEditorMode }
   | { type: "set-location"; location: LocationResult }
   | { type: "set-area-range"; range: AreaRangeHa | null }
+  | { type: "set-area-unit"; unit: "ha" | "m2" }
   | { type: "set-exact-area"; value: number | null; unit: "ha" | "m2" }
   | { type: "add-vertex"; lat: number; lon: number }
   | { type: "move-vertex"; index: number; lat: number; lon: number }
@@ -64,6 +65,12 @@ export function getTerrainEditorStatus(state: TerrainEditorState): TerrainEditor
       ...(state.exactAreaHa === null && state.areaRangeHa ? { areaRangeHa: [state.areaRangeHa[0], state.areaRangeHa[1]] as [number, number] } : {}),
     };
     const validation = validateTerrain(terrain);
+    if (validation.valid) {
+      try { squareFromArea(state.location, areaHa); }
+      catch (error) {
+        return { canConfirm: false, areaHa, error: error instanceof Error ? error.message : "No se puede dibujar el tamaño en esta ubicación.", warnings: validation.warnings, validation };
+      }
+    }
     return { canConfirm: validation.valid, areaHa, error: validation.errors[0] ?? null, warnings: validation.warnings, validation };
   }
   const result = polygonValidation(state);
@@ -85,6 +92,8 @@ export function terrainEditorReducer(state: TerrainEditorState, event: TerrainEd
       return { ...state, location: event.location, error: null };
     case "set-area-range":
       return { ...state, areaRangeHa: event.range, exactAreaHa: null, error: null };
+    case "set-area-unit":
+      return { ...state, areaUnit: event.unit, error: null };
     case "set-exact-area":
       return { ...state, exactAreaHa: event.value === null ? null : event.unit === "m2" ? event.value / 10_000 : event.value, areaRangeHa: null, areaUnit: event.unit, error: null };
     case "add-vertex":
