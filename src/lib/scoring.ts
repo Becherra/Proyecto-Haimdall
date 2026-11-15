@@ -15,7 +15,7 @@ type Criterion = { key: CriterionKey; label: string; weight: number; value: numb
 type Penalty = { label: string; value: number; kind: PenaltyKind };
 type SowingFinding = { crop: Crop; assessment: SowingAssessment };
 /** `familyBreak`: fracción de relevos que cambian de familia botánica (ver `familyBreakShare`); null si el catálogo no trae las familias. */
-type Evaluation = { rotation: Rotation; crops: Crop[]; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
+type Evaluation = { rotation: Rotation; crops: Crop[]; permanent: boolean; score: number; criteria: Criterion[]; penalties: Penalty[]; sowing: SowingFinding[] | null; calendar: RotationCalendar | null; years: number; familyBreak: number | null; waterAvailability: WaterAvailability | undefined };
 type WaterAvailability = NonNullable<UserPriorities["waterAvailability"]>;
 
 /**
@@ -134,16 +134,18 @@ function evaluateRotation(rotation: Rotation, { crops: catalog, indicators, prio
   const weights = normalizedWeights(priorities);
   const values = criterionValues(crops, dryness);
   const criteria = CRITERIA.map((key) => ({ key, label: LABELS[key], weight: weights[key], value: values[key] }));
-  const sowing = seasonality ? crops.map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
-  const calendar = seasonality ? buildRotationCalendar(crops, seasonality) : null;
-  const familyBreak = familyBreakShare(crops);
+  // Un cultivo permanente (café, plátano) no se siembra cada año ni se rota: no tiene meses de siembra, calendario de rotación ni relevos de familia.
+  const permanent = crops.some((crop) => crop.perennial === true);
+  const sowing = seasonality ? crops.filter((crop) => crop.perennial !== true).map((crop) => ({ crop, assessment: assessSowing(crop.sowingMonths, seasonality) })) : null;
+  const calendar = seasonality && !permanent ? buildRotationCalendar(crops, seasonality) : null;
+  const familyBreak = permanent ? null : familyBreakShare(crops);
   const { waterAvailability } = priorities;
   const waterFactor = WATER_AVAILABILITY_DROUGHT_FACTOR[waterAvailability ?? "medium"];
   const sowingRisk = sowingPenalties(sowing).map((penalty) => ({ ...penalty, value: penalty.value * waterFactor }));
   const penalties = [...riskPenalties(crops, indicators, dryness, years, waterFactor), ...climatePenalties(crops, indicators, years, waterAvailability), ...sowingRisk, ...pestCyclePenalties(familyBreak)];
   const weighted = criteria.reduce((sum, criterion) => sum + criterion.weight * criterion.value, 0);
   const penalty = penalties.reduce((sum, item) => sum + item.value, 0);
-  return { rotation, crops, criteria, penalties, sowing, calendar, years, familyBreak, waterAvailability, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
+  return { rotation, crops, permanent, criteria, penalties, sowing, calendar, years, familyBreak, waterAvailability, score: Math.round(Math.min(Math.max(weighted - penalty, 0), MAX_SCORE) * 100) / 100 };
 }
 
 const oneDecimal = (value: number) => value.toFixed(1);
@@ -216,6 +218,13 @@ function terrainEvidence({ slopePercent, terrainSource }: Indicators): string[] 
   return [`Pendiente del terreno: ${slopePercent.toFixed(0)} % (${origin}).`];
 }
 
+/** Un cultivo permanente ocupa el lote todo el año: no hay rotación ni calendario de siembra que mostrar. */
+function permanentEvidence({ crops, permanent }: Evaluation): string[] {
+  if (!permanent) return [];
+  const names = crops.filter((crop) => crop.perennial === true).map(commonName).join(", ");
+  return [`Cultivo permanente (${names}): ocupa el lote todo el año y no se rota; el catálogo solo propone asociarle cultivos anuales en las calles.`];
+}
+
 function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[] {
   const { criteria, crops, sowing, years, waterAvailability } = evaluation;
   const { waterDeficitMm: balance, heatStressDays, frostRiskDays, extremeRainThresholdMm: rain, meanRootZoneWetness: wetness } = indicators;
@@ -230,6 +239,7 @@ function buildEvidence(evaluation: Evaluation, indicators: Indicators): string[]
     ...(waterAvailability ? [`Disponibilidad de agua declarada por el agricultor: ${WATER_AVAILABILITY_LABELS[waterAvailability]}.`] : []),
     ...sowingEvidence(sowing, indicators),
     ...(evaluation.calendar ? calendarEvidence(evaluation.calendar) : []),
+    ...permanentEvidence(evaluation),
     ...familyEvidence(evaluation),
     durationEvidence(crops),
     ...crops.map((crop) => `Atributos de ${crop.name}: ${crop.source}.`),
@@ -294,17 +304,22 @@ function buildRisks(evaluation: Evaluation, indicators: Indicators): string[] {
   }
   if (evaluation.calendar) risks.push(...calendarRisks(evaluation.calendar, crops));
   risks.push(...familyRisks(evaluation));
+  if (evaluation.permanent && crops.length > 1) risks.push("La asociación con un cultivo anual vale sobre todo en la etapa de establecimiento o de renovación del cultivo permanente; con el cultivo adulto no se mantiene. Hay que manejar los dos por separado para que no compitan.");
   return [...risks, "El puntaje es una simplificación por reglas: no captura plagas, precios, costos ni manejo real."];
 }
 
 function sowingGaps(sowing: SowingFinding[] | null): string[] {
+  if (sowing?.length === 0) return [];
   if (!sowing) return ["El calendario de siembra de cada cultivo no se cruzó con la estacionalidad de lluvia: el calendario del catálogo solo es válido para el Eje Cafetero (Colombia)."];
   const unknown = sowing.filter(({ assessment }) => assessment.unknownMonths.length > 0)
     .map(({ crop, assessment }) => `Hay meses de siembra de ${crop.name} (${formatMonths(assessment.unknownMonths)}) sin dato de lluvia; no se pudo evaluar si caen en época seca.`);
   return ["Los meses de siembra salen del catálogo (preliminares) y se cruzaron con promedios mensuales de lluvia: no distinguen años secos o lluviosos (El Niño/La Niña) ni un calendario real por cultivo y municipio.", ...unknown];
 }
 
-function familyGap(familyBreak: number | null): string {
+function familyGap(familyBreak: number | null, permanent: boolean, cropCount: number): string {
+  if (permanent) {
+    return `Incluye un cultivo permanente: no se rota, así que no se evalúa la alternancia de familias. La asociación con cultivos anuales solo está documentada para el establecimiento o la renovación; no hay datos de competencia, plagas ni manejo del lote.${cropCount > 1 ? " Además, el puntaje promedia los dos cultivos como si compartieran el lote el mismo tiempo, y el anual solo está mientras el permanente es joven: la asociación puede valer más de lo que el puntaje muestra." : ""}`;
+  }
   return familyBreak === null
     ? "El catálogo no trae la familia botánica de todos los cultivos: no se evaluó si la rotación alterna familias."
     : "No hay datos de plagas ni enfermedades del lote: alternar familias botánicas es una regla agronómica general, no un diagnóstico.";
@@ -335,7 +350,7 @@ function terrainGaps(indicators: Indicators): string[] {
   ];
 }
 
-function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar }: Evaluation): string[] {
+function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calendar, permanent }: Evaluation): string[] {
   const missing = Object.entries(indicators.missingByParameter).filter(([, days]) => days > 0).map(([name, days]) => `Faltaron ${days} días de dato en ${name}.`);
   return [
     "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
@@ -344,7 +359,7 @@ function buildGaps(indicators: Indicators, { crops, sowing, familyBreak, calenda
     ...terrainGaps(indicators),
     ...sowingGaps(sowing),
     ...(calendar ? [calendarGap()] : []),
-    familyGap(familyBreak),
+    familyGap(familyBreak, permanent, crops.length),
     ...(indicators.waterDeficitMm === null ? ["No se pudo calcular el balance hídrico; el criterio de agua usa solo los atributos del cultivo."] : []),
     ...missing,
   ];
@@ -366,7 +381,7 @@ function buildResult(evaluation: Evaluation, indicators: Indicators): RotationRe
     ...(evaluation.calendar ? { calendar: evaluation.calendar } : {}),
     plain: buildPlain({
       crops: evaluation.crops, criteria: evaluation.criteria, penaltyKinds: evaluation.penalties.map((penalty) => penalty.kind), indicators,
-      dryness: drynessFactor(indicators), sowing: evaluation.sowing, calendar: evaluation.calendar, familyBreak: evaluation.familyBreak, waterAvailability: evaluation.waterAvailability,
+      dryness: drynessFactor(indicators), sowing: evaluation.sowing, calendar: evaluation.calendar, familyBreak: evaluation.familyBreak, permanent: evaluation.permanent, waterAvailability: evaluation.waterAvailability,
     }),
   };
 }

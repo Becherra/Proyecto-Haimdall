@@ -15,8 +15,10 @@ describe("data/crops.json", () => {
   it("tiene ids únicos y meses de siembra válidos, sin repetir", () => {
     const crops = raw.map((crop) => cropSchema.parse(crop));
     expect(new Set(crops.map((crop) => crop.id)).size).toBe(crops.length);
-    for (const { sowingMonths } of crops) {
-      expect(sowingMonths.length).toBeGreaterThan(0);
+    for (const { sowingMonths, perennial } of crops) {
+      // Un cultivo permanente no se siembra cada año: no lleva meses de siembra.
+      if (perennial) expect(sowingMonths).toEqual([]);
+      else expect(sowingMonths.length).toBeGreaterThan(0);
       expect(new Set(sowingMonths).size).toBe(sowingMonths.length);
     }
   });

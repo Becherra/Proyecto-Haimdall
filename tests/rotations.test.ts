@@ -162,7 +162,8 @@ describe("startingRotations: sin cultivo actual", () => {
     const { startingRotations } = await import("../src/lib/rotations");
     const { CROPS } = await import("../src/lib/catalog");
     const candidates = startingRotations(CROPS);
-    expect(candidates.single).toHaveLength(CROPS.length);
+    // Los cultivos permanentes (café, plátano) no se ofrecen como punto de partida.
+    expect(candidates.single).toHaveLength(CROPS.filter((entry) => !entry.perennial).length);
     expect(candidates.single.every((item) => item.id === "single" && item.cropIds.length === 1 && !item.name.startsWith("Actual"))).toBe(true);
     expect(candidates.legume.length).toBeGreaterThan(0);
     expect(candidates.coverDrought.length).toBeGreaterThan(0);
