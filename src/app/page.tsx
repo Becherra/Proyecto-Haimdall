@@ -9,8 +9,9 @@ import type { LocationResult } from "../types";
 
 const GlobeScene = dynamic(() => import("../components/GlobeScene"), { ssr: false, loading: () => <div className="flex h-full w-full items-center justify-center rounded-full bg-white/[0.03] text-sm text-ash-gray" role="status">Cargando globo…</div> });
 const MapScene = dynamic(() => import("../components/MapScene"), { ssr: false, loading: () => <div className="flex min-h-[360px] w-full items-center justify-center text-sm text-ash-gray" role="status">Cargando mapa…</div> });
-// Sin texto de carga: durante la intro la pantalla debe estar limpia hasta que los triángulos estén listos.
-const ParticleWorld = dynamic(() => import("../components/ParticleWorld"), { ssr: false, loading: () => null });
+// El campo CSS evita una pantalla vacía mientras se descarga el módulo WebGL.
+const ParticleLoading = () => <div className="particle-loading pointer-events-none fixed inset-0 z-20" aria-hidden="true" />;
+const ParticleWorld = dynamic(() => import("../components/ParticleWorld"), { ssr: false, loading: ParticleLoading });
 
 const subscribePreview = () => () => {};
 export default function Home() {
@@ -44,7 +45,7 @@ export default function Home() {
     applyStage("settled");
   }, [applyStage]);
 
-  // ParticleWorld llama a esto cuando los triángulos ya están creados: ahí arranca el reloj de la intro.
+  // ParticleWorld inicia el reloj cuando la geometría de puntos está lista.
   const beginIntro = useCallback(() => {
     window.cancelAnimationFrame(introFrame.current);
     const start = performance.now();
@@ -66,7 +67,7 @@ export default function Home() {
 
   useEffect(() => {
     if (particlesPreview || reducedMotion || !webglAvailable) { queueMicrotask(finishIntro); return; }
-    // Red de seguridad: si los triángulos no cargan en 8 s, mostramos el globo normal.
+    // Red de seguridad: si los puntos no cargan en 8 s, mostramos la landing normal.
     const safety = window.setTimeout(() => { if (!introStart.current) finishIntro(); }, 8000);
     return () => { window.clearTimeout(safety); window.cancelAnimationFrame(introFrame.current); };
   }, [particlesPreview, reducedMotion, webglAvailable, finishIntro]);
@@ -83,12 +84,17 @@ export default function Home() {
   const onGpsLocationSelected = (selected: LocationResult, accuracyMeters: number) => { setMapLocation(null); dispatch({ type: "gpsOk", location: selected, accuracyMeters }); };
   const onBackToGlobe = () => { setMapLocation(null); dispatch({ type: "volver" }); };
   const globeFading = flow.status === "transitioning";
-  const globeHidden = introStage === "scatter" || introStage === "gather" || introStage === "hold";
+  const introIsEarly = introStage === "scatter" || introStage === "gather" || introStage === "hold";
+  const globeIntroOpacity = particlesPreview
+    ? 0
+    : introStage === "hold"
+    ? 0.28
+    : introStage === "explode" || introStage === "globe" || introStage === "settled" ? 1 : 0;
   const globeInteractive = introStage === "globe" || introStage === "settled";
 
   return <main id="inicio" className="min-h-screen overflow-hidden bg-void text-bone-white">
     {!showMap ? <section className="mx-auto grid min-h-[calc(100svh-76px)] w-full max-w-[1440px] grid-cols-1 items-center px-5 pb-8 pt-2 sm:px-10 lg:min-h-[calc(100svh-88px)] lg:grid-cols-[0.88fr_1.12fr] lg:gap-3 lg:px-12 lg:py-8">
-      <div className={`relative z-10 order-2 mx-auto w-full max-w-[580px] text-center lg:order-1 lg:mx-0 lg:text-left hero-copy-${introStage}`}>
+      <div aria-hidden={introIsEarly} inert={introIsEarly} style={{ opacity: introIsEarly ? 0 : 1 }} className={`relative z-10 order-2 mx-auto w-full max-w-[580px] text-center lg:order-1 lg:mx-0 lg:text-left hero-copy-${introStage}`}>
         <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-saffron-spark sm:text-sm">NASA · agricultura · futuro</p>
         <h1 className="font-display text-[clamp(3.5rem,9vw,7rem)] font-normal leading-[0.92] tracking-[-0.055em]">HEIMDALL</h1>
         <p className="mt-5 text-xl font-light leading-relaxed text-silver-mist sm:text-2xl">Decide qué sembrar con datos de la NASA.</p>
@@ -96,12 +102,12 @@ export default function Home() {
         <div className="mt-7"><LocationSearch onLocationSelected={onLocationSelected} onGpsStart={() => dispatch({ type: "locating" })} onGpsLocationSelected={onGpsLocationSelected} onGpsError={(message) => dispatch({ type: "gpsError", message })} /></div>
       </div>
       <div ref={globeAnchor} className={`relative isolate order-1 mx-auto h-[min(39svh,340px)] w-full max-w-[610px] transition-opacity duration-500 motion-reduce:transition-none sm:h-[min(48svh,460px)] lg:order-2 lg:h-[min(78svh,740px)] ${globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
-        {/* El globo real se precarga oculto y aparece (fade) justo cuando los triángulos se disuelven. */}
-        <div className={`absolute inset-0 transition-opacity duration-700 motion-reduce:transition-none ${globeHidden ? "opacity-0" : "opacity-100"}`}>
+        {/* El globo real aparece debajo de los puntos y cruza a visible durante su disolución. */}
+        <div aria-hidden={globeIntroOpacity === 0} className={`globe-intro absolute inset-0 transition-opacity duration-500 motion-reduce:transition-none ${introStage === "explode" ? "globe-intro-explode" : ""}`} style={{ opacity: globeIntroOpacity }}>
           <GlobeScene location={location} active={!showMap && !globeFading && globeInteractive} />
         </div>
       </div>
-      {/* Overlay a pantalla completa: los triángulos cruzan toda la página y se ensamblan sobre la posición del globo. */}
+      {/* Overlay a pantalla completa: los puntos cruzan la página y se ensamblan sobre el globo. */}
       {!particlesPreview && introStage !== "settled" && <ParticleWorld stage={introStage} startRef={introStart} anchorRef={globeAnchor} onReady={beginIntro} onError={finishIntro} />}
       {particlesPreview && <ParticleWorld stage="preview" anchorRef={globeAnchor} />}
       {introStage !== "settled" && !particlesPreview && <button type="button" onClick={finishIntro} className="fixed right-5 top-24 z-30 rounded-full border border-white/30 bg-black px-4 py-2 text-xs text-white focus-visible:outline-2 focus-visible:outline-saffron-spark">Saltar</button>}
