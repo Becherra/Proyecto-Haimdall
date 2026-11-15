@@ -71,6 +71,12 @@ export const indicatorsSchema = z.object({
   meanAnnualDrySpellDays: z.number().nonnegative().nullable().optional(),
   /** Año de la serie con el balance hídrico medio mensual más bajo; ausente si la serie no tiene años completos suficientes. */
   worstYear: z.object({ year: z.number().int().min(1981), waterBalanceMm: z.number() }).optional(),
+  /** Índice de Fournier modificado (suma de la lluvia mensual al cuadrado / lluvia anual, mm): qué tan concentrada y agresiva es la lluvia del sitio para erosionar. Ausente si faltan meses de lluvia. */
+  rainErosivityIndex: z.number().nonnegative().optional(),
+  /** Radiación solar media que llega a la superficie con las nubes que hay (MJ/m²/día, NASA POWER ALLSKY_SFC_SW_DWN). */
+  meanSolarRadiationMJ: z.number().nonnegative().nullable().optional(),
+  /** Índice de claridad: radiación recibida / radiación en el borde de la atmósfera (0–1). Cerca de 0,7 es cielo despejado; cerca de 0,4 es muy nublado. */
+  clearnessIndex: z.number().min(0).max(1).nullable().optional(),
 });
 export type Indicators = z.infer<typeof indicatorsSchema>;
 
