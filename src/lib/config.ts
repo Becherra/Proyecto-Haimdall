@@ -81,3 +81,13 @@ export const MIN_MONTHS_FOR_WORST_YEAR = 10;
 export const WORST_YEAR_DROUGHT_WEIGHT = 0.5;
 /** Racha seca (días seguidos) desde la cual se avisa a los cultivos de baja tolerancia a sequía. Heurística de diseño; validar con un agrónomo local. */
 export const DRY_SPELL_ALERT_DAYS = 20;
+
+/** Días de NASA POWER reciente que se comparan con lo normal para describir la temporada actual. */
+export const CURRENT_SEASON_DAYS = 90;
+/** Años mínimos de la serie histórica con dato suficiente en la misma época para que "lo normal" sirva de comparación. */
+export const MIN_YEARS_FOR_CURRENT_SEASON = 5;
+/**
+ * Cortes de la lluvia reciente como % de la normal para decir si la temporada va muy seca, seca, normal, húmeda o muy húmeda.
+ * Heurística de diseño, no un dato oficial; validar con un agrónomo local.
+ */
+export const CURRENT_SEASON_PERCENT = { muchDrier: 50, drier: 80, wetter: 120, muchWetter: 150 } as const;
