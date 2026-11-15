@@ -180,6 +180,18 @@ export const climateResultSchema = z.object({
 });
 export type ClimateResult = z.infer<typeof climateResultSchema>;
 
+/**
+ * Escenario hipotético "¿y si…?" aplicado de forma uniforme a la serie histórica de NASA POWER; no es una proyección climática.
+ * Los límites evitan escenarios fuera de lo razonable para una comparación rápida.
+ */
+export const climateScenarioSchema = z.object({
+  /** Grados que se suman a la temperatura media, mínima y máxima de cada día (°C). Ausente = 0. */
+  tempDeltaC: z.number().finite().min(-2).max(5).optional(),
+  /** Factor que multiplica la lluvia de cada día (0.8 = 20 % menos lluvia). Ausente = 1. */
+  rainFactor: z.number().finite().min(0.5).max(1.5).optional(),
+});
+export type ClimateScenario = z.infer<typeof climateScenarioSchema>;
+
 export const climateRequestSchema = z.object({
   lat: z.number().finite().gte(-90).lte(90), lon: z.number().finite().gte(-180).lte(180),
   startYear: z.number().int().min(1981), endYear: z.number().int().min(1981),
@@ -191,11 +203,14 @@ export const analysisRequestSchema = z.object({
   startYear: z.number().int().min(1981), endYear: z.number().int().min(1981), priorities: userPrioritiesSchema,
   // Climate should use farm.centroid when a Farm is supplied; lat/lon remain for older clients.
   farm: farmSchema.optional(),
+  scenario: climateScenarioSchema.optional(),
 }).refine((value) => value.startYear <= value.endYear, "startYear debe ser menor o igual que endYear");
 export type AnalysisRequest = z.infer<typeof analysisRequestSchema>;
 
 export const analysisResponseSchema = z.object({
   climate: climateResultSchema, monthlyClimate: z.array(monthlyClimateSchema), indicators: indicatorsSchema, rotations: z.array(rotationResultSchema).min(3),
+  /** Escenario aplicado, si se pidió: `monthlyClimate`, `indicators` y `rotations` lo reflejan; `climate` conserva los datos originales de NASA. */
+  scenario: climateScenarioSchema.optional(),
 });
 export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
 
