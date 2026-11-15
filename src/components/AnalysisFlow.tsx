@@ -5,7 +5,7 @@ import AnalysisDashboard from "./AnalysisDashboard";
 import PrioritiesSlides from "./PrioritiesSlides";
 import ResultsView from "./ResultsView";
 import { buildAnalysisRequest, isAnalysisMockMode, runAnalysis } from "../services/analysis";
-import type { AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "../types";
+import type { AnalysisResponse, ClimateScenario, CropProfileSelection, Farm, UserPriorities } from "../types";
 
 const initialPriorities: UserPriorities = {
   waterSaving: 3, extraIncome: 3, soilImprovement: 3, erosionReduction: 3, lowRisk: 3,
@@ -18,6 +18,8 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
   const [step, setStep] = useState<"priorities" | "results">("priorities");
   const [technical, setTechnical] = useState(false);
   const [priorities, setPriorities] = useState(initialPriorities);
+  // Perfil de cultivo (variedad, etapa, problema observado): aún no entra al análisis climático; se guarda para volver a editarlo.
+  const [cropProfile, setCropProfile] = useState<CropProfileSelection | undefined>(undefined);
   const [baseResponse, setBaseResponse] = useState<AnalysisResponse | null>(null);
   const [response, setResponse] = useState<AnalysisResponse | null>(null);
   const [scenarioDraft, setScenarioDraft] = useState<ClimateScenario>(neutralScenario);
@@ -25,10 +27,11 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
   const [error, setError] = useState<string | null>(null);
   const mockMode = isAnalysisMockMode();
 
-  async function analyzePriorities(nextPriorities: UserPriorities) {
+  async function analyzePriorities(nextPriorities: UserPriorities, nextProfile?: CropProfileSelection) {
     setPending(true);
     setError(null);
     setPriorities(nextPriorities);
+    setCropProfile(nextProfile);
     try {
       const result = await runAnalysis(buildAnalysisRequest(farm, nextPriorities));
       setBaseResponse(result);
@@ -75,7 +78,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
   }
 
   if (step === "priorities" || !response || !baseResponse) {
-    return <PrioritiesSlides farm={farm} initialValues={priorities} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />;
+    return <PrioritiesSlides farm={farm} initialValues={priorities} initialProfile={cropProfile} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />;
   }
 
   if (!technical) return <ResultsView farm={farm} response={response} applyingScenario={pending} scenarioError={error} mockMode={mockMode} onSelectScenario={selectScenario} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;

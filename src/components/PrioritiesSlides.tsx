@@ -9,15 +9,20 @@ import { CropIcon, GoalIcon } from "./icons";
 import Logo from "./Logo";
 import { applySelection, cropAnswerFields, cropAnswerFromPriorities, NO_CROP, selectionFromPriorities } from "../lib/ui/prioritySelection";
 import type { PriorityKey } from "../lib/ui/prioritySelection";
+import CropProfileStep from "./CropProfileStep";
+import { CROP_PROFILES } from "../lib/cropProfiles";
+import { draftFromSelection, isStepAnswered, PROFILE_TITLES, profileStepsFor, toProfileSelection, type ProfileDraft, type ProfileStep } from "../lib/ui/cropProfileFlow";
 import { userPrioritiesSchema } from "../types";
-import type { Farm, UserPriorities } from "../types";
+import type { CropProfileSelection, Farm, UserPriorities } from "../types";
 
 type PrioritiesSlidesProps = {
   farm: Farm;
   initialValues: UserPriorities;
+  /** Respuestas previas del perfil de cultivo (variedad, etapa, problema), para volver a editarlas. */
+  initialProfile?: CropProfileSelection;
   error: string | null;
   submitting: boolean;
-  onSubmit: (priorities: UserPriorities) => void;
+  onSubmit: (priorities: UserPriorities, profile?: CropProfileSelection) => void;
   onChangeFarm: () => void;
 };
 
@@ -36,7 +41,8 @@ const GOALS: readonly (readonly [PriorityKey, string])[] = [
   ["erosionReduction", "Frenar la erosión"], ["lowRisk", "Menos riesgo"],
 ];
 
-const TITLES = ["¿Qué cultivo tienes?", "¿Cuánta agua tienes?", "¿Qué te importa más?"] as const;
+type CardId = "crop" | ProfileStep | "water" | "goals";
+const TITLES: Record<"crop" | "water" | "goals", string> = { crop: "¿Qué cultivo tienes?", water: "¿Cuánta agua tienes?", goals: "¿Qué te importa más?" };
 
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const ArrowLeft = () => <svg {...iconProps} className="h-8 w-8"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>;
@@ -70,12 +76,16 @@ const optionBase = "flex items-center rounded-2xl border-2 transition-colors foc
 const optionOff = "border-cream/25 text-bone-white hover:border-cream";
 const optionOn = "border-cream bg-cream text-meadow";
 
-export default function PrioritiesSlides({ farm, initialValues, error, submitting, onSubmit, onChangeFarm }: PrioritiesSlidesProps) {
+export default function PrioritiesSlides({ farm, initialValues, initialProfile, error, submitting, onSubmit, onChangeFarm }: PrioritiesSlidesProps) {
   const [step, setStep] = useState(0);
   const [crop, setCrop] = useState<string | null>(cropAnswerFromPriorities(initialValues));
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>(() => draftFromSelection(initialProfile));
   const [water, setWater] = useState<Water | null>(initialValues.waterAvailability ?? null);
   const [goals, setGoals] = useState<PriorityKey[]>(() => selectionFromPriorities(initialValues));
-  const last = TITLES.length - 1;
+  // Café y plátano suman preguntas de variedad, etapa y problema; los demás cultivos siguen igual.
+  const cards: CardId[] = ["crop", ...profileStepsFor(CROP_PROFILES, crop), "water", "goals"];
+  const current = cards[step];
+  const last = cards.length - 1;
   const placeLabel = farm.placeLabel ?? "Tu finca";
 
   const goNext = () => setStep((current) => Math.min(last, current + 1));
@@ -85,34 +95,43 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
     // «Ninguno» marca que no hay cultivo actual en lugar de mandar uno.
     const answers = { ...initialValues, ...cropAnswerFields(crop), waterAvailability: water ?? undefined };
     const parsed = userPrioritiesSchema.safeParse(applySelection(answers, goals));
-    if (parsed.success) onSubmit(parsed.data);
+    if (parsed.success) onSubmit(parsed.data, toProfileSelection(CROP_PROFILES, crop, profileDraft));
   }
-  const unanswered = (step === 0 && crop === null) || (step === 1 && water === null);
+  function chooseCrop(id: string) {
+    if (id !== crop) setProfileDraft({});
+    setCrop(id);
+  }
+  const unanswered = (current === "crop" && crop === null) || (current === "water" && water === null)
+    || (current !== "crop" && current !== "water" && current !== "goals" && !isStepAnswered(current, profileDraft));
   const onNext = step === last ? submit : goNext;
   const onBack = step === 0 ? onChangeFarm : () => setStep(step - 1);
 
   return <section className="fixed inset-0 z-40 flex flex-col bg-scene" aria-label={`Preguntas sobre ${placeLabel}`}>
     <header className="flex items-center justify-between px-4 pt-4">
       <Logo variant="horizontal" size={34} />
-      <ol className="flex items-center gap-2" aria-label={`Pregunta ${step + 1} de ${TITLES.length}`}>
-        {TITLES.map((title, index) => <li key={title} aria-current={index === step ? "step" : undefined} className={`h-2.5 rounded-full transition-all ${index === step ? "w-8 bg-cream" : index < step ? "w-2.5 bg-olive-light" : "w-2.5 bg-cream/25"}`} />)}
+      <ol className="flex items-center gap-2" aria-label={`Pregunta ${step + 1} de ${cards.length}`}>
+        {cards.map((card, index) => <li key={card} aria-current={index === step ? "step" : undefined} className={`h-2.5 rounded-full transition-all ${index === step ? "w-8 bg-cream" : index < step ? "w-2.5 bg-olive-light" : "w-2.5 bg-cream/25"}`} />)}
       </ol>
     </header>
 
     <div className="relative mx-auto mb-12 mt-5 w-full max-w-md flex-1 px-4 lg:max-w-3xl">
       <div className="relative h-full">
         <StackCard offset={0 - step}>
-          <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[0]}</h2>
-          <div role="radiogroup" aria-label={TITLES[0]} className="grid flex-1 auto-rows-fr grid-cols-3 gap-2.5 lg:grid-cols-4 lg:gap-4">
-            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} data-option onClick={(event) => { popElement(event.currentTarget); setCrop(id); }} className={`${optionBase} min-h-[5.5rem] justify-center gap-1 ${id === NO_CROP ? "col-span-full flex-row gap-3" : "flex-col"} ${crop === id ? optionOn : optionOff}`}>
+          <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES.crop}</h2>
+          <div role="radiogroup" aria-label={TITLES.crop} className="grid flex-1 auto-rows-fr grid-cols-3 gap-2.5 lg:grid-cols-4 lg:gap-4">
+            {CROPS.map(([id, name]) => <button key={id} type="button" role="radio" aria-checked={crop === id} data-option onClick={(event) => { popElement(event.currentTarget); chooseCrop(id); }} className={`${optionBase} min-h-[5.5rem] justify-center gap-1 ${id === NO_CROP ? "col-span-full flex-row gap-3" : "flex-col"} ${crop === id ? optionOn : optionOff}`}>
               <CropIcon id={id} /><span className="text-sm font-semibold">{name}</span>
             </button>)}
           </div>
         </StackCard>
 
-        <StackCard offset={1 - step}>
-          <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[1]}</h2>
-          <div role="radiogroup" aria-label={TITLES[1]} className="flex flex-1 flex-col gap-3 lg:gap-4">
+        {crop && cards.map((card, index) => card === "crop" || card === "water" || card === "goals" ? null : <StackCard key={`${crop}-${card}`} offset={index - step}>
+          <CropProfileStep step={card} cropId={crop} draft={profileDraft} onChange={setProfileDraft} />
+        </StackCard>)}
+
+        <StackCard offset={cards.indexOf("water") - step}>
+          <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES.water}</h2>
+          <div role="radiogroup" aria-label={TITLES.water} className="flex flex-1 flex-col gap-3 lg:gap-4">
             {WATER.map(([id, drops, name]) => <button key={id} type="button" role="radio" aria-checked={water === id} data-option onClick={(event) => { popElement(event.currentTarget); setWater(id); }} className={`${optionBase} min-h-24 flex-1 justify-between px-6 ${water === id ? optionOn : optionOff}`}>
               <span className={`flex gap-1 ${water === id ? "text-meadow" : "text-cream"}`} aria-hidden="true">{[1, 2, 3].map((slot) => <Drop key={slot} filled={slot <= drops} />)}</span>
               <span className="text-xl font-bold">{name}</span>
@@ -120,9 +139,9 @@ export default function PrioritiesSlides({ farm, initialValues, error, submittin
           </div>
         </StackCard>
 
-        <StackCard offset={2 - step}>
-          <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES[2]}</h2>
-          <div role="group" aria-label={TITLES[2]} className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4">
+        <StackCard offset={cards.indexOf("goals") - step}>
+          <h2 className="mb-4 text-center text-2xl font-bold text-bone-white">{TITLES.goals}</h2>
+          <div role="group" aria-label={TITLES.goals} className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-4">
             {GOALS.map(([key, name], index) => {
               const on = goals.includes(key);
               return <button key={key} type="button" aria-pressed={on} data-option onClick={(event) => { popElement(event.currentTarget); toggleGoal(key); }} className={`${optionBase} relative min-h-28 flex-col justify-center gap-1.5 ${index === GOALS.length - 1 ? "col-span-2" : ""} ${on ? optionOn : optionOff}`}>

@@ -118,6 +118,7 @@ function gaps({ crops, indicators, sowing, calendar, familyBreak, permanent }: P
     "Los datos de la NASA son de toda la zona, no solo de tu terreno.",
     indicators.meanTemperatureC === undefined || indicators.meanTemperatureC === null ? "No pudimos saber la temperatura de tu zona." : "La temperatura es un promedio de una zona grande; en la montaña cambia con la altura.",
     ...(noTemperatureRange.length > 0 && indicators.meanTemperatureC !== undefined && indicators.meanTemperatureC !== null ? [`De ${joinWords(noTemperatureRange)} no sabemos qué temperatura aguanta.`] : []),
+    ...(indicators.terrainSource === "srtm-live" ? ["La altura y la inclinación las midió un satélite de la NASA en tu terreno, pero cambian mucho de un tramo a otro."] : []),
     ...(indicators.terrainSource === "srtm-sample" ? ["La altura y la pendiente vienen de un satélite de la NASA en un punto cercano de tu zona, no de tu terreno exacto."] : []),
     ...(sowing?.length === 0 ? [] : [sowing === null ? "El calendario de siembra solo está listo para el Eje Cafetero." : "Los meses de siembra son generales: no tienen en cuenta años muy secos o muy lluviosos (El Niño y La Niña)."]),
     ...(unknownMonths.length > 0 ? [`No sabemos si algunos meses de siembra de ${joinWords(unknownMonths)} son secos.`] : []),

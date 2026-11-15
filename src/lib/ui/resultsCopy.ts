@@ -243,9 +243,9 @@ const SEASON_STATUS: Record<CurrentSeasonStatus, { label: string; tone: CurrentS
 };
 
 const SEASON_ADVICE: Record<CurrentSeasonTone, string> = {
-  dry: "En tu lote: tapa el suelo con hojarasca o rastrojo para guardar la poca humedad que queda.",
-  normal: "En tu lote: la temporada va pareja; aprovecha los días húmedos para sembrar o abonar.",
-  wet: "En tu lote: cuidado con los hongos en las hojas, los charcos y que el agua no te lave la tierra ni el abono.",
+  dry: "Qué vigilar: revisa la humedad del suelo y señales de marchitez; el efecto depende del cultivo, su etapa y si tienes riego.",
+  normal: "Qué vigilar: la lluvia normal no garantiza humedad suficiente en el suelo. Revisa el terreno antes de decidir labores.",
+  wet: "Qué vigilar: observa charcos, escorrentía y manchas en las hojas; el riesgo depende del drenaje, la pendiente y el cultivo.",
 };
 
 /** "20261112" → "12 de noviembre". */
@@ -319,11 +319,20 @@ export function activeScenarioPreset(scenario: ClimateScenario | undefined): Sce
 export type NasaSupportItemId = "history" | "drought" | "worstYear" | "terrain";
 export type NasaSupportItem = { id: NasaSupportItemId; title: string; body: string };
 
+/** Cómo empieza la frase según de dónde salió la pendiente: medida en el lote, de un punto de referencia de la zona o contada por el agricultor. */
+const TERRAIN_LEAD: Record<NonNullable<Indicators["terrainSource"]> | "unknown", string> = {
+  "srtm-live": "Con datos de la NASA medimos que tu terreno ",
+  "srtm-sample": "Cerca de tu finca, en un punto de referencia de tu zona, el terreno ",
+  user: "Según lo que nos contaste, tu terreno ",
+  unknown: "Tu terreno ",
+};
+
 function terrainSupportText(indicators: Indicators): string | null {
   if (indicators.slopePercent === undefined && indicators.siteElevationMeters === undefined) return null;
-  if ((indicators.slopePercent ?? 0) >= 20) return "Tu terreno tiene loma fuerte. Cuando llueve duro el agua corre rápido y puede llevarse la tierra buena y el abono.";
-  if ((indicators.slopePercent ?? 0) >= 8) return "Tu terreno tiene algo de falda o inclinación. Sembrar atravesado a la loma y tapar el suelo ayuda a que el agua no arrastre la tierra.";
-  return "Tu terreno es bastante parejo, así que el agua de lluvia se aprovecha mejor y casi no arrastra la tierra.";
+  const lead = TERRAIN_LEAD[indicators.terrainSource ?? "unknown"];
+  if ((indicators.slopePercent ?? 0) >= 20) return `${lead}tiene loma fuerte. Cuando llueve duro el agua corre rápido y puede llevarse la tierra buena y el abono.`;
+  if ((indicators.slopePercent ?? 0) >= 8) return `${lead}tiene algo de falda o inclinación. Sembrar atravesado a la loma y tapar el suelo ayuda a que el agua no arrastre la tierra.`;
+  return `${lead}es bastante parejo, así que el agua de lluvia se aprovecha mejor y casi no arrastra la tierra.`;
 }
 
 /** Traduce el respaldo del análisis a tarjetas simples sin números raros ni jerga estadística. */
@@ -358,6 +367,7 @@ const SIMPLE_SOURCE_CARDS = {
   roots: { title: "Humedad de la tierra", body: "Medida desde el espacio de qué tan mojada está la tierra donde llegan las raíces. Sirve de pista, pero no cambia las estrellas." },
   recent: { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
   terrain: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu zona y si tiene mucha pendiente. Es de un punto cercano, no de tu lote exacto." },
+  terrainLive: { title: "Altura y loma de tu terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu terreno y qué tan inclinado es, justo donde marcaste. La inclinación cambia de un tramo a otro, por eso es un promedio." },
   terrainUser: { title: "Altura y loma que tú contaste", body: "La altura y la inclinación de tu lote vienen de lo que tú nos dijiste." },
   crops: { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo. Son datos de partida: conviene revisarlos con un técnico de tu zona." },
 } as const satisfies Record<string, SimpleSourceCard>;
@@ -369,7 +379,7 @@ const SOURCE_TO_CARD: Record<string, SimpleSourceCardId | null> = {
   "power-t2m": "temperature", "power-t2m_min": "temperature", "power-t2m_max": "temperature",
   "power-prectotcorr": "rain", "power-evland": "evaporation", "power-gwetroot": "roots",
   "power-allsky_sfc_sw_dwn": null,
-  "power-recent": "recent", "power-cell-elevation": "terrain", "terrain-srtm": "terrain", "terrain-user": "terrainUser",
+  "power-recent": "recent", "power-cell-elevation": "terrain", "terrain-srtm": "terrain", "terrain-srtm-live": "terrainLive", "terrain-user": "terrainUser",
   "crops-catalog": "crops",
 };
 

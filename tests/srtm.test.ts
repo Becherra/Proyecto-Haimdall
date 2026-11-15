@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EARTH_METERS_PER_DEGREE, elevationAt, meanElevationAt, parseHgt, slopePercentAt, SRTM_VOID, type HgtTile } from "../src/lib/srtm";
+import { EARTH_METERS_PER_DEGREE, elevationAt, hornSlopeFromWindow, meanElevationAt, parseHgt, slopePercentAt, SRTM_VOID, type HgtTile } from "../src/lib/srtm";
 
 /** Arma un tile sintético de `size`×`size` (fila 0 = borde norte) a partir de una función fila/columna → altura. */
 function tileFrom(size: number, height: (row: number, col: number) => number, south = 0, west = -76): HgtTile {
@@ -109,5 +109,20 @@ describe("slopePercentAt", () => {
 
   it("devuelve null si el punto cae fuera del tile", () => {
     expect(slopePercentAt(tileFrom(SIZE, () => 100), 3, -75.5, 1)).toBeNull();
+  });
+});
+
+describe("hornSlopeFromWindow", () => {
+  it("da 10 % para un plano que sube 3 m por cada 30 m hacia el este", () => {
+    expect(hornSlopeFromWindow([[0, 3, 6], [0, 3, 6], [0, 3, 6]], 30, 30)).toBeCloseTo(10, 6);
+  });
+
+  it("usa el tamaño de celda de cada dirección: el mismo desnivel es más empinado en la dirección corta", () => {
+    expect(hornSlopeFromWindow([[0, 0, 0], [3, 3, 3], [6, 6, 6]], 30, 15)).toBeCloseTo(20, 6);
+  });
+
+  it("un terreno plano da 0 % y devuelve null si falta algún vecino", () => {
+    expect(hornSlopeFromWindow([[5, 5, 5], [5, 5, 5], [5, 5, 5]], 30, 30)).toBe(0);
+    expect(hornSlopeFromWindow([[5, 5, 5], [5, 5, null], [5, 5, 5]], 30, 30)).toBeNull();
   });
 });

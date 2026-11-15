@@ -8,6 +8,7 @@ import { applyScenario, isNeutralScenario, scenarioGap } from "./scenario";
 import { scoreRotations } from "./scoring";
 import { computeSeasonality } from "./seasonality";
 import { adjustRecordsForElevation, resolveTerrain } from "./terrain";
+import type { LiveTerrain } from "./terrainGrid";
 
 /** Error causado por datos de entrada inválidos (el cliente puede corregirlos), a diferencia de un fallo interno. */
 export class AnalysisInputError extends Error {}
@@ -52,6 +53,8 @@ export type AnalysisInput = {
   recentClimate?: ClimateResult;
   /** Años de clima que se pidieron; si la serie trae menos (p. ej. una muestra de respaldo corta) se avisa como vacío de información. */
   requestedYears?: number;
+  /** Altitud y pendiente medidas en vivo con NASA SRTM sobre el lote; con ellas no hace falta un punto piloto cercano. Sin ellas se usa la muestra precargada. */
+  liveTerrain?: LiveTerrain | null;
 };
 
 const formatDate = (date: string) => `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
@@ -87,13 +90,13 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  * Con `scenario` todo se calcula sobre la serie modificada, pero `climate` conserva los datos originales de NASA.
  * Es pura (sin red ni archivos). Lanza `AnalysisInputError` si no hay registros o si el cultivo actual es desconocido.
  */
-export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false, recentClimate, requestedYears }: AnalysisInput): AnalysisResponse {
+export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false, recentClimate, requestedYears, liveTerrain = null }: AnalysisInput): AnalysisResponse {
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   // «No tengo cultivo» no compara contra uno actual; sin esa marca se mantiene el cultivo declarado o el por defecto.
   const current = priorities.noCurrentCrop ? null : resolveCurrentCrop(crops, priorities.currentCropId);
-  const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined);
+  const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined, undefined, liveTerrain);
   const terrainInput = terrain || climate.cellElevationMeters !== undefined
-    ? { cellElevationMeters: climate.cellElevationMeters, siteElevationMeters: terrain?.elevationMeters, slopePercent: terrain?.slopePercent, terrainSource: terrain?.source }
+    ? { cellElevationMeters: climate.cellElevationMeters, siteElevationMeters: terrain?.elevationMeters, slopePercent: terrain?.slopePercent, terrainSource: terrain?.source, slopeRangePercent: terrain?.slopeRangePercent, terrainCellMeters: terrain?.cellMeters }
     : undefined;
   const applied = scenario && !isNeutralScenario(scenario) ? scenario : undefined;
   const records = applied ? applyScenario(climate.records, applied) : climate.records;

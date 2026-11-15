@@ -4,6 +4,10 @@ import { POST } from "../src/app/api/analysis/route";
 import { clearClimateCache } from "../src/lib/nasaPower";
 import { analysisResponseSchema } from "../src/types";
 
+
+// El terreno en vivo llama a otro servicio con el mismo fetch global: aquí se apaga para que estos tests solo cuenten las llamadas a NASA POWER.
+vi.mock("../src/lib/terrainLive", () => ({ fetchLiveTerrain: vi.fn().mockResolvedValue(null), clearLiveTerrainCache: vi.fn() }));
+
 const fixture = readFileSync("tests/fixtures/power-pereira.json", "utf8");
 const priorities = { waterSaving: 4, extraIncome: 2, soilImprovement: 3, erosionReduction: 3, lowRisk: 2 };
 const pereira = { lat: 4.8133, lon: -75.6961, startYear: 2020, endYear: 2022, priorities };
@@ -84,9 +88,10 @@ describe("POST /api/analysis", () => {
     const response = await POST(post({ ...pereira, farm }));
     const body = await response.json();
     expect(response.status).toBe(200);
-    const url = String(fetchSpy.mock.calls[0]?.[0]);
-    expect(url).toContain("latitude=4.5339");
-    expect(url).toContain("longitude=-75.6811");
+    // NASA POWER se consulta al centro de la celda del centroide (Armenia: 4.5, -75.625), no al de lat/lon de Pereira (5, -75.625).
+    const url = new URL(String(fetchSpy.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("latitude")).toBe("4.5");
+    expect(url.searchParams.get("longitude")).toBe("-75.625");
     for (const rotation of body.rotations) expect(rotation.informationGaps.join(" ")).toContain("límites");
   });
 
