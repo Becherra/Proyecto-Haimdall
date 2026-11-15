@@ -23,9 +23,9 @@ describe("getDroughtForecast", () => {
     expect(result).toEqual({ forecast: mockDroughtForecast, isSample: false });
   });
 
-  it("reports when the backend route is not connected", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
-    await expect(getDroughtForecast({ lat: 4.8133, lon: -75.6961 }, 3, false)).rejects.toThrow("aún no está conectado");
+  it("forwards a backend coverage error clearly", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "El IDEAM no tiene cobertura para esta ubicación." }, { status: 404 })));
+    await expect(getDroughtForecast({ lat: 4.8133, lon: -75.6961 }, 3, false)).rejects.toThrow("no tiene cobertura");
   });
 
   it("rejects malformed responses rather than showing unvalidated data", async () => {

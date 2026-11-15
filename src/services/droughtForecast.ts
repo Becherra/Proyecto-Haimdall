@@ -21,8 +21,12 @@ export async function getDroughtForecast(
   }
 
   const payload: unknown = await response.json().catch(() => null);
-  if (response.status === 404) throw new Error("El pronóstico territorial del IDEAM aún no está conectado al servidor.");
-  if (!response.ok) throw new Error("No pudimos consultar el pronóstico de sequía del IDEAM en este momento.");
+  if (!response.ok) {
+    const errorMessage = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+      ? payload.error
+      : "No pudimos consultar el pronóstico de sequía del IDEAM en este momento.";
+    throw new Error(errorMessage);
+  }
   const parsed = droughtForecastSchema.safeParse(payload);
   if (!parsed.success) throw new Error("La respuesta del pronóstico del IDEAM no tiene el formato esperado.");
   return { forecast: parsed.data, isSample: false };

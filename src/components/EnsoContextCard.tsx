@@ -88,7 +88,7 @@ export default function EnsoContextCard({ season, coordinates, locationLabel, mo
         <p className="pb-2 leading-5">El IDEAM combina señales de lluvia, humedad del suelo y escorrentía para estimar condiciones secas en zonas hidrográficas. ENSO (El Niño–Oscilación del Sur) aporta contexto climático, pero esta categoría no demuestra que ENSO haya causado la señal ni que el lote ya esté afectado.</p>
         <p className="pb-2 text-xs">Categoría técnica: {summary.category === "none" ? "sin sequía" : `${summary.category} · ${DROUGHT_CATEGORY_LABEL[summary.category]}`}; índice agregado a {forecast.aggregationMonths} meses.</p>
       </details>
-      <a href={forecast.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-cream/50 px-4 text-sm font-semibold text-cream underline-offset-4 hover:underline focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50">Ver boletín del IDEAM<span className="sr-only"> (abre en una pestaña nueva)</span></a>
+      <a href={forecast.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-cream/50 px-4 text-sm font-semibold text-cream underline-offset-4 hover:underline focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50">Ver datos oficiales del IDEAM<span className="sr-only"> (abre en una pestaña nueva)</span></a>
     </>}
 
     <section className="mt-4 rounded-2xl border border-olive/40 bg-meadow/40 p-3" aria-labelledby="nasa-observation-title">
