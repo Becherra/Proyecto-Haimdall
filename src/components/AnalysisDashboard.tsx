@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-import { prefersReducedMotion, useReveal } from "./motion";
-import { summarizeMonthlyClimate } from "../lib/ui/monthlyClimateSummary";
+import { Fragment, useMemo } from "react";
+import { useReveal } from "./motion";
+import { CropIcon, UiIcon } from "./icons";
+import type { UiIconName } from "./icons";
+import Logo from "./Logo";
+import { useSpeaker } from "./useSpeaker";
+import { activeScenarioPreset, bestRotationIndex, cropLink, describeNasaSupport, describeSimpleSources, isCurrentRotation, MAX_STARS, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import type { NasaSupportItemId, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, Farm, RotationResult } from "../types";
 
 type AnalysisDashboardProps = {
@@ -15,6 +18,7 @@ type AnalysisDashboardProps = {
   mockMode: boolean;
   applyingScenario: boolean;
   scenarioError: string | null;
+  onSelectScenario?: (scenario: ClimateScenario) => void;
   onScenarioChange: (scenario: ClimateScenario) => void;
   onApplyScenario: () => void;
   onShowBaseline: () => void;
@@ -24,157 +28,122 @@ type AnalysisDashboardProps = {
   onBackToSimple?: () => void;
 };
 
-const number = (value: number | null | undefined, digits = 1) => value === null || value === undefined ? "Sin dato" : new Intl.NumberFormat("es-CO", { maximumFractionDigits: digits }).format(value);
-const monthDate = (value: string | undefined) => value ? `${value.slice(6, 8)}/${value.slice(4, 6)}/${value.slice(0, 4)}` : null;
-const sourceLabel = { live: "NASA POWER en vivo", cache: "NASA POWER · caché", sample: "Muestra NASA POWER" } as const;
+const SUPPORT_ICONS: Record<NasaSupportItemId, UiIconName> = { history: "calendar", drought: "sun", worstYear: "warning", terrain: "field" };
+const SCENARIO_ICONS: Record<ScenarioPresetId, UiIconName> = { normal: "check", drought: "sun", wet: "rain", heat: "thermo" };
 
-function Indicator({ title, value, unit, note }: { title: string; value: string; unit?: string; note: string }) {
-  return <article className="rounded-2xl border border-olive/40 bg-moss card-surface p-4 sm:p-5">
-    <p className="text-xs font-medium text-ash-gray">{title}</p>
-    <p className="mt-2 text-2xl font-semibold tracking-tight text-bone-white">{value}{unit && <span className="ml-1 text-sm font-normal text-ash-gray">{unit}</span>}</p>
-    <p className="mt-1 text-[11px] leading-4 text-ash-gray">{note}</p>
+function PlaySmall({ playing, onClick }: { playing: boolean; onClick: () => void }) {
+  return <button type="button" onClick={onClick} aria-label={playing ? "Parar" : "Escuchar"} aria-pressed={playing} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50">
+    <UiIcon name={playing ? "stop" : "speaker"} className="h-8 w-8" />
+  </button>;
+}
+
+function Stars({ score }: { score: number }) {
+  const full = scoreToStars(score);
+  return <span className="flex gap-1 text-cream" role="img" aria-label={`${full} de ${MAX_STARS}`}>
+    {Array.from({ length: MAX_STARS }, (_, index) => <span key={index} className={index < full ? "" : "opacity-25"}><UiIcon name="star" className="h-6 w-6" /></span>)}
+  </span>;
+}
+
+function changePhrase(current: number, base: number | undefined): { text: string; tone: string } | null {
+  if (base === undefined) return null;
+  const diff = scoreToStars(current) - scoreToStars(base);
+  if (diff > 0) return { text: "Aguanta mejor que los demás con este clima", tone: "text-olive-light" };
+  if (diff < 0) return { text: "Sufre más si viene este clima", tone: "text-clay-light" };
+  return { text: "Se mantiene firme con este clima", tone: "text-silver-mist" };
+}
+
+function VisualRotationCard({ result, base, best, showChange }: { result: RotationResult; base: RotationResult | undefined; best: boolean; showChange: boolean }) {
+  const link = cropLink(result.rotation);
+  const change = showChange ? changePhrase(result.score, base?.score) : null;
+  return <article data-reveal className={`flex flex-col gap-3 rounded-3xl border-2 bg-moss card-surface p-4 ${best ? "border-cream" : "border-olive/40"}`}>
+    <div className="flex flex-wrap gap-2">
+      {isCurrentRotation(result) && <span className="flex items-center gap-1.5 rounded-full bg-olive px-3 py-1 text-sm font-bold text-bone-white"><UiIcon name="field" className="h-5 w-5" />Hoy</span>}
+      {best && <span className="flex items-center gap-1.5 rounded-full bg-cream px-3 py-1 text-sm font-bold text-meadow"><UiIcon name="star" className="h-5 w-5" />Mejor</span>}
+    </div>
+    <span className="flex items-center gap-1 text-olive-light" aria-hidden="true">
+      {result.rotation.cropIds.map((id, index) => <Fragment key={`${id}-${index}`}>{index > 0 && <UiIcon name={link === "with" ? "plus" : "arrow"} className="h-6 w-6 text-olive-light/50" />}<CropIcon id={id} className="h-12 w-12" /></Fragment>)}
+    </span>
+    <h3 className="text-lg font-bold text-bone-white">{result.rotation.name}</h3>
+    <Stars score={result.score} />
+    <p className="text-base leading-6 text-silver-mist">{result.plain?.why ?? result.whySuggested}</p>
+    {change && <p className={`text-sm font-bold ${change.tone}`}>{change.text}</p>}
   </article>;
 }
 
-function ClimateChart({ response }: { response: AnalysisResponse }) {
-  const summary = useMemo(() => summarizeMonthlyClimate(response.monthlyClimate), [response.monthlyClimate]);
-  const maximum = Math.max(1, ...summary.flatMap((month) => [month.precipitationMm ?? 0, month.evaporationMm ?? 0]));
-  const hasValues = summary.some((month) => month.precipitationMm !== null || month.evaporationMm !== null);
-  const usesPotentialEvaporation = response.monthlyClimate.some((month) => month.potentialEvaporationMm !== undefined);
-  const chart = useRef<HTMLElement>(null);
-  // Las barras crecen desde la base cada vez que cambian los datos (p. ej. al aplicar un escenario).
-  useGSAP(() => {
-    if (prefersReducedMotion()) return;
-    gsap.from(".chart-bar", { scaleY: 0, transformOrigin: "bottom center", duration: 0.9, ease: "power3.out", stagger: 0.025, clearProps: "transform" });
-  }, { scope: chart, dependencies: [summary] });
-
-  return <section ref={chart} className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 sm:p-6" aria-labelledby="climate-chart-title">
-    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-      <div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-olive-light">Clima de referencia</p><h3 id="climate-chart-title" className="mt-1 text-lg font-semibold text-bone-white">Lluvia y evaporación por mes</h3></div>
-      <div className="flex flex-wrap gap-4 text-xs text-silver-mist"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-olive-light" aria-hidden="true" />Lluvia</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-olive" aria-hidden="true" />{usesPotentialEvaporation ? "Evaporación potencial" : "Evaporación NASA"}</span></div>
-    </div>
-    {!hasValues ? <p className="mt-6 rounded-xl border border-cream/10 p-4 text-sm text-ash-gray" role="status">No hay valores mensuales suficientes para mostrar la gráfica.</p> : <>
-      <div className="mt-6 grid h-44 grid-cols-6 gap-2 border-b border-l border-cream/10 pb-1 sm:grid-cols-12 sm:gap-3" role="img" aria-label="Comparación mensual de lluvia y evaporación; valores promediados entre los años analizados.">
-        {summary.map((month) => <div key={month.month} className="flex min-w-0 flex-col items-center justify-end">
-          <div className="flex h-36 w-full items-end justify-center gap-1">
-            <div title={`${month.label}: lluvia ${number(month.precipitationMm)} mm`} className="chart-bar w-[38%] max-w-3 rounded-t bg-olive-light" style={{ height: `${month.precipitationMm === null ? 0 : Math.max(3, month.precipitationMm / maximum * 100)}%` }} />
-            <div title={`${month.label}: evaporación ${number(month.evaporationMm)} mm`} className="chart-bar w-[38%] max-w-3 rounded-t bg-olive" style={{ height: `${month.evaporationMm === null ? 0 : Math.max(3, month.evaporationMm / maximum * 100)}%` }} />
-          </div><span className="mt-2 text-[9px] text-ash-gray sm:text-[10px]">{month.label}</span>
-        </div>)}
-      </div>
-      <table className="sr-only"><caption>Promedio mensual de lluvia y evaporación del periodo analizado, en milímetros.</caption><thead><tr><th>Mes</th><th>Lluvia mm</th><th>Evaporación mm</th></tr></thead><tbody>{summary.map((month) => <tr key={month.month}><th>{month.label}</th><td>{number(month.precipitationMm)}</td><td>{number(month.evaporationMm)}</td></tr>)}</tbody></table>
-      <p className="mt-3 text-[11px] leading-5 text-ash-gray">Promedio de los años analizados; NASA POWER describe condiciones regionales, no mediciones exactas del lote.</p>
-    </>}
-  </section>;
-}
-
-function DetailList({ title, items }: { title: string; items: readonly string[] }) {
-  return <details className="group border-t border-cream/10 py-3">
-    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream"><span>{title}<span className="ml-2 text-xs text-ash-gray">{items.length}</span></span><span className="text-cream transition group-open:rotate-45" aria-hidden="true">+</span></summary>
-    <ul className="mt-3 space-y-2 pl-4 text-xs leading-5 text-silver-mist">{items.map((item) => <li key={item} className="list-disc marker:text-cream">{item}</li>)}</ul>
-  </details>;
-}
-
-function RotationCard({ result, baseline, index }: { result: RotationResult; baseline: RotationResult | undefined; index: number }) {
-  const difference = baseline ? result.score - baseline.score : 0;
-  const calendar = result.calendar;
-  const card = useRef<HTMLElement>(null);
-  useGSAP(() => {
-    if (prefersReducedMotion()) return;
-    gsap.from(".score-fill", { scaleX: 0, transformOrigin: "left center", duration: 1, ease: "power3.out", delay: 0.3, clearProps: "transform" });
-  }, { scope: card, dependencies: [result.score] });
-  return <article ref={card} data-reveal className="flex flex-col rounded-3xl border border-olive/40 bg-moss card-surface p-5 sm:p-6">
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-olive-light">Opción {index + 1}</p><h3 className="mt-2 text-lg font-semibold leading-snug text-bone-white">{result.rotation.name}</h3><p className="mt-2 text-xs leading-5 text-ash-gray">{result.rotation.description}</p></div>
-      <div className="shrink-0 rounded-2xl border border-olive/30 bg-olive/40 px-3 py-2 text-center"><p className="text-2xl font-bold tabular-nums text-olive-light">{number(result.score, 1)}</p><p className="text-[10px] text-ash-gray">de 5</p></div>
-    </div>
-    {baseline && <p className={`mt-3 text-xs font-medium ${difference > 0 ? "text-olive-light" : difference < 0 ? "text-clay-light" : "text-ash-gray"}`}>{difference > 0 ? "+" : ""}{number(difference, 1)} frente a la línea base</p>}
-    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-cream/10" aria-label={`Puntaje ${number(result.score, 1)} de 5`} role="img"><div className="score-fill h-full rounded-full bg-gradient-to-r from-olive to-olive-light" style={{ width: `${Math.max(0, Math.min(100, result.score / 5 * 100))}%` }} /></div>
-    <div className="mt-5 rounded-2xl bg-meadow/35 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ash-gray">Por qué aparece</p><p className="mt-2 text-sm leading-6 text-bone-white">{result.whySuggested}</p></div>
-    <div className="mt-4"><p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-ash-gray">Beneficios posibles</p><ul className="space-y-2 text-xs leading-5 text-silver-mist">{result.benefits.map((item) => <li key={item} className="flex gap-2"><span className="text-olive-light" aria-hidden="true">↗</span>{item}</li>)}</ul></div>
-    <div className="mt-4">
-      <DetailList title="Evidencia climática" items={result.evidence} />
-      <DetailList title="Vacíos de información" items={result.informationGaps} />
-      <DetailList title="Riesgos a considerar" items={result.risks} />
-      <DetailList title="Validar con experto local" items={result.validateWithLocalExpert} />
-      <details className="group border-t border-cream/10 py-3">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Calendario de la rotación <span className="text-xs text-ash-gray">{calendar ? `${calendar.months.length} meses` : "No disponible"}</span></summary>
-        {calendar ? <><div className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-6">{calendar.months.map((month) => <div key={month.offset} className={`rounded-lg border p-2 text-center ${month.risk ? "border-clay-light/50 bg-clay/40" : "border-cream/10 bg-meadow/35"}`}><p className="text-[10px] text-ash-gray">Mes {month.offset + 1}</p><p className="mt-1 truncate text-[10px] font-medium text-bone-white">{month.cropId ?? "Descanso"}</p></div>)}</div><p className="mt-3 text-[11px] text-ash-gray">{calendar.fallowMonths} meses de campo vacío · {calendar.vulnerableMonths} meses vulnerables. Calendario ilustrativo, no fechas de siembra.</p></> : <p className="mt-3 text-xs leading-5 text-ash-gray">El backend no entregó calendario para esta ubicación.</p>}
-      </details>
-    </div>
-  </article>;
-}
-
-/** Temporada actual frente a lo normal, rachas secas y año más seco: lo que el análisis sabe de la sequía, con su fuente y sus límites. */
-function DroughtIndicators({ response }: { response: AnalysisResponse }) {
-  const { currentSeason: season, indicators } = response;
-  const hasDrought = indicators.longestDrySpellDays !== undefined || indicators.worstYear !== undefined;
-  if (!season && !hasDrought) return null;
-  return <div data-reveal className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    {season && <>
-      <Indicator title="Lluvia de la temporada actual" value={number(season.rainPercentOfNormal, 0)} unit="% de lo normal" note={`${number(season.rainMm, 0)} mm de ${monthDate(season.firstDate)} a ${monthDate(season.lastDate)} frente a ${number(season.normalRainMm, 0)} mm normales en esa época (${season.baselineYears} años). Lectura reciente y preliminar de NASA POWER; no es un pronóstico.`} />
-      <Indicator title="Temperatura frente a lo normal" value={season.temperatureAnomalyC === null ? "Sin dato" : `${season.temperatureAnomalyC > 0 ? "+" : ""}${number(season.temperatureAnomalyC, 1)}`} unit="°C" note="Diferencia de la temperatura media de la ventana reciente con la de la misma época en la serie histórica." />
-      <Indicator title="Días seguidos casi sin lluvia" value={number(season.currentDryStreakDays, 0)} unit="días" note="Hasta el último día con dato; cuenta como seco un día con menos de 1 mm." />
-    </>}
-    {indicators.longestDrySpellDays !== undefined && <Indicator title="Racha seca más larga" value={number(indicators.longestDrySpellDays, 0)} unit="días" note={`Días seguidos con menos de 1 mm de lluvia en toda la serie${indicators.meanAnnualDrySpellDays === null || indicators.meanAnnualDrySpellDays === undefined ? "" : `; la racha máxima de cada año promedia ${number(indicators.meanAnnualDrySpellDays, 1)} días`}.`} />}
-    {indicators.worstYear && <Indicator title="Año más seco de la serie" value={String(indicators.worstYear.year)} note={`Balance hídrico de ${number(indicators.worstYear.waterBalanceMm, 1)} mm/mes${indicators.waterDeficitMm === null ? "" : ` frente a ${number(indicators.waterDeficitMm, 1)} mm/mes del promedio`}.`} />}
-  </div>;
-}
-
-export default function AnalysisDashboard({ farm, response, baseline, scenarioDraft, mockMode, applyingScenario, scenarioError, onScenarioChange, onApplyScenario, onShowBaseline, onEditPriorities, onChangeFarm, onBackToSimple }: AnalysisDashboardProps) {
-  const source = mockMode ? "Datos de demostración · no son datos para decisiones" : sourceLabel[response.climate.source];
-  const dates = [monthDate(response.climate.firstDate), monthDate(response.climate.lastDate)].filter(Boolean).join(" – ");
-  const rainfallPercent = Math.round(((scenarioDraft.rainFactor ?? 1) - 1) * 100);
-  const activeScenario = response.scenario !== undefined && ((response.scenario.tempDeltaC ?? 0) !== 0 || (response.scenario.rainFactor ?? 1) !== 1);
-  const totalMissing = Object.values(response.climate.missingByParameter).reduce((sum, count) => sum + count, 0);
-
+export default function AnalysisDashboard({ farm, response, baseline, mockMode, applyingScenario, scenarioError, onSelectScenario, onScenarioChange, onApplyScenario, onShowBaseline, onBackToSimple }: AnalysisDashboardProps) {
+  const { playingKey, play } = useSpeaker();
+  const supportItems = useMemo(() => describeNasaSupport(response), [response]);
+  const sources = useMemo(() => describeSimpleSources(response.dataSources), [response.dataSources]);
+  const active = activeScenarioPreset(response.scenario);
+  const bestIndex = bestRotationIndex(response.rotations);
+  const showChange = active.id !== "normal";
   const reveal = useReveal<HTMLElement>();
-  return <section ref={reveal} className="mx-auto max-w-[1440px] px-4 pb-12 pt-5 sm:px-8 lg:pt-9" aria-labelledby="analysis-title">
-    <ol className="mx-auto mb-8 grid max-w-2xl grid-cols-3 text-center text-xs sm:text-sm" aria-label="Pasos del análisis">
-      <li className="border-b-2 border-cream pb-3 text-ash-gray"><span className="mr-2">01</span>Finca</li><li className="border-b-2 border-cream pb-3 text-ash-gray"><span className="mr-2">02</span>Tus prioridades</li><li aria-current="step" className="border-b-2 border-olive pb-3 font-semibold text-bone-white"><span className="mr-2 text-olive">03</span>Resultados</li>
-    </ol>
-    <header data-reveal className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.22em] text-olive-light">HEIMDALL · análisis climático</p><h2 id="analysis-title" className="mt-2 font-display text-3xl font-medium tracking-tight text-bone-white sm:text-4xl">Tu finca, con contexto</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-silver-mist">{farm.placeLabel ?? "Finca seleccionada"} · {dates || "Periodo histórico"} · {number(response.climate.daysAnalyzed, 0)} días analizados</p></div>
-      <div className="flex flex-wrap gap-2">{onBackToSimple && <button type="button" onClick={onBackToSimple} className="min-h-10 rounded-full bg-cream px-4 text-sm font-semibold text-meadow transition hover:bg-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">← Vista simple</button>}<button type="button" onClick={onEditPriorities} className="min-h-10 rounded-full border border-cream/20 px-4 text-sm text-bone-white transition hover:border-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Editar objetivos</button><button type="button" onClick={onChangeFarm} className="min-h-10 rounded-full border border-cream/20 px-4 text-sm text-bone-white transition hover:border-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Cambiar finca</button></div>
-    </header>
 
-    <div data-reveal className="mb-5 flex flex-col gap-2 rounded-2xl border border-olive/40 bg-spruce p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-bone-white">{source}</p><p className="mt-1 text-xs text-ash-gray">Periodo histórico de referencia; no es un pronóstico.{totalMissing > 0 ? ` Se reportan ${totalMissing} valores diarios faltantes.` : " No se reportaron faltantes diarios."}</p></div><span className="w-fit rounded-full border border-cream/10 px-3 py-1 text-[11px] text-silver-mist">{response.climate.source === "sample" ? "Respaldo" : response.climate.source === "cache" ? "Caché" : "Fuente NASA"}</span></div>
+  function pickPreset(scenario: ClimateScenario) {
+    if (onSelectScenario) { onSelectScenario(scenario); return; }
+    if ((scenario.tempDeltaC ?? 0) === 0 && (scenario.rainFactor ?? 1) === 1) { onShowBaseline(); return; }
+    onScenarioChange(scenario);
+    onApplyScenario();
+  }
 
-    {activeScenario && <p className="mb-5 rounded-xl border border-cream/25 bg-cream/20 p-3 text-sm leading-5 text-cream" role="status">Estás viendo un escenario hipotético; no es una predicción. La humedad del suelo no se recalculó.</p>}
-    {scenarioError && <p className="mb-5 rounded-xl border border-clay/30 bg-clay/30 p-3 text-sm text-clay-light" role="alert">{scenarioError}</p>}
+  return <section ref={reveal} className="fixed inset-0 z-40 overflow-y-auto bg-scene" aria-labelledby="support-title">
+    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-4 lg:max-w-5xl lg:px-8 lg:pt-8">
+      <header data-reveal className="flex items-center justify-between gap-3">
+        {onBackToSimple && <button type="button" onClick={onBackToSimple} aria-label="Volver" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><UiIcon name="back" className="h-8 w-8" /></button>}
+        <div className="min-w-0 flex-1 text-center"><h1 id="support-title" className="text-2xl font-bold text-bone-white">¿Cómo lo sabemos?</h1><p className="truncate text-sm text-silver-mist">{farm.placeLabel ?? "Tu finca"}</p></div>
+        <Logo variant="mark" size={44} />
+      </header>
 
-    <section data-reveal className="mb-6 rounded-3xl border border-cream/50 bg-moss card-surface p-5 sm:p-6" aria-labelledby="scenario-title">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-        <div className="max-w-md"><p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-olive-light">Explora sin confundirlo con el pronóstico</p><h3 id="scenario-title" className="mt-1 text-lg font-semibold text-bone-white">¿Y si cambia el clima?</h3><p className="mt-1 text-xs leading-5 text-ash-gray">Prueba cambios uniformes sobre la historia de NASA POWER.</p></div>
-        <div className="grid flex-1 gap-5 sm:grid-cols-2 xl:max-w-2xl">
-          <div><div className="mb-2 flex justify-between gap-2"><label htmlFor="scenario-temperature" className="text-xs font-medium text-bone-white">Cambio de temperatura</label><output htmlFor="scenario-temperature" className="text-xs font-semibold text-olive-light">{number(scenarioDraft.tempDeltaC ?? 0, 1)} °C</output></div><input id="scenario-temperature" type="range" min="-2" max="5" step="0.5" value={scenarioDraft.tempDeltaC ?? 0} disabled={mockMode || applyingScenario} onChange={(event) => onScenarioChange({ ...scenarioDraft, tempDeltaC: Number(event.target.value) })} className="w-full accent-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream disabled:opacity-40" /><div className="mt-1 flex justify-between text-[10px] text-ash-gray"><span>−2 °C</span><span>+5 °C</span></div></div>
-          <div><div className="mb-2 flex justify-between gap-2"><label htmlFor="scenario-rain" className="text-xs font-medium text-bone-white">Cambio de lluvia</label><output htmlFor="scenario-rain" className="text-xs font-semibold text-olive-light">{rainfallPercent > 0 ? "+" : ""}{rainfallPercent} %</output></div><input id="scenario-rain" type="range" min="-50" max="50" step="5" value={rainfallPercent} disabled={mockMode || applyingScenario} onChange={(event) => onScenarioChange({ ...scenarioDraft, rainFactor: 1 + Number(event.target.value) / 100 })} className="w-full accent-olive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream disabled:opacity-40" /><div className="mt-1 flex justify-between text-[10px] text-ash-gray"><span>−50 %</span><span>+50 %</span></div></div>
+      <section data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4" aria-label="¿Y si cambia el tiempo?">
+        <div className="flex items-center gap-3">
+          <UiIcon name="sun" className="h-10 w-10 shrink-0 text-olive-light" />
+          <div><h2 className="text-xl font-bold text-bone-white">¿Y si cambia el tiempo?</h2><p className="text-sm text-silver-mist">Toca un botón para poner a prueba tus 3 caminos.</p></div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row xl:flex-col"><button type="button" onClick={onApplyScenario} disabled={mockMode || applyingScenario || ((scenarioDraft.tempDeltaC ?? 0) === 0 && (scenarioDraft.rainFactor ?? 1) === 1)} className="min-h-11 rounded-full bg-cream px-5 text-sm font-semibold text-meadow transition hover:bg-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream disabled:cursor-not-allowed disabled:opacity-40">{applyingScenario ? "Recalculando…" : "Aplicar escenario"}</button>{activeScenario && <button type="button" onClick={onShowBaseline} disabled={applyingScenario} className="min-h-10 rounded-full border border-cream/20 px-4 text-xs text-bone-white hover:border-cream/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream disabled:opacity-40">Volver al análisis base</button>}</div>
+        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {SCENARIO_PRESETS.map((preset) => {
+            const selected = preset.id === active.id;
+            return <button key={preset.id} type="button" aria-pressed={selected} disabled={applyingScenario || (mockMode && preset.id !== "normal")} onClick={() => pickPreset(preset.scenario)} className={`flex flex-col items-start gap-1.5 rounded-2xl border-2 p-3 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 disabled:opacity-40 ${selected ? "border-cream bg-olive/50 text-bone-white" : "border-olive/40 bg-meadow/40 text-silver-mist hover:border-cream/60"}`}>
+              <UiIcon name={SCENARIO_ICONS[preset.id]} className={`h-8 w-8 ${selected ? "text-cream" : "text-olive-light"}`} />
+              <span className="text-base font-bold leading-5 text-bone-white">{preset.label}</span>
+              <span className="text-xs leading-4 text-silver-mist">{preset.subtitle}</span>
+            </button>;
+          })}
+        </div>
+        <p className="mt-3 text-sm font-medium text-olive-light" role="status">{applyingScenario ? "Mirando cómo responderían tus cultivos…" : active.notice}</p>
+        {scenarioError && <p className="mt-2 text-sm text-clay-light" role="alert">{scenarioError}</p>}
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {response.rotations.map((result, index) => <VisualRotationCard key={result.rotation.id} result={result} base={baseline.rotations.find((item) => item.rotation.id === result.rotation.id)} best={index === bestIndex} showChange={showChange} />)}
       </div>
-      {mockMode && <p className="mt-4 text-xs text-cream" role="status">Los escenarios requieren `NEXT_PUBLIC_USE_MOCKS=false`; el mock es solo una vista de demostración.</p>}
-      {applyingScenario && <p className="mt-3 text-xs text-silver-mist" role="status" aria-live="polite">Aplicando el escenario a la serie histórica…</p>}
-    </section>
 
-    <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Indicator title="Balance hídrico" value={number(response.indicators.waterDeficitMm)} unit="mm" note={`${response.indicators.waterBalanceMethod === "potential" ? "Lluvia − evapotranspiración potencial estimada" : "Lluvia − evaporación"}; negativo indica déficit.`} />
-      <Indicator title="Estrés por calor" value={number(response.indicators.heatStressDays, 0)} unit="días" note="Total del periodo analizado, no por año." />
-      <Indicator title="Riesgo de helada" value={number(response.indicators.frostRiskDays, 0)} unit="días" note="Total del periodo analizado, no por año." />
-      <Indicator title="Lluvia diaria extrema" value={number(response.indicators.extremeRainThresholdMm)} unit="mm" note="Umbral del percentil extremo de precipitación." />
-      <Indicator title="Temperatura media estimada" value={number(response.indicators.meanTemperatureC)} unit="°C" note={response.indicators.siteElevationMeters === undefined ? "Promedio de la celda climática regional." : `Ajustada con altitud del sitio (${number(response.indicators.siteElevationMeters, 0)} m).`} />
-      <Indicator title="Humedad de raíces" value={number(response.indicators.meanRootZoneWetness, 2)} unit="/ 1" note="Proxy regional de humedad, no medición del suelo de tu lote." />
-      <Indicator title="Datos diarios faltantes" value={number(totalMissing, 0)} unit="valores" note="Suma de faltantes reportados por parámetro." />
-      <Indicator title="Cobertura temporal" value={number(response.climate.daysAnalyzed, 0)} unit="días" note={`${monthDate(response.climate.firstDate) ?? "Inicio sin dato"} a ${monthDate(response.climate.lastDate) ?? "fin sin dato"}.`} />
+      <h2 data-reveal className="mt-2 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="calendar" className="h-8 w-8 text-olive-light" />Lo que ha vivido tu zona</h2>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {supportItems.map((item) => <article key={item.id} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+          <div className="flex items-center gap-3">
+            <UiIcon name={SUPPORT_ICONS[item.id]} className="h-12 w-12 shrink-0 text-olive-light" />
+            <h3 className="flex-1 text-xl font-bold leading-6 text-bone-white">{item.title}</h3>
+            <PlaySmall playing={playingKey === `support-${item.id}`} onClick={() => play(`support-${item.id}`, [{ text: `${item.title}. ${item.body}` }])} />
+          </div>
+          <p className="mt-3 text-base leading-6 text-bone-white">{item.body}</p>
+        </article>)}
+      </div>
+
+      {sources.length > 0 && <>
+        <h2 data-reveal className="mt-2 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="search" className="h-8 w-8 text-olive-light" />¿Qué miraron los satélites de la NASA?</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {sources.map((source) => <article key={source.id} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+            <div className="flex items-center gap-3">
+              <UiIcon name="check" className="h-10 w-10 shrink-0 text-olive-light" />
+              <h3 className="flex-1 text-lg font-bold text-bone-white">{source.title}</h3>
+              <PlaySmall playing={playingKey === `source-${source.id}`} onClick={() => play(`source-${source.id}`, [{ text: `${source.title}. ${source.body}` }])} />
+            </div>
+            <p className="mt-2 text-base leading-6 text-silver-mist">{source.body}</p>
+          </article>)}
+        </div>
+      </>}
+
+      <p className="mt-2 rounded-2xl bg-moss/60 p-4 text-center text-sm leading-6 text-silver-mist">Esta guía te ayuda a pensar tu siembra, pero tu conocimiento del terreno y el consejo de un técnico de tu zona siempre van primero.</p>
     </div>
-
-    <DroughtIndicators response={response} />
-
-    <div data-reveal className="mb-8"><ClimateChart response={response} /></div>
-
-    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-olive-light">Comparación explicable</p><h3 className="mt-1 text-xl font-semibold text-bone-white">Tres caminos para evaluar</h3></div><p className="max-w-xl text-xs leading-5 text-ash-gray">El puntaje ordena opciones según tus prioridades. No es una garantía de rendimiento.</p></div>
-    <div className="grid items-start gap-4 xl:grid-cols-3">{response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} baseline={baseline.rotations.find((item) => item.rotation.id === result.rotation.id)} index={index} />)}</div>
-
-    {response.dataSources && <details className="mt-7 rounded-2xl border border-cream/10 bg-cream/[0.04] p-4 sm:p-5"><summary className="cursor-pointer text-sm font-semibold text-bone-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream">Fuentes de datos y para qué se usaron <span className="ml-1 text-xs text-ash-gray">{response.dataSources.length}</span></summary><ul className="mt-4 grid gap-3 sm:grid-cols-2">{response.dataSources.map((source) => <li key={source.id} className="rounded-xl border border-cream/10 bg-meadow/40 p-3"><p className="text-sm font-medium text-bone-white">{source.name}</p><p className="mt-1 text-xs text-cream">{source.provider}</p><p className="mt-2 text-xs leading-5 text-ash-gray">{source.use}</p>{source.url && <a href={source.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-bone-white underline underline-offset-2">Ver fuente<span className="sr-only">: {source.name}</span></a>}</li>)}</ul></details>}
-    <footer className="mt-8 border-t border-cream/10 pt-5 text-center text-xs leading-5 text-ash-gray">Heimdall ofrece apoyo a la decisión, no reemplaza el conocimiento del agricultor ni la validación de un agrónomo local.</footer>
   </section>;
 }

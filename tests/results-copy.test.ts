@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
+import { MAX_SEASON_DROPS, NASA_DATA_AUDIO_ID, NASA_DATA_TEXT, NORMAL_SEASON_DROPS, SCENARIO_PRESETS, activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, describeNasaSupport, describeSimpleSources, rainCalendar, rainCalendarSentence, rotationSections, rotationSpeechItems, scoreToStars } from "../src/lib/ui/resultsCopy";
 import type { CurrentSeason, Indicators, MonthlyClimate, RotationResult } from "../src/types";
 
 const indicators: Indicators = { waterDeficitMm: -120.4, heatStressDays: 0, frostRiskDays: 3, extremeRainThresholdMm: 17.4, meanRootZoneWetness: 0.8, meanTemperatureC: 22.34, missingByParameter: {} };
@@ -187,5 +187,42 @@ describe("cropLink: cómo se unen los cultivos de una opción", () => {
 
   it("un solo cultivo no tiene unión, y se queda en relevo por defecto", () => {
     expect(cropLink({ name: "Actual: Café (Coffea arabica)" })).toBe("then");
+  });
+});
+
+describe("activeScenarioPreset y describeNasaSupport: simulador simple y respaldo sin jerga", () => {
+  it("reconoce cuál botón de clima está activo o vuelve al clima normal por defecto", () => {
+    expect(activeScenarioPreset(undefined).id).toBe("normal");
+    expect(activeScenarioPreset({ tempDeltaC: 0, rainFactor: 1 }).id).toBe("normal");
+    for (const preset of SCENARIO_PRESETS) {
+      expect(activeScenarioPreset(preset.scenario).id).toBe(preset.id);
+    }
+  });
+
+  it("traduce la sequía histórica, el peor año y la loma del lote a frases de campo sin siglas raras", () => {
+    const items = describeNasaSupport({
+      indicators: { ...indicators, longestDrySpellDays: 22, worstYear: { year: 2015, waterBalanceMm: -40 }, slopePercent: 25, siteElevationMeters: 1850 },
+    });
+    expect(items.map((item) => item.id)).toEqual(["history", "drought", "worstYear", "terrain"]);
+    expect(items.find((item) => item.id === "drought")?.body).toContain("varias semanas seguidas sin un buen aguacero");
+    expect(items.find((item) => item.id === "worstYear")?.title).toContain("2015");
+    expect(items.find((item) => item.id === "terrain")?.body).toContain("loma fuerte");
+  });
+
+  it("omite tarjetas opcionales si no hay datos de racha seca, peor año ni terreno, y adapta pendientes suaves", () => {
+    const minimal = describeNasaSupport({ indicators });
+    expect(minimal.map((item) => item.id)).toEqual(["history"]);
+    const gentle = describeNasaSupport({ indicators: { ...indicators, longestDrySpellDays: 8, slopePercent: 4 } });
+    expect(gentle.find((item) => item.id === "drought")?.body).toContain("no suelen pasar demasiados días");
+    expect(gentle.find((item) => item.id === "terrain")?.body).toContain("bastante parejo");
+  });
+
+  it("explica las fuentes de la NASA con palabras sencillas", () => {
+    const sources = describeSimpleSources([
+      { id: "power-climate", name: "NASA POWER", provider: "NASA", use: "Uso técnico" },
+      { id: "srtm", name: "SRTM", provider: "NASA", use: "Elevación" },
+    ]);
+    expect(sources[0]?.title).toBe("Lluvias y sol de tu región");
+    expect(sources[1]?.title).toBe("Altura y loma del terreno");
   });
 });

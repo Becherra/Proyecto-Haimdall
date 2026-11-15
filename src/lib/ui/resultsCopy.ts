@@ -1,4 +1,4 @@
-import type { CurrentSeason, CurrentSeasonStatus, Indicators, MonthlyClimate, RotationResult } from "../../types";
+import type { AnalysisResponse, ClimateScenario, CurrentSeason, CurrentSeasonStatus, DataSource, Indicators, MonthlyClimate, RotationResult } from "../../types";
 import { CURRENT_SEASON_DRY_STREAK_NOTICE_DAYS, CURRENT_SEASON_TEMPERATURE_NOTICE_C } from "../config";
 import { summarizeMonthlyClimate } from "./monthlyClimateSummary";
 
@@ -233,4 +233,72 @@ export function currentSeasonSpeechItems(card: CurrentSeasonCard): SpeechItem[] 
  */
 export function cropLink(rotation: Pick<RotationResult["rotation"], "name">): "then" | "with" {
   return rotation.name.includes(" + ") ? "with" : "then";
+}
+
+export type ScenarioPresetId = "normal" | "drought" | "wet" | "heat";
+export type ScenarioPreset = {
+  id: ScenarioPresetId;
+  label: string;
+  subtitle: string;
+  scenario: ClimateScenario;
+  notice: string;
+};
+
+/** Botones simples para que el agricultor pruebe qué pasa con sus cultivos si cambia el tiempo, sin usar porcentajes ni grados. */
+export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
+  { id: "normal", label: "Clima normal", subtitle: "Como suele ser aquí", scenario: { tempDeltaC: 0, rainFactor: 1 }, notice: "Estás viendo tus cultivos con el clima habitual de tu zona." },
+  { id: "drought", label: "Si viene sequía", subtitle: "Poca agua y más sol", scenario: { tempDeltaC: 1, rainFactor: 0.7 }, notice: "Estás probando qué pasaría en un año seco. Mira cómo cambian las estrellas de cada camino." },
+  { id: "wet", label: "Si llueve mucho", subtitle: "Temporada de mucha agua", scenario: { tempDeltaC: 0, rainFactor: 1.35 }, notice: "Estás probando qué pasaría en un año de mucha agua. Mira qué cultivos aguantan mejor." },
+  { id: "heat", label: "Si hace más calor", subtitle: "Días más bochornosos", scenario: { tempDeltaC: 2, rainFactor: 1 }, notice: "Estás probando qué pasaría si los días se ponen más calientes que de costumbre." },
+] as const;
+
+/** Identifica cuál botón de clima está activo; si no hay escenario o vuelve a 0/1, es "normal". */
+export function activeScenarioPreset(scenario: ClimateScenario | undefined): ScenarioPreset {
+  const temp = scenario?.tempDeltaC ?? 0;
+  const rain = scenario?.rainFactor ?? 1;
+  return SCENARIO_PRESETS.find((preset) => preset.scenario.tempDeltaC === temp && preset.scenario.rainFactor === rain) ?? SCENARIO_PRESETS[0]!;
+}
+
+export type NasaSupportItemId = "history" | "drought" | "worstYear" | "terrain";
+export type NasaSupportItem = { id: NasaSupportItemId; title: string; body: string };
+
+function terrainSupportText(indicators: Indicators): string | null {
+  if (indicators.slopePercent === undefined && indicators.siteElevationMeters === undefined) return null;
+  if ((indicators.slopePercent ?? 0) >= 20) return "Tu terreno tiene loma fuerte. Cuando llueve duro el agua corre rápido y puede llevarse la tierra buena y el abono.";
+  if ((indicators.slopePercent ?? 0) >= 8) return "Tu terreno tiene algo de falda o inclinación. Sembrar atravesado a la loma y tapar el suelo ayuda a que el agua no arrastre la tierra.";
+  return "Tu terreno es bastante parejo, así que el agua de lluvia se aprovecha mejor y casi no arrastra la tierra.";
+}
+
+/** Traduce el respaldo del análisis a tarjetas simples sin números raros ni jerga estadística. */
+export function describeNasaSupport({ indicators }: Pick<AnalysisResponse, "indicators">): NasaSupportItem[] {
+  const drySpell = indicators.longestDrySpellDays;
+  const terrain = terrainSupportText(indicators);
+  return [
+    { id: "history", title: "Muchos años de memoria", body: "Miramos las lluvias, el calor y la humedad de muchos años hacia atrás con satélites de la NASA, para no guiarnos por un solo año bueno o malo." },
+    ...(drySpell === undefined ? [] : [{
+      id: "drought" as const,
+      title: "Cuando aprieta el verano",
+      body: drySpell >= 15
+        ? "En los años difíciles han pasado varias semanas seguidas sin un buen aguacero. Por eso ayuda tener cultivos que tapen y guarden la humedad de la tierra."
+        : "Incluso en épocas secas, en esta zona no suelen pasar demasiados días seguidos sin que caiga algo de agua.",
+    }]),
+    ...(indicators.worstYear ? [{
+      id: "worstYear" as const,
+      title: `El año más duro fue ${indicators.worstYear.year}`,
+      body: `Ese año faltó más agua que en cualquier otro de los que revisamos. Las opciones con más estrellas buscan defenderte mejor si se repite un año parecido.`,
+    }] : []),
+    ...(terrain ? [{ id: "terrain" as const, title: "Cómo es la loma de tu lote", body: terrain }] : []),
+  ];
+}
+
+const SIMPLE_SOURCES: Record<string, { title: string; body: string }> = {
+  "power-climate": { title: "Lluvias y sol de tu región", body: "Satélites de la NASA que anotan todos los días cuánto llovió, qué tanto calentó el sol y qué tan húmeda estuvo la tierra." },
+  "power-recent": { title: "Cómo van estos últimos meses", body: "Lectura reciente del satélite para saber si esta temporada viene más seca o más lluviosa que de costumbre." },
+  srtm: { title: "Altura y loma del terreno", body: "Mapa de la NASA que mide desde el espacio qué tan alto está tu lote y si tiene mucha pendiente." },
+  "crops-catalog": { title: "Guía de cultivos del campo", body: "Información de qué tanta agua, qué clima y qué cuidados necesita cada cultivo para darse bien." },
+};
+
+/** Explica cada fuente de datos sin siglas ni palabras de ingeniero. */
+export function describeSimpleSources(sources: readonly DataSource[] = []): { id: string; title: string; body: string }[] {
+  return sources.map((source) => ({ id: source.id, ...(SIMPLE_SOURCES[source.id] ?? { title: source.name, body: source.use }) }));
 }

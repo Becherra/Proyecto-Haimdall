@@ -9,15 +9,26 @@ import { CropIcon, UiIcon } from "./icons";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import { useSpeaker } from "./useSpeaker";
-import { bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, scoreToStars } from "../lib/ui/resultsCopy";
-import type { ClimateTopicId, CurrentSeasonTone, RotationSection } from "../lib/ui/resultsCopy";
-import type { AnalysisResponse, CurrentSeason, Farm, RotationResult } from "../types";
+import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scoreToStars } from "../lib/ui/resultsCopy";
+import type { ClimateTopicId, CurrentSeasonTone, RotationSection, ScenarioPresetId } from "../lib/ui/resultsCopy";
+import type { AnalysisResponse, ClimateScenario, CurrentSeason, Farm, RotationResult } from "../types";
 
 const FarmMiniMap = dynamic(() => import("./FarmMiniMap"), { ssr: false, loading: () => <div className="h-full w-full bg-moss" aria-hidden="true" /> });
 
-type ResultsViewProps = { farm: Farm; response: AnalysisResponse; onEditPriorities: () => void; onChangeFarm: () => void; onShowTechnical: () => void };
+type ResultsViewProps = {
+  farm: Farm;
+  response: AnalysisResponse;
+  applyingScenario?: boolean;
+  scenarioError?: string | null;
+  mockMode?: boolean;
+  onSelectScenario?: (scenario: ClimateScenario) => void;
+  onEditPriorities: () => void;
+  onChangeFarm: () => void;
+  onShowTechnical: () => void;
+};
 
 const CLIMATE_ICONS: Record<ClimateTopicId, UiIconName> = { water: "drop", heat: "sun", frost: "snow", rain: "rain", temperature: "thermo", roots: "roots" };
+const SCENARIO_ICONS: Record<ScenarioPresetId, UiIconName> = { normal: "check", drought: "sun", wet: "rain", heat: "thermo" };
 const SECTION_ICONS: Record<RotationSection["id"], UiIconName> = { why: "bulb", evidence: "search", benefits: "check", risks: "warning", gaps: "question", expert: "person" };
 
 type PlayProps = { playing: boolean; onClick: () => void; size?: "small" | "big" };
@@ -181,9 +192,32 @@ function ClimateList({ response }: { response: AnalysisResponse }) {
   </article>)}</>;
 }
 
+function ScenarioBar({ response, applyingScenario, scenarioError, mockMode, onSelectScenario }: Pick<ResultsViewProps, "response" | "applyingScenario" | "scenarioError" | "mockMode" | "onSelectScenario">) {
+  if (!onSelectScenario) return null;
+  const active = activeScenarioPreset(response.scenario);
+  return <section data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4 lg:col-span-3" aria-label="¿Y si cambia el tiempo?">
+    <div className="flex items-center gap-3">
+      <UiIcon name="sun" className="h-10 w-10 shrink-0 text-olive-light" />
+      <div><h3 className="text-xl font-bold text-bone-white">¿Y si cambia el tiempo?</h3><p className="text-sm text-silver-mist">Toca un botón para ver cómo aguantan tus 3 caminos.</p></div>
+    </div>
+    <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      {SCENARIO_PRESETS.map((preset) => {
+        const selected = preset.id === active.id;
+        return <button key={preset.id} type="button" aria-pressed={selected} disabled={applyingScenario || (mockMode && preset.id !== "normal")} onClick={() => onSelectScenario(preset.scenario)} className={`flex flex-col items-start gap-1.5 rounded-2xl border-2 p-3 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 disabled:opacity-40 ${selected ? "border-cream bg-olive/50 text-bone-white" : "border-olive/40 bg-meadow/40 text-silver-mist hover:border-cream/60"}`}>
+          <UiIcon name={SCENARIO_ICONS[preset.id]} className={`h-8 w-8 ${selected ? "text-cream" : "text-olive-light"}`} />
+          <span className="text-base font-bold leading-5 text-bone-white">{preset.label}</span>
+          <span className="text-xs leading-4 text-silver-mist">{preset.subtitle}</span>
+        </button>;
+      })}
+    </div>
+    <p className="mt-3 text-sm font-medium text-olive-light" role="status">{applyingScenario ? "Mirando cómo responderían tus cultivos…" : active.notice}</p>
+    {scenarioError && <p className="mt-2 text-sm text-clay-light" role="alert">{scenarioError}</p>}
+  </section>;
+}
+
 const actionButton = "flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream";
 
-export default function ResultsView({ farm, response, onEditPriorities, onChangeFarm, onShowTechnical }: ResultsViewProps) {
+export default function ResultsView({ farm, response, applyingScenario, scenarioError, mockMode, onSelectScenario, onEditPriorities, onChangeFarm, onShowTechnical }: ResultsViewProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const bestIndex = bestRotationIndex(response.rotations);
   const open = openIndex === null ? null : response.rotations[openIndex] ?? null;
@@ -198,6 +232,7 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
 
       <h2 data-reveal className="flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-olive-light" />Tus 3 caminos</h2>
       {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} onOpen={() => setOpenIndex(index)} />)}
+      <ScenarioBar response={response} applyingScenario={applyingScenario} scenarioError={scenarioError} mockMode={mockMode} onSelectScenario={onSelectScenario} />
 
       <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
       {response.currentSeason && <SeasonCard season={response.currentSeason} />}
@@ -208,7 +243,7 @@ export default function ResultsView({ farm, response, onEditPriorities, onChange
       <nav className="flex items-start justify-center gap-6 lg:col-span-3" aria-label="Más opciones">
         <button type="button" onClick={onEditPriorities} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="back" className="h-8 w-8" /></span>Preguntas</button>
         <button type="button" onClick={onChangeFarm} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="pin" className="h-8 w-8" /></span>Otra finca</button>
-        <button type="button" onClick={onShowTechnical} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="sliders" className="h-8 w-8" /></span>Datos técnicos</button>
+        <button type="button" onClick={onShowTechnical} className="flex flex-col items-center gap-1 text-xs text-silver-mist"><span className={actionButton}><UiIcon name="search" className="h-8 w-8" /></span>Cómo lo sabemos</button>
       </nav>
       <p className="text-center text-[10px] text-ash-gray lg:col-span-3">Imágenes: © Esri · OpenStreetMap</p>
     </div>
