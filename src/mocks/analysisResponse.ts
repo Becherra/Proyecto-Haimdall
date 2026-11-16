@@ -1,4 +1,6 @@
+import { generateActionPlan } from "../lib/actionPlan";
 import { analysisResponseSchema, type AnalysisResponse } from "../types";
+import { mockLocation } from "./location";
 
 const mockResponse = {
   climate: {
@@ -47,4 +49,10 @@ const mockResponse = {
   ],
 } satisfies AnalysisResponse;
 
-export const mockAnalysisResponse: AnalysisResponse = analysisResponseSchema.parse(mockResponse);
+// El plan sale del generador real para que el mock muestre lo mismo que respondería el backend (maíz: sin pasos y con su vacío).
+const withActionPlans = {
+  ...mockResponse,
+  rotations: mockResponse.rotations.map((result) => ({ ...result, actionPlan: generateActionPlan({ rotation: result.rotation, location: mockLocation, season: mockResponse.currentSeason }) })),
+};
+
+export const mockAnalysisResponse: AnalysisResponse = analysisResponseSchema.parse(withActionPlans);
