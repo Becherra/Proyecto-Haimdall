@@ -19,6 +19,7 @@ const subscribePreview = () => () => {};
 export default function Home() {
   const [flow, dispatch] = useReducer(locationFlowReducer, initialLocationFlow);
   const [confirmedFarm, setConfirmedFarm] = useState<Farm | null>(null);
+  const [globeExpanded, setGlobeExpanded] = useState(false);
   // Arranca en "scatter" para que el globo real NO parpadee antes de la intro.
   const [introStage, setIntroStage] = useState<HeroIntroStage>("scatter");
   const introStageRef = useRef<HeroIntroStage>("scatter");
@@ -84,6 +85,7 @@ export default function Home() {
   }, [flow.location, flow.status, reducedMotion, webglAvailable]);
 
   const onLocationSelected = (selected: LocationResult) => { dispatch({ type: "buscar", location: selected }); };
+  const onGlobeFarmMarked = (selected: LocationResult) => { setGlobeExpanded(false); dispatch({ type: "elegirEnGlobo", location: selected }); };
   const onGpsLocationSelected = (selected: LocationResult, accuracyMeters: number) => { dispatch({ type: "gpsOk", location: selected, accuracyMeters }); };
   const onBackToGlobe = () => { setConfirmedFarm(null); dispatch({ type: "volver" }); };
   const globeFading = flow.status === "transitioning";
@@ -104,11 +106,12 @@ export default function Home() {
         <p className="mx-auto mt-3 max-w-[460px] text-sm leading-7 text-ash-gray sm:text-base lg:mx-0">Marca tu finca y compara rotaciones de cultivo con evidencia, riesgos y lo que aún no sabemos.</p>
         <div className="mt-7"><LocationSearch onLocationSelected={onLocationSelected} onGpsStart={() => dispatch({ type: "locating" })} onGpsLocationSelected={onGpsLocationSelected} onGpsError={(message) => dispatch({ type: "gpsError", message })} /></div>
       </div>
-      <div ref={globeAnchor} className={`relative isolate order-1 mx-auto h-[min(39svh,340px)] w-full max-w-[610px] transition-opacity duration-500 motion-reduce:transition-none sm:h-[min(48svh,460px)] lg:order-2 lg:h-[min(78svh,740px)] ${globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
-        <GlobeGlow />
+      {/* Al acercarse a la imagen satelital el globo pasa a pantalla completa: el mismo globo es el mapa. */}
+      <div ref={globeAnchor} className={`isolate order-1 w-full transition-opacity duration-500 motion-reduce:transition-none lg:order-2 ${globeExpanded ? "fixed inset-0 z-40 bg-meadow" : "relative mx-auto h-[min(39svh,340px)] max-w-[610px] sm:h-[min(48svh,460px)] lg:h-[min(78svh,740px)]"} ${globeFading ? "opacity-0" : "opacity-100"}`} aria-hidden={showMap}>
+        {!globeExpanded && <GlobeGlow />}
         {/* El globo real aparece debajo de los puntos y cruza a visible durante su disolución. */}
         <div aria-hidden={globeIntroOpacity === 0} className={`globe-intro absolute inset-0 transition-opacity duration-500 motion-reduce:transition-none ${introStage === "explode" ? "globe-intro-explode" : ""}`} style={{ opacity: globeIntroOpacity }}>
-          <GlobeScene location={location} active={!showMap && !globeFading && globeInteractive} />
+          <GlobeScene location={location} active={!showMap && !globeFading && globeInteractive} onMarkFarm={onGlobeFarmMarked} onExpandedChange={setGlobeExpanded} />
         </div>
       </div>
       {/* Overlay a pantalla completa: los puntos cruzan la página y se ensamblan sobre el globo. */}
