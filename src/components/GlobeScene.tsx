@@ -2,9 +2,10 @@
 
 import Globe, { type GlobeMethods } from "react-globe.gl";
 import * as THREE from "three";
+import ThreeSlippyMapGlobe from "three-slippy-map-globe";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GLOBE_RELIEF } from "../lib/config";
-import { calculateGlobeView, cameraNearPlane, canMarkFarmAt, GLOBE_ZOOM_LIMITS, globeCurvatureResolution, globeRotateSpeed, globeZoomSpeed, nextGlobeSurface, tapZoomAltitude, visibleHalfSpanDegrees, type GlobeSurface } from "../lib/ui/globeView";
+import { calculateGlobeView, cameraNearPlane, canMarkFarmAt, GLOBE_ZOOM_LIMITS, globeCurvatureResolution, globeRotateSpeed, globeZoomSpeed, nextGlobeSurface, referenceLayerScale, tapZoomAltitude, visibleHalfSpanDegrees, type GlobeSurface } from "../lib/ui/globeView";
 import { buildGlobePickLocation, pickReliefPoint, sampleElevation, type ElevationGrid, type GeoPoint } from "../lib/ui/globePick";
 import type { LocationResult } from "../types";
 
@@ -42,6 +43,11 @@ const satelliteTileUrl = (x: number, y: number, level: number) => `https://serve
 // globe.gl acepta `globeTileEngineMaxLevel` (por defecto 17) pero los tipos de react-globe.gl no lo declaran; sin subir a 18
 // no se llega a ver una casa.
 const satelliteLevelProps = { globeTileEngineMaxLevel: 18 } as object;
+/**
+ * Capa transparente de Esri con fronteras, nombres de países, departamentos, ciudades y pueblos; se dibuja sobre el relieve y
+ * sobre la foto satelital para que el agricultor se ubique. Los nombres vienen tal como los publica Esri (no están traducidos).
+ */
+const referenceTileUrl = (x: number, y: number, level: number) => `https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/${level}/${y}/${x}`;
 const TAP_FLIGHT_MS = 900;
 const TILE_LOADING_COLOR = "#1d3a40";
 
@@ -75,6 +81,49 @@ function tintTileBackLayer(globe: GlobeMethods): void {
   globe.scene().traverse((object) => {
     if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshBasicMaterial && object.geometry instanceof THREE.SphereGeometry && object.geometry.parameters.radius < radius) object.material.color.set(TILE_LOADING_COLOR);
   });
+}
+
+/** Motor de mosaicos que three-globe usa para el satélite: cuelga del grupo del globo y es el que tiene `updatePov`. */
+function findTileEngine(globe: GlobeMethods): THREE.Object3D | null {
+  let found: THREE.Object3D | null = null;
+  globe.scene().traverse((object) => { if (!found && "updatePov" in object && "minLevel" in object) found = object; });
+  return found;
+}
+
+/**
+ * Crea la capa de nombres y límites como un segundo motor de mosaicos junto al del satélite. Los mosaicos llegan con
+ * transparencia: se marcan transparentes al añadirse (antes de su primer dibujo) para no verse como cuadros negros.
+ */
+function createReferenceLayer(globe: GlobeMethods, curvatureResolution: number, onTileAdded: () => void): ThreeSlippyMapGlobe | null {
+  const engine = findTileEngine(globe);
+  if (!engine?.parent) return null;
+  const layer = new ThreeSlippyMapGlobe(globe.getGlobeRadius(), { tileUrl: referenceTileUrl, maxLevel: 18 });
+  // Misma malla que el satélite: con una más gruesa (5° por defecto) la capa se hunde bajo la foto y los nombres salen cortados.
+  layer.curvatureResolution = curvatureResolution;
+  // La esfera negra de respaldo que trae el motor taparía el planeta mientras llegan los mosaicos.
+  layer.children.filter((child) => child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial).forEach((child) => layer.remove(child));
+  const addToGroup = layer.add.bind(layer);
+  layer.add = (...objects: THREE.Object3D[]) => {
+    for (const object of objects) {
+      object.userData.level = layer.level;
+      if (object instanceof THREE.Mesh && object.material instanceof THREE.Material) { object.material.transparent = true; object.material.depthWrite = false; object.renderOrder = 2; }
+    }
+    onTileAdded();
+    return addToGroup(...objects);
+  };
+  engine.parent.add(layer);
+  return layer;
+}
+
+/**
+ * El motor deja debajo los mosaicos del nivel anterior mientras llegan los nuevos; con imagen opaca no se nota, pero con
+ * una capa transparente los nombres salen dobles (uno grande y otro chico). Cuando ya hay mosaicos del nivel actual se
+ * ocultan los de niveles más gruesos.
+ */
+function hideSupersededLevels(layer: ThreeSlippyMapGlobe): void {
+  const levelOf = (object: THREE.Object3D) => (typeof object.userData.level === "number" ? object.userData.level : layer.level);
+  const hasCurrent = layer.children.some((child) => levelOf(child) === layer.level);
+  layer.children.forEach((child) => { child.visible = !hasCurrent || levelOf(child) >= layer.level; });
 }
 
 function supportsWebGL(): boolean {
@@ -124,6 +173,8 @@ export default function GlobeScene({ location, active = true, introSpin = false,
   const resumeTimer = useRef<number | undefined>(undefined);
   const elevationGrid = useRef<ElevationGrid | null>(null);
   const surfaceRef = useRef<GlobeSurface>("relief");
+  const referenceLayer = useRef<ThreeSlippyMapGlobe | null>(null);
+  const referenceTimer = useRef<number | undefined>(undefined);
   const [webglAvailable] = useState(() => typeof window === "undefined" || supportsWebGL());
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [curvatureResolution] = useState(() => globeCurvatureResolution(isSmallScreen()));
@@ -173,6 +224,8 @@ export default function GlobeScene({ location, active = true, introSpin = false,
   }, []);
 
   useEffect(() => { onExpandedChange?.(satellite); }, [onExpandedChange, satellite]);
+
+  useEffect(() => () => { window.clearTimeout(referenceTimer.current); const layer = referenceLayer.current; layer?.clearTiles(); layer?.removeFromParent(); referenceLayer.current = null; }, []);
 
   useEffect(() => {
     const globe = globeRef.current;
@@ -242,11 +295,23 @@ export default function GlobeScene({ location, active = true, introSpin = false,
     if (camera.near !== near) { camera.near = near; camera.updateProjectionMatrix(); }
     globe.controls().zoomSpeed = globeZoomSpeed(altitude);
     globe.controls().rotateSpeed = globeRotateSpeed(altitude);
+    const reference = referenceLayer.current;
+    if (reference) {
+      reference.scale.setScalar(referenceLayerScale(surfaceRef.current, altitude));
+      reference.updatePov(camera);
+      scheduleReferenceCleanup();
+    }
     const nextSurface = nextGlobeSurface(surfaceRef.current, altitude);
     surfaceRef.current = nextSurface;
     setSurface(nextSurface);
     setCanMark(canMarkFarmAt(altitude));
     if (altitude < HIGH_RESOLUTION_ALTITUDE) setZoomedIn(true);
+  }
+
+  /** Espera un momento a que lleguen los mosaicos nuevos antes de ocultar los viejos, para no dejar huecos. */
+  function scheduleReferenceCleanup() {
+    window.clearTimeout(referenceTimer.current);
+    referenceTimer.current = window.setTimeout(() => { if (referenceLayer.current) hideSupersededLevels(referenceLayer.current); }, 450);
   }
 
   function flyTo(point: GeoPoint, altitude: number) {
@@ -295,13 +360,13 @@ export default function GlobeScene({ location, active = true, introSpin = false,
   const showControls = active && webglAvailable && !location;
 
   return <div ref={containerRef} className="relative flex h-full w-full items-center justify-center" aria-label="Globo terrestre con relieve que también es mapa: gíralo y acércalo hasta tu finca">
-    {!webglAvailable ? fallback : size.width > 0 && size.height > 0 ? <Globe ref={globeRef} width={size.width} height={size.height} globeImageUrl={globeImageUrl} globeMaterial={reliefMaterial} bumpImageUrl={ELEVATION_TEXTURE} globeTileEngineUrl={satellite ? satelliteTileUrl : null} {...satelliteLevelProps} globeCurvatureResolution={curvatureResolution} showAtmosphere atmosphereColor="#737F35" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={reducedMotion ? 0.6 : markerPulse ? 0.75 : 0.6} pointColor={() => "#EAD39D"} pointLabel="label" onGlobeClick={onGlobeClick} onZoom={({ altitude }) => syncToAltitude(altitude)} showPointerCursor={(objType) => active && objType === "globe"} rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { const globe = globeRef.current; if (!globe) return; globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); setGlobeLighting(globe, surfaceRef.current); tintTileBackLayer(globe); }} /> : <div className="text-sm text-ash-gray" role="status">Preparando globo…</div>}
+    {!webglAvailable ? fallback : size.width > 0 && size.height > 0 ? <Globe ref={globeRef} width={size.width} height={size.height} globeImageUrl={globeImageUrl} globeMaterial={reliefMaterial} bumpImageUrl={ELEVATION_TEXTURE} globeTileEngineUrl={satellite ? satelliteTileUrl : null} {...satelliteLevelProps} globeCurvatureResolution={curvatureResolution} showAtmosphere atmosphereColor="#737F35" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={reducedMotion ? 0.6 : markerPulse ? 0.75 : 0.6} pointColor={() => "#EAD39D"} pointLabel="label" onGlobeClick={onGlobeClick} onZoom={({ altitude }) => syncToAltitude(altitude)} showPointerCursor={(objType) => active && objType === "globe"} rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { const globe = globeRef.current; if (!globe) return; globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); setGlobeLighting(globe, surfaceRef.current); tintTileBackLayer(globe); referenceLayer.current ??= createReferenceLayer(globe, curvatureResolution, scheduleReferenceCleanup); syncToAltitude(globe.pointOfView().altitude); }} /> : <div className="text-sm text-ash-gray" role="status">Preparando globo…</div>}
     {showControls && satellite && <button type="button" onClick={backToPlanet} className="absolute left-4 top-4 z-10 flex min-h-14 items-center gap-2 rounded-full border-2 border-cream/50 bg-meadow/85 px-5 text-base font-medium text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><span aria-hidden="true">←</span> Ver el planeta</button>}
     {showControls && <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex flex-col items-center gap-2 px-4">
       {satellite && canMark && onMarkFarm
         ? <button type="button" onClick={markFarm} className="pointer-events-auto min-h-16 w-full max-w-md rounded-full bg-cream px-6 py-4 text-lg font-bold text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-2 focus:ring-cream focus:ring-offset-2 focus:ring-offset-meadow">Marcar mi finca aquí</button>
         : <p className="w-fit max-w-full rounded-full border border-cream/20 bg-meadow/85 px-4 py-2 text-center text-xs text-silver-mist sm:text-sm" role="status">{satellite ? "Sigue acercándote hasta ver tu finca" : "Gira el globo y acércate a tu finca (toca para acercar)"}</p>}
-      {satellite && <p className="text-[10px] text-silver-mist/80">Imagen satelital © Esri</p>}
+      {satellite && <p className="text-[10px] text-silver-mist/80">Imagen satelital, nombres y límites © Esri, HERE, Garmin, OpenStreetMap</p>}
     </div>}
   </div>;
 }

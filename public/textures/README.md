@@ -12,4 +12,4 @@ La variante `earth-bluemarble-4k.jpg` se redimensionó localmente a 4096×2048 d
 
 Fuente y créditos: [NASA Science – Blue Marble: Next Generation Topography and Bathymetry](https://visibleearth.nasa.gov/images/73934/topography). Crédito de la fuente: imagery by Jesse Allen, NASA's Earth Observatory, using data from the General Bathymetric Chart of the Oceans (GEBCO) produced by the British Oceanographic Data Centre.
 
-Al acercarse, el globo cambia a mosaicos satelitales **Esri World Imagery** (los mismos del mapa de marcado), cargados en vivo.
+Al acercarse, el globo cambia a mosaicos satelitales **Esri World Imagery** (los mismos del mapa de marcado), cargados en vivo. Encima, en todo momento, va la capa transparente **Esri World Boundaries and Places** con fronteras, departamentos, nombres de países, ciudades y pueblos (nombres tal como los publica Esri, sin traducir). Créditos: Esri, HERE, Garmin, FAO, NOAA, USGS, © colaboradores de OpenStreetMap.

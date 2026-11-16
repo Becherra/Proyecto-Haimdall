@@ -119,7 +119,7 @@ export default function Home() {
       {particlesPreview && <ParticleWorld stage="preview" anchorRef={globeAnchor} />}
       {introStage !== "settled" && !particlesPreview && <button type="button" onClick={finishIntro} className="fixed right-5 top-24 z-30 rounded-full border border-cream/30 bg-meadow px-4 py-2 text-xs text-bone-white focus-visible:outline-2 focus-visible:outline-cream">Saltar</button>}
       {flow.status === "flying" && location && <p className="order-3 text-center text-sm text-cream" role="status" aria-live="polite">Volando hacia {location.label}…</p>}
-      <footer className="order-4 mt-2 space-y-1 text-center text-xs text-ash-gray lg:col-span-2"><p>© Colaboradores de OpenStreetMap</p><p>Imagen: NASA Blue Marble, con tratamiento de color propio</p></footer>
+      <footer className="order-4 mt-2 space-y-1 text-center text-xs text-ash-gray lg:col-span-2"><p>© Colaboradores de OpenStreetMap · Nombres y límites: Esri</p><p>Imagen: NASA Blue Marble, con tratamiento de color propio</p></footer>
     </section>}
     {showMap && <section className="mx-auto w-full max-w-[1440px] px-4 pb-5 pt-2 sm:px-8">
       <div className="mb-3 flex items-baseline justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-olive-light">Ubicación de la finca</p><h1 className="mt-1 text-2xl font-normal tracking-tight sm:text-3xl">HEIMDALL</h1></div><p className="hidden text-sm text-ash-gray sm:block">Rotaciones de cultivo con datos de la NASA</p></div>
