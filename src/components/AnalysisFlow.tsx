@@ -18,7 +18,6 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
   const [step, setStep] = useState<"priorities" | "results">("priorities");
   const [technical, setTechnical] = useState(false);
   const [priorities, setPriorities] = useState(initialPriorities);
-  // Perfil de cultivo (variedad, etapa, problema observado): aún no entra al análisis climático; se guarda para volver a editarlo.
   const [cropProfile, setCropProfile] = useState<CropProfileSelection | undefined>(undefined);
   const [baseResponse, setBaseResponse] = useState<AnalysisResponse | null>(null);
   const [response, setResponse] = useState<AnalysisResponse | null>(null);
@@ -33,7 +32,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     setPriorities(nextPriorities);
     setCropProfile(nextProfile);
     try {
-      const result = await runAnalysis(buildAnalysisRequest(farm, nextPriorities));
+      const result = await runAnalysis(buildAnalysisRequest(farm, nextPriorities, { cropProfile: nextProfile }));
       setBaseResponse(result);
       setResponse(result);
       setScenarioDraft(neutralScenario);
@@ -57,7 +56,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     setError(null);
     setScenarioDraft(nextScenario);
     try {
-      const result = await runAnalysis(buildAnalysisRequest(farm, priorities, nextScenario));
+      const result = await runAnalysis(buildAnalysisRequest(farm, priorities, { scenario: nextScenario, cropProfile }));
       setResponse(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo calcular ese clima.");
