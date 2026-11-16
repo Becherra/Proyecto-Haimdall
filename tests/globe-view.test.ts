@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { calculateGlobeView, cameraNearPlane, canMarkFarmAt, GLOBE_ZOOM_LIMITS, globeCurvatureResolution, globeRotateSpeed, globeZoomSpeed, nextGlobeSurface, tapZoomAltitude, visibleHalfSpanDegrees } from "../src/lib/ui/globeView";
+import { GLOBE_RELIEF } from "../src/lib/config";
+import { calculateGlobeView, cameraNearPlane, canMarkFarmAt, GLOBE_ZOOM_LIMITS, globeCurvatureResolution, globeRotateSpeed, globeZoomSpeed, nextGlobeSurface, referenceLayerScale, tapZoomAltitude, visibleHalfSpanDegrees } from "../src/lib/ui/globeView";
 
 describe("calculateGlobeView", () => {
   it("mantiene una vista amplia antes de seleccionar ubicación", () => {
@@ -83,5 +84,23 @@ describe("el globo como mapa", () => {
     // A 1 radio de altura se ven ±26,7° de latitud (tan 25° × 57,3°).
     expect(visibleHalfSpanDegrees(1)).toBeCloseTo(26.72, 1);
     expect(visibleHalfSpanDegrees(-1)).toBe(0);
+  });
+});
+
+describe("capa de nombres y límites", () => {
+  it("sobre el relieve queda por encima de la montaña más alta", () => {
+    expect(referenceLayerScale("relief", 1.5)).toBeGreaterThan(1 + GLOBE_RELIEF.maxHeightRatio);
+  });
+
+  it("sobre el satélite sube con la altitud, con un mínimo y un máximo", () => {
+    expect(referenceLayerScale("satellite", 0.3)).toBeCloseTo(1.0006);
+    expect(referenceLayerScale("satellite", 0.01)).toBeCloseTo(1.00002);
+    expect(referenceLayerScale("satellite", GLOBE_ZOOM_LIMITS.minAltitude)).toBe(1.00001);
+    expect(referenceLayerScale("satellite", 5)).toBe(1.002);
+    expect(referenceLayerScale("satellite", -1)).toBe(1.00001);
+  });
+
+  it("nunca queda por debajo del globo", () => {
+    for (const altitude of [0, GLOBE_ZOOM_LIMITS.minAltitude, 0.3, 3]) expect(referenceLayerScale("satellite", altitude)).toBeGreaterThan(1);
   });
 });

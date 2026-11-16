@@ -1,3 +1,5 @@
+import { GLOBE_RELIEF } from "../config";
+
 export type GlobeView = { altitude: number; transitionMs: number };
 
 /** Calcula una aproximación legible sin acercarse tanto que pierda nitidez. */
@@ -73,4 +75,14 @@ export function visibleHalfSpanDegrees(altitude: number): number {
  */
 export function globeCurvatureResolution(isSmallScreen: boolean): number {
   return isSmallScreen ? 1 : 0.5;
+}
+
+/**
+ * Escala de la capa de nombres y límites respecto al radio del globo. Va un poco por encima de lo que dibuja debajo para que
+ * no se mezcle con él (z-fighting): sobre el relieve, por encima de la montaña más alta; sobre el satélite, una fracción que
+ * crece con la altitud porque a más distancia el buffer de profundidad es menos preciso y hace falta más separación.
+ */
+export function referenceLayerScale(surface: GlobeSurface, altitude: number): number {
+  if (surface === "relief") return 1 + GLOBE_RELIEF.maxHeightRatio + 0.001;
+  return 1 + Math.min(0.002, Math.max(0.00001, Math.max(0, altitude) * 0.002));
 }
