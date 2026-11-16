@@ -159,9 +159,7 @@ export const SCORE_DIFFERENCE_NOTICE = 0.25;
 export const PWA_THEME_COLOR = "#0d3c16";
 export const PWA_BACKGROUND_COLOR = "#0d3c16";
 /**
- * Relieve del globo de inicio y del toque sobre él. `maxHeightRatio` es la altura que alcanza el pixel más alto del mapa de
- * elevación NASA (unos 9 km) como fracción del radio del globo: ~25 veces exagerado para que cordilleras como los Andes se vean
- * desde el espacio. `pickBoxDegrees` es el medio lado de la zona que abre el mapa detallado tras tocar el globo (~11 km en el
- * ecuador): un dedo sobre el globo no es más preciso que eso, así que el mapa abre amplio y el agricultor afina ahí. Heurística de diseño.
+ * Relieve del globo de inicio. `maxHeightRatio` es la altura que alcanza el pixel más alto del mapa de elevación NASA (unos 9 km)
+ * como fracción del radio del globo: ~25 veces exagerado para que cordilleras como los Andes se vean desde el espacio. Heurística de diseño.
  */
-export const GLOBE_RELIEF = { maxHeightRatio: 0.035, pickBoxDegrees: 0.05, pickMarchSteps: 96, pickRefineSteps: 10 } as const;
+export const GLOBE_RELIEF = { maxHeightRatio: 0.035 } as const;

@@ -39,14 +39,3 @@ describe("locationFlowReducer", () => {
     expect(locationFlowReducer(flying, { type: "vueloTerminado" }).status).toBe("transitioning");
   });
 });
-
-describe("elegir la zona en el globo", () => {
-  it("pasa directo al mapa sin volver a volar", () => {
-    expect(locationFlowReducer(initialLocationFlow, { type: "elegirEnGlobo", location })).toEqual({ status: "map", location });
-  });
-
-  it("no interrumpe un vuelo ni un mapa ya abierto", () => {
-    const flying = locationFlowReducer(initialLocationFlow, { type: "buscar", location });
-    expect(locationFlowReducer(flying, { type: "elegirEnGlobo", location: { ...location, lat: 1 } })).toBe(flying);
-  });
-});
