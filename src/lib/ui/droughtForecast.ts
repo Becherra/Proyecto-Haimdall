@@ -1,4 +1,5 @@
 import { droughtCategorySchema, droughtForecastSchema, type DroughtCategory, type DroughtForecast } from "../../types/drought";
+import type { SpeechItem } from "./resultsCopy";
 
 export { droughtCategorySchema, droughtForecastSchema } from "../../types/drought";
 export type { DroughtCategory, DroughtForecast } from "../../types/drought";
@@ -42,6 +43,28 @@ export function summarizeDroughtForecast(forecast: DroughtForecast): DroughtFore
       : `El IDEAM prevé ${DROUGHT_CATEGORY_LABEL[strongest].toLowerCase()} en la zona hidrográfica ${forecast.hydrographicZone} durante ${peakMonthsLabel}.`,
     meaning: meaningFor(strongest),
   };
+}
+
+/** Lo que conviene vigilar: es el mismo texto que se ve en la tarjeta y que se lee en voz alta. */
+export const DROUGHT_WATCH_TEXT = "La disponibilidad de agua y la humedad del suelo de tu lote al acercarse esos meses. El efecto en el cultivo depende de cuál tengas y de su etapa.";
+
+/** Etiqueta corta de un mes del pronóstico, en palabras de campo. */
+export function simpleDroughtLabel(category: DroughtCategory): string {
+  if (category === "none") return "Sin señal seca";
+  if (category === "D0") return "Más seco de lo habitual";
+  return DROUGHT_CATEGORY_LABEL[category];
+}
+
+/** El pronóstico para leer en voz alta: titular, cada mes por venir, qué puede significar y qué vigilar. */
+export function droughtForecastSpeechItems(forecast: DroughtForecast): SpeechItem[] {
+  const summary = summarizeDroughtForecast(forecast);
+  const months = forecast.months.filter(({ month }) => month >= forecast.forecastStartMonth)
+    .map(({ month, category }) => `${formatDroughtMonth(month)}: ${simpleDroughtLabel(category).toLowerCase()}.`);
+  return [
+    { text: `Pronóstico de sequía del IDEAM. ${summary.headline}` },
+    { text: months.join(" ") },
+    { text: `Qué puede significar: ${summary.meaning} Qué conviene vigilar: ${DROUGHT_WATCH_TEXT}` },
+  ];
 }
 
 function formatMonthList(months: string[]): string {

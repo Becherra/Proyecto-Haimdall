@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { droughtForecastSchema, summarizeDroughtForecast, type DroughtForecast } from "../src/lib/ui/droughtForecast";
+import { DROUGHT_WATCH_TEXT, droughtForecastSchema, droughtForecastSpeechItems, simpleDroughtLabel, summarizeDroughtForecast, type DroughtForecast } from "../src/lib/ui/droughtForecast";
 
 const forecast: DroughtForecast = {
   source: "IDEAM",
@@ -18,6 +18,28 @@ const forecast: DroughtForecast = {
     { month: "2027-04", category: "D1", indexValue: -1.216 },
   ],
 };
+
+describe("drought forecast speech", () => {
+  it("reads the headline, each upcoming month in simple words and what to watch", () => {
+    const text = droughtForecastSpeechItems(forecast).map((item) => item.text).join(" ");
+    expect(text).toContain("El IDEAM prevé sequía extrema");
+    expect(text).toContain("noviembre de 2026: más seco de lo habitual");
+    expect(text).toContain("febrero de 2027: sequía extrema");
+    expect(text).toContain(DROUGHT_WATCH_TEXT);
+  });
+
+  it("skips months before the forecast starts", () => {
+    const text = droughtForecastSpeechItems({ ...forecast, forecastStartMonth: "2027-02" }).map((item) => item.text).join(" ");
+    expect(text).not.toContain("noviembre de 2026");
+    expect(text).toContain("marzo de 2027");
+  });
+
+  it("names a month without drought signal plainly", () => {
+    expect(simpleDroughtLabel("none")).toBe("Sin señal seca");
+    expect(simpleDroughtLabel("D0")).toBe("Más seco de lo habitual");
+    expect(simpleDroughtLabel("D2")).toBe("Sequía severa");
+  });
+});
 
 describe("drought forecast display", () => {
   it("validates IDEAM's zone-level monthly response", () => {
