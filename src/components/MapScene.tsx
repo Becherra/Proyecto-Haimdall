@@ -27,8 +27,10 @@ function ZoomToLocation({ location, gpsAccuracyMeters }: Pick<MapSceneProps, "lo
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const view = calculateMapView(location, gpsAccuracyMeters);
     if (view.bounds) {
-      map.fitBounds(view.bounds, { animate: !reducedMotion, duration: 1.2, maxZoom: view.targetZoom });
-      if (map.getZoom() < 12) map.setZoom(12, { animate: !reducedMotion });
+      // El zoom se calcula antes de mover el mapa: con fitBounds animado, getZoom() aún devolvía el 8 inicial y el mapa
+      // siempre terminaba en 12, aunque la zona (p. ej. la vista del globo) pidiera más cerca.
+      const bounds = L.latLngBounds(view.bounds);
+      map.setView(bounds.getCenter(), Math.max(12, Math.min(view.targetZoom, map.getBoundsZoom(bounds))), { animate: !reducedMotion });
       return;
     }
     map.setView([location.lat, location.lon], 8, { animate: false });
