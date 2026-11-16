@@ -158,3 +158,8 @@ export const SCORE_DIFFERENCE_NOTICE = 0.25;
 /** Colores de la app instalada (PWA). Coinciden con `--color-meadow` de `globals.css`. */
 export const PWA_THEME_COLOR = "#0d3c16";
 export const PWA_BACKGROUND_COLOR = "#0d3c16";
+/**
+ * Relieve del globo de inicio. `maxHeightRatio` es la altura que alcanza el pixel más alto del mapa de elevación NASA (unos 9 km)
+ * como fracción del radio del globo: ~25 veces exagerado para que cordilleras como los Andes se vean desde el espacio. Heurística de diseño.
+ */
+export const GLOBE_RELIEF = { maxHeightRatio: 0.035 } as const;
