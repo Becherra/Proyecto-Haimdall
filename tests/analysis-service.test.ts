@@ -27,9 +27,16 @@ describe("analysis service", () => {
   });
 
   it("adds an optional climate scenario without changing farm or priorities", () => {
-    expect(buildAnalysisRequest(farm, priorities, { tempDeltaC: 2, rainFactor: 0.8 })).toMatchObject({
+    expect(buildAnalysisRequest(farm, priorities, { scenario: { tempDeltaC: 2, rainFactor: 0.8 } })).toMatchObject({
       farm, priorities, scenario: { tempDeltaC: 2, rainFactor: 0.8 },
     });
+  });
+
+  it("sends the declared crop profile so the backend can build the action plan", () => {
+    const coffee = { ...priorities, currentCropId: "cafe" };
+    const cropProfile = { cropId: "cafe", cultivarId: "unknown", stageId: "produccion" };
+    expect(buildAnalysisRequest(farm, coffee, { cropProfile })).toMatchObject({ priorities: coffee, cropProfile });
+    expect(buildAnalysisRequest(farm, coffee)).not.toHaveProperty("cropProfile");
   });
 
   it("validates the server response and posts the request body", async () => {
@@ -58,6 +65,6 @@ describe("analysis service", () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCKS", "true");
     expect(isAnalysisMockMode()).toBe(true);
     await expect(runAnalysis(buildAnalysisRequest(farm, priorities))).resolves.toEqual(mockAnalysisResponse);
-    await expect(runAnalysis(buildAnalysisRequest(farm, priorities, { tempDeltaC: 2 }))).rejects.toThrow("requieren el backend real");
+    await expect(runAnalysis(buildAnalysisRequest(farm, priorities, { scenario: { tempDeltaC: 2 } }))).rejects.toThrow("requieren el backend real");
   });
 });

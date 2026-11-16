@@ -31,6 +31,12 @@ export function profileStepsFor(catalog: CropProfileCatalog, cropId: string | nu
   return profile.plantingMaterials.length > 0 ? ["cultivar", "material", "stage", "problem"] : ["cultivar", "stage", "problem"];
 }
 
+/** Tarjeta en la que abren las preguntas: la de `target` si el cultivo la tiene (la 0 es «¿Qué cultivo tienes?»), si no la primera. */
+export function startingCardIndex(catalog: CropProfileCatalog, cropId: string | null, target: ProfileStep | undefined): number {
+  const index = target ? profileStepsFor(catalog, cropId).indexOf(target) : -1;
+  return index === -1 ? 0 : index + 1;
+}
+
 /** Opciones de cada paso, siempre con una salida («No sé», «Otra», «Nada») para no bloquear al agricultor. */
 export function profileOptions(catalog: CropProfileCatalog, cropId: string, step: ProfileStep): ProfileOption[] {
   const profile = getCropProfile(catalog, cropId);

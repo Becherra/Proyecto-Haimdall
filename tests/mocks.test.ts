@@ -12,4 +12,11 @@ describe("mock de análisis", () => {
       expect(rotation.validateWithLocalExpert.length).toBeGreaterThan(0);
     }
   });
+
+  it("trae el plan que daría el backend para maíz: sin pasos y explicando el vacío", () => {
+    for (const { actionPlan } of mockAnalysisResponse.rotations) {
+      expect(actionPlan?.status).toBe("insufficient");
+      expect(actionPlan?.gaps.length).toBeGreaterThan(0);
+    }
+  });
 });

@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { CurrentSeason } from "../types";
-import { DROUGHT_CATEGORY_LABEL, formatDroughtMonth, summarizeDroughtForecast } from "../lib/ui/droughtForecast";
+import { DROUGHT_CATEGORY_LABEL, DROUGHT_WATCH_TEXT, droughtForecastSpeechItems, formatDroughtMonth, simpleDroughtLabel, summarizeDroughtForecast } from "../lib/ui/droughtForecast";
 import { describeLocalClimateSignal } from "../lib/ui/localClimateSignal";
 import { getDroughtForecast, type DroughtForecastResult } from "../services/droughtForecast";
+import { UiIcon } from "./icons";
+import { PlayButton } from "./PlayButton";
+import { useSpeaker } from "./useSpeaker";
 
 type Props = {
   season?: CurrentSeason;
@@ -28,6 +31,7 @@ const CATEGORY_STYLE = {
 } as const;
 
 export default function EnsoContextCard({ season, coordinates, locationLabel, mockMode }: Props) {
+  const { playingKey, play } = useSpeaker();
   const [forecastState, setForecastState] = useState<{ requestKey: string; state: Exclude<ForecastState, { status: "loading" }> } | null>(null);
   const { lat, lon } = coordinates;
   const requestKey = `${lat}:${lon}:${mockMode}`;
@@ -51,16 +55,15 @@ export default function EnsoContextCard({ season, coordinates, locationLabel, mo
   const summary = forecast ? summarizeDroughtForecast(forecast) : null;
 
   return <article data-reveal className="rounded-3xl border border-cream/30 bg-moss card-surface p-4 lg:col-span-3" aria-labelledby="enso-context-title">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex items-start gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cream/15 text-cream" aria-hidden="true"><span className="text-2xl font-bold">⌁</span></span>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-cream">Pronóstico de sequía · IDEAM</p>
-          <h3 id="enso-context-title" className="mt-1 text-xl font-bold text-bone-white">¿Qué se prevé para tu zona?</h3>
-        </div>
+    <div className="flex items-center gap-3">
+      <UiIcon name="sun" className="h-12 w-12 shrink-0 text-olive-light" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-cream">Pronóstico de sequía · IDEAM</p>
+        <h3 id="enso-context-title" className="mt-1 text-xl font-bold leading-6 text-bone-white">¿Qué se prevé para tu zona?</h3>
       </div>
-      {forecast && <span className="rounded-full border border-olive-light/40 px-3 py-1 text-sm text-silver-mist">Actualizado {formatIssueDate(forecast.issuedAt)}</span>}
+      {forecast && <PlayButton playing={playingKey === "drought-forecast"} onClick={() => play("drought-forecast", droughtForecastSpeechItems(forecast))} />}
     </div>
+    {forecast && <p className="mt-3 inline-flex rounded-full border border-olive-light/40 px-3 py-1 text-sm text-silver-mist">Actualizado {formatIssueDate(forecast.issuedAt)}</p>}
 
     {currentState.status === "loading" && <p className="mt-4 rounded-2xl border border-olive/40 bg-meadow/30 p-4 text-sm text-silver-mist" role="status">Consultando el pronóstico para {locationLabel}…</p>}
     {currentState.status === "error" && <div className="mt-4 rounded-2xl border border-cream/30 bg-black/15 p-4" role="alert">
@@ -75,12 +78,12 @@ export default function EnsoContextCard({ season, coordinates, locationLabel, mo
         <p className="mt-2 text-sm leading-5 text-silver-mist">Este resultado corresponde a la zona hidrográfica {forecast.hydrographicZone} y usa una escala de {forecast.aggregationMonths} meses. Es una señal regional: no confirma falta de agua ni daños en tu finca.</p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Pronóstico mensual de sequía">
           {forecast.months.filter(({ month }) => month >= forecast.forecastStartMonth).map(({ month, category }) => <li key={month} className={`flex min-h-16 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${CATEGORY_STYLE[category]}`}>
-            <span className="font-semibold capitalize">{formatDroughtMonth(month)}</span>
-            <span className="text-right">{simpleCategoryLabel(category)}</span>
+            <span className="font-semibold first-letter:uppercase">{formatDroughtMonth(month)}</span>
+            <span className="text-right">{simpleDroughtLabel(category)}</span>
           </li>)}
         </ul>
         <p className="mt-4 text-sm leading-5 text-bone-white"><strong>¿Qué puede significar?</strong> {summary.meaning}</p>
-        <p className="mt-2 text-sm leading-5 text-silver-mist"><strong>¿Qué conviene vigilar?</strong> La disponibilidad de agua y la humedad del suelo de tu lote al acercarse esos meses. El efecto en el cultivo depende de cuál tengas y de su etapa.</p>
+        <p className="mt-2 text-sm leading-5 text-silver-mist"><strong>¿Qué conviene vigilar?</strong> {DROUGHT_WATCH_TEXT}</p>
       </div>
 
       <details className="mt-3 rounded-xl border border-cream/20 px-3 py-2 text-sm text-silver-mist">
@@ -101,12 +104,6 @@ export default function EnsoContextCard({ season, coordinates, locationLabel, mo
       <p className="mt-1 text-xs text-ash-gray">NASA POWER muestra una observación climática regional reciente, no un pronóstico ni una medición del lote.</p>
     </section>
   </article>;
-}
-
-function simpleCategoryLabel(category: keyof typeof CATEGORY_STYLE): string {
-  if (category === "none") return "Sin señal seca";
-  if (category === "D0") return "Más seco de lo habitual";
-  return DROUGHT_CATEGORY_LABEL[category];
 }
 
 function formatRainfall(value: number | null | undefined): string {

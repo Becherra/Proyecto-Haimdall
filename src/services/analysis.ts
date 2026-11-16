@@ -1,5 +1,5 @@
 import { analysisRequestSchema, analysisResponseSchema } from "../types";
-import type { AnalysisRequest, AnalysisResponse, ClimateScenario, Farm, UserPriorities } from "../types";
+import type { AnalysisRequest, AnalysisResponse, ClimateScenario, CropProfileSelection, Farm, UserPriorities } from "../types";
 import { mockAnalysisResponse } from "../mocks";
 
 /** Años de clima que se analizan: los últimos 15 completos (el máximo que acepta el cliente de NASA POWER), para que la línea base incluya años de El Niño y de La Niña. */
@@ -11,11 +11,14 @@ export function analysisPeriod(now: Date = new Date()): { startYear: number; end
   return { startYear: endYear - ANALYSIS_YEARS + 1, endYear };
 }
 
-/** Builds the shared API contract from the confirmed farm and the farmer's priorities. */
-export function buildAnalysisRequest(farm: Farm, priorities: UserPriorities, scenario?: ClimateScenario): AnalysisRequest {
+export type AnalysisRequestOptions = { scenario?: ClimateScenario; cropProfile?: CropProfileSelection };
+
+/** Builds the shared API contract from the confirmed farm, the farmer's priorities and, if declared, the crop profile used by the action plan. */
+export function buildAnalysisRequest(farm: Farm, priorities: UserPriorities, { scenario, cropProfile }: AnalysisRequestOptions = {}): AnalysisRequest {
   return analysisRequestSchema.parse({
     lat: farm.centroid.lat, lon: farm.centroid.lon, ...analysisPeriod(), priorities, farm,
     ...(scenario ? { scenario } : {}),
+    ...(cropProfile ? { cropProfile } : {}),
   });
 }
 

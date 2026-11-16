@@ -11,7 +11,7 @@ import { applySelection, cropAnswerFields, cropAnswerFromPriorities, NO_CROP, se
 import type { PriorityKey } from "../lib/ui/prioritySelection";
 import CropProfileStep from "./CropProfileStep";
 import { CROP_PROFILES } from "../lib/cropProfiles";
-import { draftFromSelection, isStepAnswered, PROFILE_TITLES, profileStepsFor, toProfileSelection, type ProfileDraft, type ProfileStep } from "../lib/ui/cropProfileFlow";
+import { draftFromSelection, isStepAnswered, PROFILE_TITLES, profileStepsFor, startingCardIndex, toProfileSelection, type ProfileDraft, type ProfileStep } from "../lib/ui/cropProfileFlow";
 import { userPrioritiesSchema } from "../types";
 import type { CropProfileSelection, Farm, UserPriorities } from "../types";
 
@@ -20,6 +20,8 @@ type PrioritiesSlidesProps = {
   initialValues: UserPriorities;
   /** Respuestas previas del perfil de cultivo (variedad, etapa, problema), para volver a editarlas. */
   initialProfile?: CropProfileSelection;
+  /** Pregunta del perfil en la que se abre (p. ej. la etapa); por defecto, la primera. */
+  startStep?: ProfileStep;
   error: string | null;
   submitting: boolean;
   onSubmit: (priorities: UserPriorities, profile?: CropProfileSelection) => void;
@@ -76,8 +78,8 @@ const optionBase = "flex items-center rounded-2xl border-2 transition-colors foc
 const optionOff = "border-cream/25 text-bone-white hover:border-cream";
 const optionOn = "border-cream bg-cream text-meadow";
 
-export default function PrioritiesSlides({ farm, initialValues, initialProfile, error, submitting, onSubmit, onChangeFarm }: PrioritiesSlidesProps) {
-  const [step, setStep] = useState(0);
+export default function PrioritiesSlides({ farm, initialValues, initialProfile, startStep, error, submitting, onSubmit, onChangeFarm }: PrioritiesSlidesProps) {
+  const [step, setStep] = useState(() => startingCardIndex(CROP_PROFILES, cropAnswerFromPriorities(initialValues), startStep));
   const [crop, setCrop] = useState<string | null>(cropAnswerFromPriorities(initialValues));
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(() => draftFromSelection(initialProfile));
   const [water, setWater] = useState<Water | null>(initialValues.waterAvailability ?? null);
