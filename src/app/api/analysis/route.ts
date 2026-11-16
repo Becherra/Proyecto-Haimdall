@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AnalysisInputError, buildAnalysis } from "../../../lib/analysis";
+import { AnalysisInputError, buildAnalysis, validateAnalysisProfile } from "../../../lib/analysis";
 import { resolveAnalysisSite } from "../../../lib/analysisSite";
 import { CROPS } from "../../../lib/catalog";
 import { fetchDailyClimate, fetchRecentClimate, InvalidClimateRequestError } from "../../../lib/nasaPower";
@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   const site = resolveAnalysisSite(parsed.data);
   if (!site.valid) return NextResponse.json({ error: site.errors.join(" ") }, { status: 400 });
   try {
+    validateAnalysisProfile(priorities, parsed.data.cropProfile);
     // Primero la serie larga: valida el rango antes de hacer cualquier petición; los últimos días se piden en paralelo.
     const climateRequest = fetchDailyClimate({ ...site.location, startYear, endYear });
     const recentRequest = fetchRecentOrNull(site.location);
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     const recent = await recentRequest;
     const liveTerrain = await terrainRequest;
     const siteGaps = [...site.informationGaps, ...(recent ? [] : [RECENT_CLIMATE_GAP]), ...(needsTerrain && !liveTerrain ? [LIVE_TERRAIN_GAP] : [])];
-    return NextResponse.json(buildAnalysis({ climate, crops: CROPS, priorities, location: site.location, siteGaps, scenario, includeDailyRecords, ...(recent ? { recentClimate: recent } : {}), liveTerrain, requestedYears: endYear - startYear + 1 }));
+    return NextResponse.json(buildAnalysis({ cropProfile: parsed.data.cropProfile, climate, crops: CROPS, priorities, location: site.location, siteGaps, scenario, includeDailyRecords, ...(recent ? { recentClimate: recent } : {}), liveTerrain, requestedYears: endYear - startYear + 1 }));
   } catch (error) {
     if (error instanceof AnalysisInputError || error instanceof InvalidClimateRequestError) return NextResponse.json({ error: error.message }, { status: 400 });
     const message = error instanceof Error ? error.message : "No fue posible completar el análisis";

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-11-15",
+  "rules": [{
+    "id": "coffee-production-dry-observation-v1",
+    "cropId": "cafe",
+    "stageId": "produccion",
+    "source": "Cenicafé — Boletín Agrometeorológico Cafetero, edición El Niño 2026",
+    "url": "https://publicaciones.cenicafe.org/index.php/boletin_agrometeorologico/article/download/5106/5976",
+    "reference": "Página 5, En la cosecha y poscosecha",
+    "sourceDate": "2026",
+    "scope": "Región cafetera colombiana; prácticas de cosecha en contexto seco",
+    "instructions": ["Observa el estado de maduración de los frutos del cafetal.", "Distingue los frutos maduros de los verdes antes de decidir la recolección."],
+    "verification": "Describe el estado de maduración observado; si no puedes identificarlo, consulta antes de recolectar.",
+    "limitations": ["La fuente indica monitoreo periódico, sin fijar una frecuencia para tu finca.", "La señal seca regional justifica revisar el cultivo, pero no confirma estrés hídrico ni madurez en el lote."]
+  }]
+}

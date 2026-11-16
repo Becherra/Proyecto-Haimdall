@@ -1,0 +1,330 @@
+{
+  "note": "Ejemplo offline: análisis de fixture histórica NASA; la señal seca del segundo ejemplo es sintética, no una observación real.",
+  "request": {
+    "lat": 4.8133,
+    "lon": -75.6961,
+    "startYear": 2020,
+    "endYear": 2022,
+    "priorities": {
+      "currentCropId": "cafe",
+      "waterSaving": 3,
+      "extraIncome": 3,
+      "soilImprovement": 3,
+      "erosionReduction": 3,
+      "lowRisk": 3
+    },
+    "cropProfile": {
+      "cropId": "cafe",
+      "cultivarId": "unknown",
+      "stageId": "produccion"
+    }
+  },
+  "rotationWithoutRecentClimate": {
+    "rotation": {
+      "id": "baseline",
+      "name": "Actual: Café (Coffea arabica)",
+      "cropIds": [
+        "cafe"
+      ],
+      "description": "Mantiene la práctica declarada como línea base de comparación."
+    },
+    "score": 2.63,
+    "whySuggested": "Obtiene 2.6/5 según tus prioridades; lo que más suma es Ingresos extra (4.0/5) y Reducción de erosión (3.0/5). Es un apoyo a la decisión, no una certeza.",
+    "evidence": [
+      "Balance hídrico medio (lluvia − evaporación potencial estimada): 35.6 mm/mes (NASA POWER, PRECTOTCORR; evaporación potencial estimada con Hargreaves–Samani a partir de T2M, T2M_MIN, T2M_MAX y la latitud).",
+      "Días con T2M_MAX > 35 °C: 0 en 3 años (≈0 al año); días con T2M_MIN < 0 °C: 0 en 3 años (≈0 al año) (NASA POWER, temperaturas ajustadas a la altitud del lote).",
+      "Racha seca más larga: 15 días seguidos con menos de 1 mm de lluvia (la racha máxima de cada año promedia 11.3 días) (NASA POWER, PRECTOTCORR).",
+      "Lluvia diaria extrema (percentil 95): 17.4 mm/día (NASA POWER, PRECTOTCORR).",
+      "Erosividad de la lluvia (índice de Fournier modificado): 156, clase alta (NASA POWER, PRECTOTCORR mensual; es la lluvia de toda la celda, no la de tu lote).",
+      "Radiación solar media: 16.1 MJ/m²/día; llega el 45 % de la del borde de la atmósfera (índice de claridad 0.45: bastante nublado) (NASA POWER, ALLSKY_SFC_SW_DWN; no cambia el puntaje).",
+      "Humedad media de la zona radicular: 0.80 (NASA POWER, GWETROOT; proxy, no medición del lote).",
+      "Ahorro de agua: 2.0/5 con peso 20 %.",
+      "Ingresos extra: 4.0/5 con peso 20 %.",
+      "Mejora del suelo: 1.5/5 con peso 20 %.",
+      "Reducción de erosión: 3.0/5 con peso 20 %.",
+      "Bajo riesgo: 2.7/5 con peso 20 %.",
+      "Temperatura media del sitio: 20.6 °C (NASA POWER, T2M de 16.3 °C en celda a 2138 m, ajustada a 1413 m con altitud leída de NASA SRTM en el punto piloto más cercano). Rango en que crece bien según el catálogo: Café 14–28 °C.",
+      "Pendiente del terreno: 12 % (NASA SRTM, punto piloto más cercano).",
+      "Cultivo permanente (Café): ocupa el lote todo el año y no se rota; el catálogo solo propone asociarle cultivos anuales en las calles.",
+      "Duración de la secuencia: 365 días de cultivo (ciclos típicos del catálogo, no datos del lote).",
+      "Atributos de Café (Coffea arabica): FAO EcoCrop ficha Coffea arabica (id 749, leída completa): temperatura óptima 14–28 °C y absoluta 10–34 °C; lluvia anual óptima 1400–2300 mm (absoluta 750–4200); altitud absoluta máxima 2800 m (no se verificó la altitud recomendada en Colombia); pH óptimo 5,5–7; arbusto perenne con ciclo de producción de 210 a 330 días al año; EcoCrop lo lista en cultivos en callejones con fríjol, yuca, plátano y otros, y lo marca susceptible a nematodos. Cenicafé (resumen de búsqueda, no se abrió el documento): la mayor parte del café colombiano está entre 17 y 23 °C de temperatura media, y el fríjol y el maíz intercalados son viables durante el establecimiento y la renovación por zoca (primer año). Fijación de N: no fija. Erosión, materia orgánica, forraje, mercado, tolerancia a calor y a sequía: juicio sin fuente cuantitativa. Cultivo permanente: no tiene meses de siembra ni se rota; solo se ofrece como cultivo actual del agricultor, nunca como sugerencia. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local.."
+    ],
+    "benefits": [
+      "Tiene buen potencial de mercado según el catálogo."
+    ],
+    "informationGaps": [
+      "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
+      "Los datos de NASA POWER son de malla y no miden el lote específico.",
+      "La serie climática cubre solo 3 años: no alcanza para ver cómo cambia la lluvia de un año a otro ni identificar el año más seco.",
+      "La temperatura es el promedio de una celda de unos 50 km de NASA POWER: en montaña la del lote cambia con la altitud y puede diferir varios grados.",
+      "La altitud y la pendiente son lecturas de NASA SRTM (~30 m) en el punto piloto más cercano de la zona, no del lote: si tu lote está en otra ladera pueden diferir.",
+      "La corrección por altitud aplica el mismo gradiente andino promedio (~0,6 °C por cada 100 m) a la media, las mínimas y las máximas, y de ahí sale la evaporación estimada: es un supuesto, no una medición en el lote.",
+      "Incluye un cultivo permanente: no se rota, así que no se evalúa la alternancia de familias. La asociación con cultivos anuales solo está documentada para el establecimiento o la renovación; no hay datos de competencia, plagas ni manejo del lote."
+    ],
+    "risks": [
+      "El puntaje es una simplificación por reglas: no captura plagas, precios, costos ni manejo real."
+    ],
+    "validateWithLocalExpert": [
+      "Variedades y fechas de siembra locales de Café (Coffea arabica).",
+      "Confirmar con un agrónomo local los atributos del catálogo y su adecuación al sitio."
+    ],
+    "plain": {
+      "why": "Va bien con lo que más te importa: ganar más y frenar la erosión. Es una ayuda para decidir, no una seguridad.",
+      "benefits": [
+        "Suele tener buen mercado."
+      ],
+      "risks": [
+        "El puntaje es una guía sencilla: no mira plagas, precios ni costos reales."
+      ],
+      "gaps": [
+        "No tenemos datos del suelo de tu terreno ni de los precios de tu zona.",
+        "Los datos de la NASA son de toda la zona, no solo de tu terreno.",
+        "La temperatura es un promedio de una zona grande; en la montaña cambia con la altura.",
+        "La altura y la pendiente vienen de un satélite de la NASA en un punto cercano de tu zona, no de tu terreno exacto.",
+        "Sembrar entre las calles solo sirve mientras la planta grande, como el café o el plátano, es joven; después ya no. Un técnico debe confirmarlo para tu finca."
+      ],
+      "validate": [
+        "Pregúntale a un técnico de tu zona qué variedades y fechas de siembra sirven para Café.",
+        "Pídele que revise si esta opción de verdad le va a tu terreno."
+      ]
+    },
+    "actionPlan": {
+      "status": "insufficient",
+      "stages": [
+        {
+          "stage": "understand",
+          "actions": []
+        },
+        {
+          "stage": "prepare",
+          "actions": []
+        },
+        {
+          "stage": "monitor",
+          "actions": []
+        },
+        {
+          "stage": "review",
+          "actions": []
+        }
+      ],
+      "gaps": [
+        "No hay una señal reciente seca que active esta regla; esto no demuestra ausencia de riesgos en la finca."
+      ],
+      "disclaimer": "Apoyo a la decisión. Plan inicial sin almacenamiento de seguimiento; no confirma enfermedades ni condiciones del lote."
+    }
+  },
+  "syntheticSeason": {
+    "windowDays": 30,
+    "firstDate": "20261001",
+    "lastDate": "20261030",
+    "daysWithData": 30,
+    "rainMm": 40,
+    "normalRainMm": 100,
+    "rainPercentOfNormal": 40,
+    "status": "much-drier",
+    "temperatureAnomalyC": 1,
+    "currentDryStreakDays": 3,
+    "baselineYears": 10
+  },
+  "rotationWithSyntheticSeason": {
+    "rotation": {
+      "id": "baseline",
+      "name": "Actual: Café (Coffea arabica)",
+      "cropIds": [
+        "cafe"
+      ],
+      "description": "Mantiene la práctica declarada como línea base de comparación."
+    },
+    "score": 2.63,
+    "whySuggested": "Obtiene 2.6/5 según tus prioridades; lo que más suma es Ingresos extra (4.0/5) y Reducción de erosión (3.0/5). Es un apoyo a la decisión, no una certeza.",
+    "evidence": [
+      "Balance hídrico medio (lluvia − evaporación potencial estimada): 35.6 mm/mes (NASA POWER, PRECTOTCORR; evaporación potencial estimada con Hargreaves–Samani a partir de T2M, T2M_MIN, T2M_MAX y la latitud).",
+      "Días con T2M_MAX > 35 °C: 0 en 3 años (≈0 al año); días con T2M_MIN < 0 °C: 0 en 3 años (≈0 al año) (NASA POWER, temperaturas ajustadas a la altitud del lote).",
+      "Racha seca más larga: 15 días seguidos con menos de 1 mm de lluvia (la racha máxima de cada año promedia 11.3 días) (NASA POWER, PRECTOTCORR).",
+      "Lluvia diaria extrema (percentil 95): 17.4 mm/día (NASA POWER, PRECTOTCORR).",
+      "Erosividad de la lluvia (índice de Fournier modificado): 156, clase alta (NASA POWER, PRECTOTCORR mensual; es la lluvia de toda la celda, no la de tu lote).",
+      "Radiación solar media: 16.1 MJ/m²/día; llega el 45 % de la del borde de la atmósfera (índice de claridad 0.45: bastante nublado) (NASA POWER, ALLSKY_SFC_SW_DWN; no cambia el puntaje).",
+      "Humedad media de la zona radicular: 0.80 (NASA POWER, GWETROOT; proxy, no medición del lote).",
+      "Ahorro de agua: 2.0/5 con peso 20 %.",
+      "Ingresos extra: 4.0/5 con peso 20 %.",
+      "Mejora del suelo: 1.5/5 con peso 20 %.",
+      "Reducción de erosión: 3.0/5 con peso 20 %.",
+      "Bajo riesgo: 2.7/5 con peso 20 %.",
+      "Temperatura media del sitio: 20.6 °C (NASA POWER, T2M de 16.3 °C en celda a 2138 m, ajustada a 1413 m con altitud leída de NASA SRTM en el punto piloto más cercano). Rango en que crece bien según el catálogo: Café 14–28 °C.",
+      "Pendiente del terreno: 12 % (NASA SRTM, punto piloto más cercano).",
+      "Cultivo permanente (Café): ocupa el lote todo el año y no se rota; el catálogo solo propone asociarle cultivos anuales en las calles.",
+      "Duración de la secuencia: 365 días de cultivo (ciclos típicos del catálogo, no datos del lote).",
+      "Atributos de Café (Coffea arabica): FAO EcoCrop ficha Coffea arabica (id 749, leída completa): temperatura óptima 14–28 °C y absoluta 10–34 °C; lluvia anual óptima 1400–2300 mm (absoluta 750–4200); altitud absoluta máxima 2800 m (no se verificó la altitud recomendada en Colombia); pH óptimo 5,5–7; arbusto perenne con ciclo de producción de 210 a 330 días al año; EcoCrop lo lista en cultivos en callejones con fríjol, yuca, plátano y otros, y lo marca susceptible a nematodos. Cenicafé (resumen de búsqueda, no se abrió el documento): la mayor parte del café colombiano está entre 17 y 23 °C de temperatura media, y el fríjol y el maíz intercalados son viables durante el establecimiento y la renovación por zoca (primer año). Fijación de N: no fija. Erosión, materia orgánica, forraje, mercado, tolerancia a calor y a sequía: juicio sin fuente cuantitativa. Cultivo permanente: no tiene meses de siembra ni se rota; solo se ofrece como cultivo actual del agricultor, nunca como sugerencia. Puntajes 0–5 preliminares por juicio relativo (docs/crops-rubric.md); validar con un agrónomo local.."
+    ],
+    "benefits": [
+      "Tiene buen potencial de mercado según el catálogo."
+    ],
+    "informationGaps": [
+      "No hay datos de suelo (textura, fertilidad, pendiente) ni de precios locales.",
+      "Los datos de NASA POWER son de malla y no miden el lote específico.",
+      "La serie climática cubre solo 3 años: no alcanza para ver cómo cambia la lluvia de un año a otro ni identificar el año más seco.",
+      "La temperatura es el promedio de una celda de unos 50 km de NASA POWER: en montaña la del lote cambia con la altitud y puede diferir varios grados.",
+      "La altitud y la pendiente son lecturas de NASA SRTM (~30 m) en el punto piloto más cercano de la zona, no del lote: si tu lote está en otra ladera pueden diferir.",
+      "La corrección por altitud aplica el mismo gradiente andino promedio (~0,6 °C por cada 100 m) a la media, las mínimas y las máximas, y de ahí sale la evaporación estimada: es un supuesto, no una medición en el lote.",
+      "Incluye un cultivo permanente: no se rota, así que no se evalúa la alternancia de familias. La asociación con cultivos anuales solo está documentada para el establecimiento o la renovación; no hay datos de competencia, plagas ni manejo del lote."
+    ],
+    "risks": [
+      "El puntaje es una simplificación por reglas: no captura plagas, precios, costos ni manejo real."
+    ],
+    "validateWithLocalExpert": [
+      "Variedades y fechas de siembra locales de Café (Coffea arabica).",
+      "Confirmar con un agrónomo local los atributos del catálogo y su adecuación al sitio."
+    ],
+    "plain": {
+      "why": "Va bien con lo que más te importa: ganar más y frenar la erosión. Es una ayuda para decidir, no una seguridad.",
+      "benefits": [
+        "Suele tener buen mercado."
+      ],
+      "risks": [
+        "El puntaje es una guía sencilla: no mira plagas, precios ni costos reales."
+      ],
+      "gaps": [
+        "No tenemos datos del suelo de tu terreno ni de los precios de tu zona.",
+        "Los datos de la NASA son de toda la zona, no solo de tu terreno.",
+        "La temperatura es un promedio de una zona grande; en la montaña cambia con la altura.",
+        "La altura y la pendiente vienen de un satélite de la NASA en un punto cercano de tu zona, no de tu terreno exacto.",
+        "Sembrar entre las calles solo sirve mientras la planta grande, como el café o el plátano, es joven; después ya no. Un técnico debe confirmarlo para tu finca."
+      ],
+      "validate": [
+        "Pregúntale a un técnico de tu zona qué variedades y fechas de siembra sirven para Café.",
+        "Pídele que revise si esta opción de verdad le va a tu terreno."
+      ]
+    },
+    "actionPlan": {
+      "status": "partial",
+      "stages": [
+        {
+          "stage": "understand",
+          "actions": []
+        },
+        {
+          "stage": "prepare",
+          "actions": []
+        },
+        {
+          "stage": "monitor",
+          "actions": [
+            {
+              "id": "baseline:coffee-production-dry-observation-v1:observe",
+              "stage": "monitor",
+              "status": "ready",
+              "ruleId": "coffee-production-dry-observation-v1",
+              "instructions": [
+                "Observa el estado de maduración de los frutos del cafetal.",
+                "Distingue los frutos maduros de los verdes antes de decidir la recolección."
+              ],
+              "risks": [
+                "No deducir enfermedades, madurez o necesidad de tratamiento de los datos climáticos."
+              ],
+              "limitations": [
+                "La fuente indica monitoreo periódico, sin fijar una frecuencia para tu finca.",
+                "La señal seca regional justifica revisar el cultivo, pero no confirma estrés hídrico ni madurez en el lote."
+              ],
+              "what": "Revisa la maduración antes de planear la cosecha",
+              "why": "El cultivo está en producción y la señal regional seca aconseja comprobar su estado en campo.",
+              "appliesWhen": "Cafetal en producción con señal reciente seca; antes de decidir qué frutos recolectar.",
+              "prerequisites": [
+                "Cultivo y etapa declarados",
+                "Señal reciente seca disponible"
+              ],
+              "missingData": [],
+              "verification": "Describe el estado de maduración observado; si no puedes identificarlo, consulta antes de recolectar.",
+              "evidence": [
+                {
+                  "id": "baseline:coffee-production-dry-observation-v1:source",
+                  "type": "published-practice",
+                  "source": "Cenicafé — Boletín Agrometeorológico Cafetero, edición El Niño 2026",
+                  "sourceUrl": "https://publicaciones.cenicafe.org/index.php/boletin_agrometeorologico/article/download/5106/5976",
+                  "reference": "Página 5, En la cosecha y poscosecha",
+                  "scale": "Región cafetera colombiana; prácticas de cosecha en contexto seco",
+                  "date": "2026",
+                  "detail": "La publicación recomienda observar la maduración y seleccionar los frutos maduros durante la cosecha."
+                },
+                {
+                  "id": "baseline:coffee-production-dry-observation-v1:climate",
+                  "type": "regional",
+                  "source": "NASA POWER",
+                  "sourceUrl": "https://power.larc.nasa.gov/",
+                  "date": "20261030",
+                  "detail": "La comparación reciente disponible muestra menos lluvia de lo habitual; no mide la humedad ni el estado de esta finca."
+                },
+                {
+                  "id": "baseline:coffee-production-dry-observation-v1:profile",
+                  "type": "declared",
+                  "source": "Agricultor",
+                  "detail": "Café en producción, según el perfil declarado."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "review",
+          "actions": [
+            {
+              "id": "baseline:coffee-production-dry-observation-v1:harvest",
+              "stage": "review",
+              "status": "missing-data",
+              "ruleId": "coffee-production-dry-observation-v1",
+              "instructions": [],
+              "risks": [
+                "No deducir enfermedades, madurez o necesidad de tratamiento de los datos climáticos."
+              ],
+              "limitations": [
+                "La fuente indica monitoreo periódico, sin fijar una frecuencia para tu finca.",
+                "La señal seca regional justifica revisar el cultivo, pero no confirma estrés hídrico ni madurez en el lote."
+              ],
+              "what": "Decidir la recolección selectiva",
+              "why": "La selección depende de la madurez real de los frutos.",
+              "appliesWhen": "Después de comprobar la madurez en campo.",
+              "prerequisites": [
+                "Observación de frutos maduros"
+              ],
+              "missingData": [
+                "Confirmación de madurez en campo; este endpoint no la recoge."
+              ],
+              "verification": "Comprueba con la observación del lote qué frutos están maduros antes de decidir la cosecha.",
+              "evidence": [
+                {
+                  "id": "baseline:coffee-production-dry-observation-v1:source",
+                  "type": "published-practice",
+                  "source": "Cenicafé — Boletín Agrometeorológico Cafetero, edición El Niño 2026",
+                  "sourceUrl": "https://publicaciones.cenicafe.org/index.php/boletin_agrometeorologico/article/download/5106/5976",
+                  "reference": "Página 5, En la cosecha y poscosecha",
+                  "scale": "Región cafetera colombiana; prácticas de cosecha en contexto seco",
+                  "date": "2026",
+                  "detail": "La publicación recomienda observar la maduración y seleccionar los frutos maduros durante la cosecha."
+                },
+                {
+                  "id": "baseline:coffee-production-dry-observation-v1:climate",
+                  "type": "regional",
+                  "source": "NASA POWER",
+                  "sourceUrl": "https://power.larc.nasa.gov/",
+                  "date": "20261030",
+                  "detail": "La comparación reciente disponible muestra menos lluvia de lo habitual; no mide la humedad ni el estado de esta finca."
+                },
+                {
+                  "id": "baseline:coffee-production-dry-observation-v1:profile",
+                  "type": "declared",
+                  "source": "Agricultor",
+                  "detail": "Café en producción, según el perfil declarado."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Falta confirmar la madurez en campo.",
+        "Este plan cubre observación del café actual; no valida el establecimiento ni manejo de cultivos asociados."
+      ],
+      "disclaimer": "Apoyo a la decisión. Plan inicial sin almacenamiento de seguimiento; no confirma enfermedades ni condiciones del lote."
+    }
+  }
+}
