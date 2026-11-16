@@ -67,6 +67,11 @@ const UI_ICONS = {
   sliders: <><path d="M6 14h36M6 24h36M6 34h36" /><circle cx="16" cy="14" r="4" fill="currentColor" /><circle cx="32" cy="24" r="4" fill="currentColor" /><circle cx="20" cy="34" r="4" fill="currentColor" /></>,
   pin: <><path d="M24 44S9 29 9 19a15 15 0 0 1 30 0c0 10-15 25-15 25Z" /><circle cx="24" cy="19" r="5" /></>,
   calendar: <><rect x="6" y="9" width="36" height="33" rx="5" /><path d="M6 20h36M15 5v8M33 5v8" /></>,
+  eye: <><path d="M3 24S11 11 24 11s21 13 21 13-8 13-21 13S3 24 3 24Z" /><circle cx="24" cy="24" r="6" /></>,
+  tool: <path d="M30 6a10 10 0 0 0-9 14L7 34a4 4 0 0 0 6 6l14-14A10 10 0 0 0 41 17l-6 6-6-2-2-6 6-6a10 10 0 0 0-3-3Z" />,
+  list: <><path d="M20 12h22M20 24h22M20 36h22" /><path d="m5 12 3 3 6-6M5 24l3 3 6-6M5 36l3 3 6-6" /></>,
+  book: <><path d="M24 12c-5-4-12-5-19-4v30c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4Z" /><path d="M24 12v30" /></>,
+  lock: <><rect x="9" y="21" width="30" height="22" rx="4" /><path d="M16 21v-6a8 8 0 0 1 16 0v6M24 30v5" /></>,
 } as const;
 
 export type UiIconName = keyof typeof UI_ICONS;

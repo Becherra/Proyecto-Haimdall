@@ -10,16 +10,22 @@ import { StarGlyphs } from "./StarGlyphs";
 import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import EnsoContextCard from "./EnsoContextCard";
+import ActionPlanSection from "./ActionPlanSection";
+import { PlayButton } from "./PlayButton";
 import { useSpeaker } from "./useSpeaker";
+import { planChip, planForRotation } from "../lib/ui/actionPlanView";
 import { activeScenarioPreset, bestRotationIndex, climateTopicSpeechItems, cropLink, currentSeasonSpeechItems, describeClimate, describeCurrentSeason, isCurrentRotation, MAX_SEASON_DROPS, MAX_STARS, RAIN_CALENDAR_INTRO, rainCalendar, rainCalendarSpeechItems, rotationSections, rotationSpeechItems, SCENARIO_PRESETS, scenarioPresets } from "../lib/ui/resultsCopy";
 import type { ClimateTopicId, CurrentSeasonTone, RotationSection, ScenarioPresetId } from "../lib/ui/resultsCopy";
-import type { AnalysisResponse, ClimateScenario, CurrentSeason, Farm, RotationResult } from "../types";
+import type { ActionPlan, AnalysisResponse, ClimateScenario, CropProfileSelection, CurrentSeason, Farm, RotationResult } from "../types";
 
 const FarmMiniMap = dynamic(() => import("./FarmMiniMap"), { ssr: false, loading: () => <div className="h-full w-full bg-moss" aria-hidden="true" /> });
 
 type ResultsViewProps = {
   farm: Farm;
   response: AnalysisResponse;
+  /** Respuesta con el clima real: de ella sale el plan cuando hay un escenario «¿y si…?» activo. */
+  baseline?: AnalysisResponse;
+  cropProfile?: CropProfileSelection;
   applyingScenario?: boolean;
   scenarioError?: string | null;
   mockMode?: boolean;
@@ -32,15 +38,6 @@ type ResultsViewProps = {
 const CLIMATE_ICONS: Record<ClimateTopicId, UiIconName> = { water: "drop", heat: "sun", frost: "snow", rain: "rain", temperature: "thermo", roots: "roots" };
 const SCENARIO_ICONS: Record<ScenarioPresetId, UiIconName> = { normal: "check", drought: "sun", wet: "rain", heat: "thermo" };
 const SECTION_ICONS: Record<RotationSection["id"], UiIconName> = { why: "bulb", evidence: "search", benefits: "check", risks: "warning", gaps: "question", expert: "person" };
-
-type PlayProps = { playing: boolean; onClick: () => void; size?: "small" | "big" };
-function PlayButton({ playing, onClick, size = "small" }: PlayProps) {
-  const dimension = size === "big" ? "h-24 w-full gap-3 text-xl font-bold" : "h-14 w-14 shrink-0";
-  return <button type="button" onClick={onClick} aria-label={playing ? "Parar" : "Escuchar"} aria-pressed={playing} className={`flex items-center justify-center rounded-full bg-cream text-meadow shadow-lg transition hover:bg-bone-white focus:outline-none focus:ring-4 focus:ring-cream/50 ${dimension}`}>
-    <UiIcon name={playing ? "stop" : "speaker"} className={size === "big" ? "h-12 w-12" : "h-8 w-8"} />
-    {size === "big" && <span>{playing ? "Parar" : "Escuchar"}</span>}
-  </button>;
-}
 
 function Stars({ score, className = "h-7 w-7" }: { score: number; className?: string }) {
   const stars = useRef<HTMLSpanElement>(null);
@@ -65,12 +62,22 @@ function Badges({ result, best }: { result: RotationResult; best: boolean }) {
   </div>;
 }
 
-function RotationCard({ result, best, onOpen }: { result: RotationResult; best: boolean; onOpen: () => void }) {
+function PlanChip({ plan }: { plan?: ActionPlan }) {
+  const chip = planChip(plan);
+  if (!chip) return null;
+  const ready = chip.tone === "ready";
+  return <span className={`flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold ${ready ? "bg-olive text-bone-white" : "border border-dashed border-ash-gray/50 text-ash-gray"}`}>
+    <UiIcon name="list" className="h-5 w-5" />{chip.label}
+  </span>;
+}
+
+function RotationCard({ result, best, plan, onOpen }: { result: RotationResult; best: boolean; plan?: ActionPlan; onOpen: () => void }) {
   return <button type="button" data-reveal onClick={onOpen} className={`flex w-full flex-col gap-3 rounded-3xl border-2 bg-moss card-surface p-4 text-left transition-colors hover:border-cream focus:outline-none focus-visible:ring-4 focus-visible:ring-cream/50 ${best ? "border-cream" : "border-olive/50"}`}>
     <div className="flex items-start justify-between gap-2"><Badges result={result} best={best} /><UiIcon name="arrow" className="h-7 w-7 shrink-0 text-cream" /></div>
     <CropChain cropIds={result.rotation.cropIds} link={cropLink(result.rotation)} />
     <p className="text-lg font-bold text-bone-white">{result.rotation.name}</p>
     <Stars score={result.score} />
+    <PlanChip plan={plan} />
   </button>;
 }
 
@@ -85,7 +92,9 @@ function AccordionBody({ texts }: { texts: readonly string[] }) {
   return <div ref={body} className="overflow-hidden"><ul className="space-y-2 px-4 pb-4 text-lg leading-7 text-bone-white">{texts.map((text) => <li key={text}>{text}</li>)}</ul></div>;
 }
 
-function RotationDetail({ result, best, onClose }: { result: RotationResult; best: boolean; onClose: () => void }) {
+type RotationDetailProps = { result: RotationResult; best: boolean; plan?: ActionPlan; fromBaseline: boolean; cropProfile?: CropProfileSelection; onTellStage: () => void; onClose: () => void };
+
+function RotationDetail({ result, best, plan, fromBaseline, cropProfile, onTellStage, onClose }: RotationDetailProps) {
   const { playingKey, play, stop } = useSpeaker();
   const [openId, setOpenId] = useState<RotationSection["id"] | null>(null);
   const key = `rotation-${result.rotation.id}`;
@@ -105,6 +114,7 @@ function RotationDetail({ result, best, onClose }: { result: RotationResult; bes
         <p className="text-xl font-bold text-bone-white">{result.rotation.name}</p>
         <Stars score={result.score} />
       </div>
+      {plan && <ActionPlanSection plan={plan} profile={cropProfile} fromBaseline={fromBaseline} onTellStage={() => { stop(); onTellStage(); }} />}
       <div className="flex flex-col gap-3">
         {rotationSections(result).map((section) => {
           const isOpen = openId === section.id;
@@ -218,10 +228,11 @@ function ScenarioBar({ response, applyingScenario, scenarioError, mockMode, onSe
 
 const actionButton = "flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream";
 
-export default function ResultsView({ farm, response, applyingScenario, scenarioError, mockMode, onSelectScenario, onEditPriorities, onChangeFarm, onShowTechnical }: ResultsViewProps) {
+export default function ResultsView({ farm, response, baseline, cropProfile, applyingScenario, scenarioError, mockMode, onSelectScenario, onEditPriorities, onChangeFarm, onShowTechnical }: ResultsViewProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const bestIndex = bestRotationIndex(response.rotations);
   const open = openIndex === null ? null : response.rotations[openIndex] ?? null;
+  const fromBaseline = Boolean(response.scenario && baseline);
 
   const reveal = useReveal<HTMLElement>();
   return <main ref={reveal} className="fixed inset-0 z-40 overflow-y-auto bg-scene">
@@ -232,7 +243,7 @@ export default function ResultsView({ farm, response, applyingScenario, scenario
       </header>
 
       <h2 data-reveal className="flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="field" className="h-8 w-8 text-olive-light" />Tus 3 caminos</h2>
-      {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} onOpen={() => setOpenIndex(index)} />)}
+      {response.rotations.map((result, index) => <RotationCard key={result.rotation.id} result={result} best={index === bestIndex} plan={planForRotation(result, response, baseline)} onOpen={() => setOpenIndex(index)} />)}
       <ScenarioBar response={response} applyingScenario={applyingScenario} scenarioError={scenarioError} mockMode={mockMode} onSelectScenario={onSelectScenario} />
 
       <h2 data-reveal className="mt-4 flex items-center gap-3 text-2xl lg:col-span-3 font-bold text-bone-white"><UiIcon name="sun" className="h-8 w-8 text-olive-light" />El clima de tu zona</h2>
@@ -249,6 +260,6 @@ export default function ResultsView({ farm, response, applyingScenario, scenario
       </nav>
       <p className="text-center text-[10px] text-ash-gray lg:col-span-3">Imágenes: © Esri · OpenStreetMap</p>
     </div>
-    {open && <RotationDetail result={open} best={openIndex === bestIndex} onClose={() => setOpenIndex(null)} />}
+    {open && <RotationDetail result={open} best={openIndex === bestIndex} plan={planForRotation(open, response, baseline)} fromBaseline={fromBaseline} cropProfile={cropProfile} onTellStage={onEditPriorities} onClose={() => setOpenIndex(null)} />}
   </main>;
 }

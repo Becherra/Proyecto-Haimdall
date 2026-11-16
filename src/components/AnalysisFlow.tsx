@@ -80,7 +80,7 @@ export default function AnalysisFlow({ farm, onChangeFarm }: AnalysisFlowProps) 
     return <PrioritiesSlides farm={farm} initialValues={priorities} initialProfile={cropProfile} error={error} submitting={pending} onSubmit={analyzePriorities} onChangeFarm={onChangeFarm} />;
   }
 
-  if (!technical) return <ResultsView farm={farm} response={response} applyingScenario={pending} scenarioError={error} mockMode={mockMode} onSelectScenario={selectScenario} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;
+  if (!technical) return <ResultsView farm={farm} response={response} baseline={baseResponse} cropProfile={cropProfile} applyingScenario={pending} scenarioError={error} mockMode={mockMode} onSelectScenario={selectScenario} onEditPriorities={() => { setStep("priorities"); setError(null); }} onChangeFarm={onChangeFarm} onShowTechnical={() => setTechnical(true)} />;
 
   return <AnalysisDashboard
     onBackToSimple={() => setTechnical(false)}

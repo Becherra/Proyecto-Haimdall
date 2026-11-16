@@ -7,6 +7,7 @@ import type { UiIconName } from "./icons";
 import Logo from "./Logo";
 import { StarGlyphs } from "./StarGlyphs";
 import { useSpeaker } from "./useSpeaker";
+import { describePlanEvidence } from "../lib/ui/actionPlanView";
 import { activeScenarioPreset, bestRotationIndex, compareScores, cropLink, describeNasaSupport, describeSimpleSources, isCurrentRotation, MAX_STARS, SCENARIO_PRESETS, scenarioPresets } from "../lib/ui/resultsCopy";
 import type { NasaSupportItemId, ScenarioPresetId } from "../lib/ui/resultsCopy";
 import type { AnalysisResponse, ClimateScenario, Farm, RotationResult } from "../types";
@@ -75,6 +76,7 @@ export default function AnalysisDashboard({ farm, response, baseline, mockMode, 
   const { playingKey, play } = useSpeaker();
   const supportItems = useMemo(() => describeNasaSupport(response), [response]);
   const sources = useMemo(() => describeSimpleSources(response.dataSources), [response.dataSources]);
+  const planEvidence = useMemo(() => describePlanEvidence(baseline.rotations), [baseline.rotations]);
   const presets = scenarioPresets(response.extremeYears);
   const active = activeScenarioPreset(response.scenario, presets);
   const bestIndex = bestRotationIndex(response.rotations);
@@ -143,6 +145,21 @@ export default function AnalysisDashboard({ farm, response, baseline, mockMode, 
             <p className="mt-2 text-base leading-6 text-silver-mist">{source.body}</p>
           </article>)}
         </div>
+      </>}
+
+      {planEvidence.length > 0 && <>
+        <h2 data-reveal className="mt-2 flex items-center gap-3 text-2xl font-bold text-bone-white"><UiIcon name="list" className="h-8 w-8 text-olive-light" />¿De dónde salen los pasos?</h2>
+        {planEvidence.map((group) => <article key={group.key} data-reveal className="rounded-3xl border border-olive/40 bg-moss card-surface p-4">
+          <h3 className="text-lg font-bold text-bone-white">{group.what}</h3>
+          <ul className="mt-3 flex flex-col gap-3">
+            {group.evidence.map((row) => <li key={`${row.typeLabel}-${row.source}`} className="rounded-2xl bg-meadow/40 p-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-olive-light">{row.typeLabel}</p>
+              <p className="mt-1 text-base font-semibold text-bone-white">{row.href ? <a href={row.href} target="_blank" rel="noreferrer" className="underline decoration-cream/40 hover:text-cream">{row.source}</a> : row.source}</p>
+              <p className="mt-1 text-sm leading-5 text-silver-mist">{row.detail}</p>
+              {(row.reference || row.scale || row.date) && <p className="mt-1 text-xs leading-5 text-ash-gray">{[row.reference, row.scale, row.date].filter(Boolean).join(" · ")}</p>}
+            </li>)}
+          </ul>
+        </article>)}
       </>}
 
       <p className="mt-2 rounded-2xl bg-moss/60 p-4 text-center text-sm leading-6 text-silver-mist">Esta guía te ayuda a pensar tu siembra, pero tu conocimiento del terreno y el consejo de un técnico de tu zona siempre van primero.</p>
