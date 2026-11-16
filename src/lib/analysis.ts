@@ -1,4 +1,6 @@
-import type { AnalysisClimate, AnalysisResponse, ClimateResult, ClimateScenario, Crop, Rotation, RotationResult, UserPriorities } from "../types";
+import { generateActionPlan } from "./actionPlan";
+import { CROP_PROFILES, selectionErrors } from "./cropProfiles";
+import type { AnalysisClimate, AnalysisResponse, CropProfileSelection, ClimateResult, ClimateScenario, Crop, Rotation, RotationResult, UserPriorities } from "../types";
 import { DEFAULT_CURRENT_CROP_ID, SOWING_CALENDAR_REGION } from "./config";
 import { temperatureSuitability } from "./climateFit";
 import { computeExtremeYears } from "./extremeYears";
@@ -59,6 +61,7 @@ function startingOptions(crops: readonly Crop[], score: Scorer): RotationResult[
 }
 
 export type AnalysisInput = {
+  cropProfile?: CropProfileSelection;
   climate: ClimateResult; crops: readonly Crop[]; priorities: UserPriorities; location: { lat: number; lon: number };
   /** Vacíos de información sobre el lote (p. ej. solo se conoce un punto); se agregan a todas las rotaciones. */
   siteGaps?: readonly string[];
@@ -107,7 +110,8 @@ export function isInSowingCalendarRegion(lat: number, lon: number): boolean {
  * Con `scenario` todo se calcula sobre la serie modificada, pero `climate` conserva los datos originales de NASA.
  * Es pura (sin red ni archivos). Lanza `AnalysisInputError` si no hay registros o si el cultivo actual es desconocido.
  */
-export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false, recentClimate, requestedYears, liveTerrain = null }: AnalysisInput): AnalysisResponse {
+export function buildAnalysis({ climate, crops, priorities, location, siteGaps = [], scenario, includeDailyRecords = false, recentClimate, requestedYears, liveTerrain = null, cropProfile }: AnalysisInput): AnalysisResponse {
+  validateAnalysisProfile(priorities, cropProfile);
   if (climate.records.length === 0) throw new AnalysisInputError("No hay datos climáticos para analizar");
   const terrain = resolveTerrain(location, priorities, climate.cellElevationMeters !== undefined, undefined, liveTerrain);
   const terrainInput = terrain || climate.cellElevationMeters !== undefined
@@ -132,5 +136,13 @@ export function buildAnalysis({ climate, crops, priorities, location, siteGaps =
   const currentSeason = recentClimate ? computeCurrentSeason(recentClimate.records, climate.records) : null;
   // Los años extremos se buscan en los datos originales de NASA, no en la serie con escenario.
   const extremeYears = computeExtremeYears(climate.records);
-  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results, dataSources: listDataSources(indicators, { currentSeason: currentSeason !== null }), ...(currentSeason ? { currentSeason } : {}), ...(extremeYears ? { extremeYears } : {}), ...(scenario ? { scenario } : {}) };
+  return { climate: summarizeClimate(climate, includeDailyRecords), monthlyClimate, indicators, rotations: results.map((result) => ({ ...result, actionPlan: generateActionPlan({ rotation: result.rotation, location, profile: cropProfile, season: currentSeason, hypothetical: Boolean(applied) }) })), dataSources: listDataSources(indicators, { currentSeason: currentSeason !== null }), ...(currentSeason ? { currentSeason } : {}), ...(extremeYears ? { extremeYears } : {}), ...(scenario ? { scenario } : {}) };
+}
+
+/** Valida que el perfil corresponda al cultivo declarado y al catálogo antes de consultar fuentes. */
+export function validateAnalysisProfile(priorities: UserPriorities, profile?: CropProfileSelection): void {
+  if (!profile) return;
+  if (priorities.noCurrentCrop || profile.cropId !== priorities.currentCropId) throw new AnalysisInputError("El perfil debe corresponder al cultivo actual declarado");
+  const errors = selectionErrors(CROP_PROFILES, profile);
+  if (errors.length) throw new AnalysisInputError(errors.join(". "));
 }
