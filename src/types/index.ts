@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cropProfileSelectionSchema } from "./cropProfile";
 
 export * from "./drought";
 
@@ -208,6 +209,7 @@ export type EvidenceType = z.infer<typeof evidenceTypeSchema>;
 export const evidenceSchema = z.object({
   id: z.string().min(1), type: evidenceTypeSchema, source: z.string().min(1), sourceUrl: z.string().url().optional(),
   /** Resolución o escala del dato (p. ej. "malla de ~0.5°", "250 m"); ausente si no aplica o no se conoce. */
+  reference: z.string().min(1).optional(),
   scale: z.string().min(1).optional(), date: z.string().min(1).optional(),
   /** Qué dice el dato en este caso, en una frase. */
   detail: z.string().min(1),
@@ -226,6 +228,10 @@ export type PlanActionStatus = z.infer<typeof planActionStatusSchema>;
 /** Una acción del plan: solo es "ready" si trae evidencia y ningún dato pendiente; si no, dice qué falta en vez de dar una instrucción. */
 export const planActionSchema = z.object({
   id: z.string().min(1), stage: planStageSchema, status: planActionStatusSchema,
+  ruleId: z.string().min(1).optional(),
+  instructions: z.array(z.string().min(1)).optional(),
+  risks: z.array(z.string().min(1)).optional(),
+  limitations: z.array(z.string().min(1)).optional(),
   what: z.string().min(1), why: z.string().min(1),
   /** Cuándo aplica: etapa del cultivo o ventana regional documentada, no un mes genérico. */
   appliesWhen: z.string().min(1),
@@ -308,6 +314,7 @@ export const analysisRequestSchema = z.object({
   startYear: z.number().int().min(1981), endYear: z.number().int().min(1981), priorities: userPrioritiesSchema,
   // Climate should use farm.centroid when a Farm is supplied; lat/lon remain for older clients.
   farm: farmSchema.optional(),
+  cropProfile: cropProfileSelectionSchema.optional(),
   scenario: climateScenarioSchema.optional(),
   /** Pide incluir los registros diarios en `climate.records` (miles de filas). Por defecto no se envían. */
   includeDailyRecords: z.boolean().optional(),
