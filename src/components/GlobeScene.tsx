@@ -219,10 +219,8 @@ export default function GlobeScene({ location, active = true, introSpin = false 
   }
 
   const fallback = <div className="flex h-full w-full items-center justify-center rounded-full border border-cream/10 bg-meadow p-8 text-center text-sm text-silver-mist" role="status">Tu navegador no puede mostrar el globo 3D. Puedes buscar una ubicación para continuar.</div>;
-  const showHint = active && webglAvailable && !location;
 
   return <div ref={containerRef} className="relative flex h-full w-full items-center justify-center" aria-label="Globo terrestre con relieve, fronteras y nombres: gíralo para explorar">
     {!webglAvailable ? fallback : size.width > 0 && size.height > 0 ? <Globe ref={globeRef} width={size.width} height={size.height} globeImageUrl={globeImageUrl} globeMaterial={reliefMaterial} bumpImageUrl={ELEVATION_TEXTURE} globeCurvatureResolution={curvatureResolution} showAtmosphere atmosphereColor="#737F35" atmosphereAltitude={0.12} backgroundColor="rgba(0,0,0,0)" pointsData={location ? [location] : []} pointLat="lat" pointLng="lon" pointAltitude={0.08} pointRadius={reducedMotion ? 0.6 : markerPulse ? 0.75 : 0.6} pointColor={() => "#EAD39D"} pointLabel="label" onZoom={updateReferenceLayer} rendererConfig={{ antialias: false, alpha: true, powerPreference: "high-performance" }} onGlobeReady={() => { const globe = globeRef.current; if (!globe) return; globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); setGlobeLighting(globe); referenceLayer.current ??= createReferenceLayer(globe, curvatureResolution, scheduleReferenceCleanup); referenceLayer.current?.scale.setScalar(referenceLayerScale()); updateReferenceLayer(); }} /> : <div className="text-sm text-ash-gray" role="status">Preparando globo…</div>}
-    {showHint && <p className="pointer-events-none absolute inset-x-0 bottom-3 z-10 mx-auto w-fit max-w-[calc(100%-2rem)] rounded-full border border-cream/20 bg-meadow/85 px-4 py-2 text-center text-xs text-silver-mist sm:text-sm" role="status">Gira el globo para explorar el mundo</p>}
   </div>;
 }
