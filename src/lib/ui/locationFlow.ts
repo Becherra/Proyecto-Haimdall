@@ -8,6 +8,7 @@ export type LocationFlowState =
 
 export type LocationFlowEvent =
   | { type: "buscar"; location: LocationResult }
+  | { type: "elegirEnGlobo"; location: LocationResult }
   | { type: "locating" }
   | { type: "gpsOk"; location: LocationResult; accuracyMeters: number }
   | { type: "gpsError"; message: string }
@@ -25,6 +26,10 @@ export function locationFlowReducer(state: LocationFlowState, event: LocationFlo
     case "buscar":
       if (!["idle", "error", "flying", "transitioning"].includes(state.status)) return state;
       return { status: "flying", location: event.location };
+    case "elegirEnGlobo":
+      // La cámara del globo ya está sobre el lugar: se pasa directo al mapa, sin volar de nuevo.
+      if (!["idle", "error"].includes(state.status)) return state;
+      return { status: "map", location: event.location };
     case "gpsOk":
       if (!["idle", "locating", "error"].includes(state.status)) return state;
       return { status: "flying", location: event.location, accuracyMeters: event.accuracyMeters };
