@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { CROP_PROFILES } from "../src/lib/cropProfiles";
-import { draftFromSelection, isStepAnswered, profileOptions, profileStepsFor, toProfileSelection } from "../src/lib/ui/cropProfileFlow";
+import { draftFromSelection, isStepAnswered, profileOptions, profileStepsFor, startingCardIndex, toProfileSelection } from "../src/lib/ui/cropProfileFlow";
 import { cropProfileSelectionSchema } from "../src/types";
+
+describe("startingCardIndex", () => {
+  it("cae en la pregunta pedida: la etapa del café es la tercera tarjeta (cultivo, variedad, etapa)", () => {
+    expect(startingCardIndex(CROP_PROFILES, "cafe", "stage")).toBe(2);
+    expect(startingCardIndex(CROP_PROFILES, "platano", "stage")).toBe(3);
+  });
+
+  it("empieza por la primera pregunta si no se pide una o el cultivo no tiene esa pregunta", () => {
+    expect(startingCardIndex(CROP_PROFILES, "cafe", undefined)).toBe(0);
+    expect(startingCardIndex(CROP_PROFILES, "cafe", "material")).toBe(0);
+    expect(startingCardIndex(CROP_PROFILES, "maiz", "stage")).toBe(0);
+    expect(startingCardIndex(CROP_PROFILES, null, "stage")).toBe(0);
+  });
+});
 
 describe("flujo cultivo → variedad → etapa → problema", () => {
   it("solo pregunta de más para cultivos con perfil; el plátano incluye el material de siembra", () => {

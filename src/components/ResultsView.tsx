@@ -31,6 +31,8 @@ type ResultsViewProps = {
   mockMode?: boolean;
   onSelectScenario?: (scenario: ClimateScenario) => void;
   onEditPriorities: () => void;
+  /** Vuelve a las preguntas directo en la de la etapa del cultivo. */
+  onTellStage: () => void;
   onChangeFarm: () => void;
   onShowTechnical: () => void;
 };
@@ -228,7 +230,7 @@ function ScenarioBar({ response, applyingScenario, scenarioError, mockMode, onSe
 
 const actionButton = "flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream";
 
-export default function ResultsView({ farm, response, baseline, cropProfile, applyingScenario, scenarioError, mockMode, onSelectScenario, onEditPriorities, onChangeFarm, onShowTechnical }: ResultsViewProps) {
+export default function ResultsView({ farm, response, baseline, cropProfile, applyingScenario, scenarioError, mockMode, onSelectScenario, onEditPriorities, onTellStage, onChangeFarm, onShowTechnical }: ResultsViewProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const bestIndex = bestRotationIndex(response.rotations);
   const open = openIndex === null ? null : response.rotations[openIndex] ?? null;
@@ -260,6 +262,6 @@ export default function ResultsView({ farm, response, baseline, cropProfile, app
       </nav>
       <p className="text-center text-[10px] text-ash-gray lg:col-span-3">Imágenes: © Esri · OpenStreetMap</p>
     </div>
-    {open && <RotationDetail result={open} best={openIndex === bestIndex} plan={planForRotation(open, response, baseline)} fromBaseline={fromBaseline} cropProfile={cropProfile} onTellStage={onEditPriorities} onClose={() => setOpenIndex(null)} />}
+    {open && <RotationDetail result={open} best={openIndex === bestIndex} plan={planForRotation(open, response, baseline)} fromBaseline={fromBaseline} cropProfile={cropProfile} onTellStage={onTellStage} onClose={() => setOpenIndex(null)} />}
   </main>;
 }
