@@ -91,7 +91,7 @@ export default function AnalysisDashboard({ farm, response, baseline, mockMode, 
   }
 
   return <section ref={reveal} className="fixed inset-0 z-40 overflow-y-auto bg-scene" aria-labelledby="support-title">
-    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-4 lg:max-w-5xl lg:px-8 lg:pt-8">
+    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-4 md:max-w-2xl lg:max-w-5xl lg:px-8 lg:pt-8">
       <header data-reveal className="flex items-center justify-between gap-3">
         {onBackToSimple && <button type="button" onClick={onBackToSimple} aria-label="Volver" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><UiIcon name="back" className="h-8 w-8" /></button>}
         <div className="min-w-0 flex-1 text-center"><h1 id="support-title" className="text-2xl font-bold text-bone-white">¿Cómo lo sabemos?</h1><p className="truncate text-sm text-silver-mist">{farm.placeLabel ?? "Tu finca"}</p></div>

@@ -103,7 +103,7 @@ function RotationDetail({ result, best, plan, fromBaseline, cropProfile, onTellS
   const close = () => { stop(); onClose(); };
   const reveal = useReveal<HTMLElement>();
   return <section ref={reveal} className="fixed inset-0 z-50 overflow-y-auto bg-scene" aria-label={result.rotation.name}>
-    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-10 pt-4 lg:max-w-3xl lg:pt-8">
+    <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-10 pt-4 md:max-w-2xl lg:max-w-3xl lg:pt-8">
       {/* Columnas iguales a ambos lados para que el logo quede centrado y no flote un ícono suelto en la esquina. */}
       <div className="grid grid-cols-[4rem_1fr_4rem] items-center">
         <button type="button" onClick={close} aria-label="Volver" className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-cream/50 text-bone-white transition hover:border-cream focus:outline-none focus:ring-2 focus:ring-cream"><UiIcon name="back" className="h-8 w-8" /></button>
@@ -238,7 +238,7 @@ export default function ResultsView({ farm, response, baseline, cropProfile, app
 
   const reveal = useReveal<HTMLElement>();
   return <main ref={reveal} className="fixed inset-0 z-40 overflow-y-auto bg-scene">
-    <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4 lg:grid lg:max-w-6xl lg:grid-cols-3 lg:gap-5 lg:px-8 lg:pt-8">
+    <div className="mx-auto flex max-w-md flex-col gap-4 px-4 pb-12 pt-4 md:max-w-2xl lg:grid lg:max-w-6xl lg:grid-cols-3 lg:gap-5 lg:px-8 lg:pt-8">
       <header data-reveal className="flex items-center justify-between gap-3 lg:col-span-3">
         <Logo variant="horizontal" size={36} />
         <div className="relative isolate z-0 h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-cream/60 shadow-lg" role="img" aria-label={`Mapa de ${farm.placeLabel ?? "tu finca"}`}><FarmMiniMap farm={farm} /></div>
