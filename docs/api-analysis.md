@@ -29,9 +29,10 @@ La herramienta es **apoyo a la decisión**: cada rotación trae por qué se sugi
 | `lat`, `lon` | Sí | Se usan solo si no llega `farm`. |
 | `startYear`, `endYear` | Sí | Desde 1981 hasta el año pasado; máximo 15 años. La interfaz pide los últimos 15 años completos (hoy 2011–2025): una serie corta no muestra cómo cambia la lluvia de un año a otro. |
 | `priorities` | Sí | Cinco valores de 0 a 5: `waterSaving`, `extraIncome`, `soilImprovement`, `erosionReduction`, `lowRisk`. |
-| `priorities.currentCropId` | No | Cultivo actual. Por defecto `maiz`. Ids válidos: `maiz`, `frijol`, `soya`, `arveja`, `mucuna`, `crotalaria`, `yuca`, `papa`, `avena`, `repollo`. |
+| `priorities.currentCropId` | No | Cultivo actual. Por defecto `maiz` (o el cultivo anual que mejor encaje en la temperatura del sitio si el maíz no crece bien ahí). Ids válidos: `maiz`, `frijol`, `soya`, `arveja`, `mucuna`, `crotalaria`, `yuca`, `papa`, `avena`, `repollo`, `cafe`, `platano`. |
+| `priorities.noCurrentCrop` | No | `true` cuando el agricultor declara que hoy no tiene cultivo (`Ninguno`): propone tres puntos de partida en lugar de comparar contra una línea base actual. |
 | `priorities.waterAvailability` | No | `low`, `medium` o `high`. |
-| `priorities.elevationMeters`, `priorities.slopePercent` | No | Altitud (m s. n. m.) y pendiente (%) que declara el agricultor. Tienen prioridad sobre la lectura SRTM precargada. |
+| `priorities.elevationMeters`, `priorities.slopePercent` | No | Altitud (m s. n. m.) y pendiente (%) que declara el agricultor (`terrainSource: "user"`). Tienen prioridad sobre la medición en vivo con NASA SRTM (`srtm-live`) y sobre la muestra precargada (`srtm-sample`). |
 | `farm` | No | Contrato de `docs/farm-contract.md`. Se valida de nuevo en el servidor, el área del polígono se recalcula y el clima se consulta en `farm.centroid`. |
 | `scenario` | No | Escenario "¿y si…?": `tempDeltaC` entre −2 y 5 °C, `rainFactor` entre 0.5 y 1.5 (0.8 = 20 % menos lluvia). |
 | `includeDailyRecords` | No | `true` para recibir los registros diarios en `climate.records`. Por defecto no se envían. |
@@ -86,13 +87,13 @@ Todo el clima viene de **NASA POWER**, API diaria por punto (`https://power.larc
 | `T2M` | Temperatura media del sitio, aptitud térmica de cada cultivo, evaporación potencial. |
 | `T2M_MIN` | Días con riesgo de helada, evaporación potencial. |
 | `T2M_MAX` | Días de estrés por calor, evaporación potencial. |
-| `PRECTOTCORR` | Balance hídrico, meses secos y lluviosos, umbral de lluvia extrema. |
+| `PRECTOTCORR` | Balance hídrico, meses secos y lluviosos, mejores ventanas de siembra del sitio, umbral de lluvia extrema e índice de erosividad de la lluvia (Fournier modificado). |
 | `EVLAND` | Resumen mensual de evaporación. El balance hídrico usa la evaporación potencial estimada con Hargreaves–Samani. |
 | `GWETROOT` | Humedad de la zona de raíces: media del sitio y, por cada cultivo, el rango en sus meses de siembra, con aviso de los meses de siembra en que el suelo queda por debajo de lo normal (menos del 97 % de la media anual). Se muestra como evidencia y riesgo; no cambia el puntaje: varía poco (0,75–0,85 en el Eje Cafetero), sigue a la lluvia y es un proxy de ~50 km. |
-| `ALLSKY_SFC_SW_DWN` | Se descarga, pero todavía no interviene en indicadores ni puntajes. |
+| `ALLSKY_SFC_SW_DWN` | Radiación solar media en superficie (`meanSolarRadiationMJ`) e índice de claridad (`clearnessIndex`); se muestra como evidencia del sitio y no cambia el puntaje. |
 | Altitud de la celda | Corregir la temperatura de la celda a la altitud del lote. |
 
-Lo que **no** es dato de la NASA POWER: el catálogo de cultivos (`data/crops.json`, con sus fuentes en `docs/crops-rubric.md`). Las altitudes y pendientes precargadas (`data/samples/srtm-eje-cafetero.json`) son lecturas del ráster NASA SRTMGL1 v003 en cinco puntos piloto (ver `docs/srtm-samples.md`): valen para el punto, no para todo el lote.
+Lo que **no** es dato de NASA POWER: el catálogo de cultivos (`data/crops.json`, con sus fuentes en `docs/crops-rubric.md`), los perfiles fitosanitarios de café y plátano (`data/crop-profiles.json`, ver `docs/crop-profiles.md`) y el pronóstico de sequía por zona hidrográfica del IDEAM (`GET /api/drought`). La altitud y la pendiente se miden en vivo sobre el punto o polígono del lote con NASA SRTMGL1 v003 (~30 m vía OpenTopoData, `terrainSource: "srtm-live"`) y, si el servicio no responde, usan como respaldo las lecturas SRTM precargadas en cinco puntos piloto (`data/samples/srtm-eje-cafetero.json`, `terrainSource: "srtm-sample"`, ver `docs/srtm-samples.md`).
 
 ### Muestras precargadas
 
@@ -101,12 +102,12 @@ Si NASA POWER no responde, hay respaldo para Pereira (cubre también Santa Rosa 
 ## Límites conocidos
 
 - **Resolución del clima.** Pereira, Manizales y Santa Rosa de Cabal caen en la misma celda de NASA POWER y reciben temperatura y lluvia idénticas; entre esos sitios solo cambia la corrección por altitud. Dibujar el lote no mejora esa resolución.
-- **Terreno.** Solo cinco puntos del Eje Cafetero tienen altitud y pendiente precargadas (lecturas SRTM del punto, no del lote). Fuera de ellos no hay corrección por altitud salvo que el agricultor la declare.
-- **Catálogo.** Diez cultivos anuales y dos permanentes (café y plátano). Los permanentes solo se aceptan como cultivo actual (`currentCropId: "cafe"` o `"platano"`): sus alternativas son asociarles fríjol o maíz en las calles mientras son jóvenes, sin calendario de rotación, y nunca se sugieren como punto de partida. No hay pastos ni otros permanentes. Los puntajes 0–5 son preliminares y no los ha validado un agrónomo. Los meses de siembra son los mismos para todos los cultivos y no tienen fuente propia para papa, avena y repollo.
-- **Calendario.** Es ilustrativo: usa meses de siembra y ciclos típicos, no las fechas reales del agricultor.
-- **Escenarios.** Son un cambio uniforme sobre la serie histórica, no una proyección climática; la humedad del suelo no se recalcula.
-- **Clima reciente.** Solo lluvia y temperatura de NASA POWER de los últimos días; no hay pronóstico. IMERG, SMAP y NDVI recientes no están integrados.
-- **Sin datos de suelo, plagas, precios ni costos.** Tampoco se integraron NDVI, SMAP ni GAEZ.
+- **Terreno.** Cuando OpenTopoData responde, la altitud y la pendiente se miden en vivo con NASA SRTM (~30 m) sobre hasta 100 puntos del punto o polígono (`srtm-live`); en lotes grandes la celda es más ancha y suaviza las laderas, y el satélite no detecta terrazas ni zanjas. Si el servicio en vivo no responde, solo cinco puntos del Eje Cafetero tienen altitud y pendiente precargadas (`srtm-sample`).
+- **Catálogo y sanidad.** Diez cultivos anuales y dos permanentes (café y plátano). Los permanentes solo se aceptan como cultivo actual (`currentCropId: "cafe"` o `"platano"`): sus alternativas son asociarles fríjol o maíz en las calles mientras son jóvenes, sin calendario de rotación, y nunca se sugieren como punto de partida. No hay pastos ni otros permanentes. Los puntajes 0–5 son preliminares y no los ha validado un agrónomo. El módulo de variedades y sanidad vegetal (`data/crop-profiles.json`) cubre café y plátano como orientación con fuentes (Cenicafé, AGROSAVIA, ICA) y no es un diagnóstico ni altera el puntaje.
+- **Calendario.** Es ilustrativo: usa meses de siembra y ciclos típicos, no las fechas reales del agricultor; se complementa con `sowingWindows` calculadas a partir del balance hídrico y la temperatura del sitio.
+- **Escenarios.** Pueden recrear años reales extremos de la serie (`extremeYears`: el más seco, el más lluvioso y el más cálido) o aplicar un cambio uniforme sobre la serie histórica; no son una proyección climática y la humedad del suelo no se recalcula.
+- **Clima reciente y pronóstico.** `currentSeason` compara los últimos 90 días de NASA POWER con la serie histórica (observación preliminar, no pronóstico). El pronóstico oficial de sequía por zona hidrográfica viene por separado de `GET /api/drought` (IDEAM, agregaciones de 3, 6, 9 y 12 meses). IMERG, SMAP y NDVI recientes no están integrados.
+- **Sin análisis físico-químico de suelo, precios ni costos.** Tampoco se integraron NDVI, SMAP ni GAEZ.
 
 ## Uso de inteligencia artificial
 
