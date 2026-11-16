@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { actionPlanSpeechItems, describeActionPlan, evidenceChip, planChip } from "../src/lib/ui/actionPlanView";
-import { actionPlanSchema, type ActionPlan, type CropProfileSelection, type Evidence, type PlanAction } from "../src/types";
+import { actionPlanSpeechItems, describeActionPlan, describePlanEvidence, evidenceChip, planChip, planForRotation } from "../src/lib/ui/actionPlanView";
+import { actionPlanSchema, type ActionPlan, type CropProfileSelection, type Evidence, type PlanAction, type RotationResult } from "../src/types";
 
 const source: Evidence = { id: "s", type: "published-practice", source: "Cenicafé — Boletín Agrometeorológico Cafetero", sourceUrl: "https://example.org/b.pdf", reference: "Página 5, En la cosecha y poscosecha", detail: "Observar la maduración." };
 const climate: Evidence = { id: "c", type: "regional", source: "NASA POWER", date: "20261030", detail: "Menos lluvia de lo habitual." };
@@ -29,7 +29,7 @@ describe("describeActionPlan", () => {
     expect(view.tone).toBe("empty");
     expect(view.ready).toEqual([]);
     expect(view.gaps).toEqual(["Falta conocer la etapa del cultivo."]);
-    expect(view.summary).toContain("no es que no haya riesgo");
+    expect(view.summary).toBe("No es que no haya riesgo: nos falta saber más.");
   });
 
   it("ofrece volver a contar la etapa solo si el cultivo tiene perfil y la etapa quedó en «No sé»", () => {
@@ -49,6 +49,39 @@ describe("describeActionPlan", () => {
     const second = { ...observe, id: "a:observe-2" };
     const plan = actionPlanSchema.parse({ ...partial, status: "ready", stages: stages([observe, second]), gaps: [] });
     expect(describeActionPlan(plan, coffee("produccion")).summary).toBe("2 pasos listos");
+  });
+});
+
+describe("planForRotation", () => {
+  const result = (id: string, actionPlan?: ActionPlan): RotationResult => ({ rotation: { id, name: id, cropIds: ["cafe"], description: "d" }, score: 3, whySuggested: "w", evidence: ["e"], benefits: ["b"], informationGaps: ["g"], risks: ["r"], validateWithLocalExpert: ["v"], ...(actionPlan ? { actionPlan } : {}) });
+  const baseline = { rotations: [result("baseline", partial), result("legume", empty)] };
+
+  it("sin escenario usa el plan de la propia respuesta", () => {
+    expect(planForRotation(result("baseline", empty), {}, baseline)).toBe(empty);
+  });
+
+  it("con escenario «¿y si…?» muestra el plan del clima real de la misma alternativa", () => {
+    const scenario = { scenario: { tempDeltaC: 2 } };
+    expect(planForRotation(result("baseline", empty), scenario, baseline)).toBe(partial);
+    expect(planForRotation(result("otra"), scenario, baseline)).toBeUndefined();
+  });
+});
+
+describe("describePlanEvidence", () => {
+  const withPlan = (id: string, actionPlan: ActionPlan): RotationResult => ({ rotation: { id, name: id, cropIds: ["cafe"], description: "d" }, score: 3, whySuggested: "w", evidence: ["e"], benefits: ["b"], informationGaps: ["g"], risks: ["r"], validateWithLocalExpert: ["v"], actionPlan });
+  const ruled = actionPlanSchema.parse({ ...partial, stages: stages([{ ...observe, ruleId: "rule-v1" }, { ...harvest, ruleId: "rule-v1" }]) });
+
+  it("lista la evidencia de cada práctica una sola vez aunque salga en varias alternativas", () => {
+    const rows = describePlanEvidence([withPlan("baseline", ruled), withPlan("legume", ruled)]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].what).toBe("Revisa la maduración");
+    expect(rows[0].evidence.map((e) => e.typeLabel)).toEqual(["Práctica publicada", "Dato de la zona, no de tu lote", "Lo que nos contaste"]);
+    expect(rows[0].evidence[0]).toMatchObject({ reference: "Página 5, En la cosecha y poscosecha", href: "https://example.org/b.pdf" });
+    expect(rows[0].evidence[1].date).toBe("30/10/2026");
+  });
+
+  it("no muestra nada si ningún plan tiene pasos listos", () => {
+    expect(describePlanEvidence([withPlan("baseline", empty)])).toEqual([]);
   });
 });
 

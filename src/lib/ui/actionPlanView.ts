@@ -1,4 +1,4 @@
-import { PLAN_STAGES, UNKNOWN_ANSWER, type ActionPlan, type CropProfileSelection, type Evidence, type PlanAction, type PlanStage } from "../../types";
+import { PLAN_STAGES, UNKNOWN_ANSWER, type ActionPlan, type AnalysisResponse, type CropProfileSelection, type Evidence, type PlanAction, type PlanStage, type RotationResult } from "../../types";
 import type { SpeechItem } from "./resultsCopy";
 
 export type PlanIconName = "bulb" | "tool" | "eye" | "list" | "book" | "pin" | "person" | "search";
@@ -20,7 +20,7 @@ const STAGE_COPY: Record<PlanStage, { label: string; icon: PlanIconName }> = {
   review: { label: "Revisar", icon: "list" },
 };
 
-const EMPTY_SUMMARY = "Aún no hay pasos con respaldo para tu caso; no es que no haya riesgo, nos falta saber más.";
+const EMPTY_SUMMARY = "No es que no haya riesgo: nos falta saber más.";
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const allActions = (plan: ActionPlan) => plan.stages.flatMap((group) => group.actions);
@@ -52,6 +52,12 @@ export function describeActionPlan(plan: ActionPlan, profile: CropProfileSelecti
   };
 }
 
+/** Un escenario hipotético no activa pasos de campo: con escenario activo, el plan es el de la misma alternativa con el clima real. */
+export function planForRotation(result: RotationResult, response: Pick<AnalysisResponse, "scenario">, baseline?: Pick<AnalysisResponse, "rotations">): ActionPlan | undefined {
+  if (!response.scenario || !baseline) return result.actionPlan;
+  return baseline.rotations.find((entry) => entry.rotation.id === result.rotation.id)?.actionPlan;
+}
+
 /** Etiqueta corta del plan para la tarjeta del camino; null si la respuesta no trae plan (backend antiguo). */
 export function planChip(plan: ActionPlan | undefined): PlanChip | null {
   if (!plan) return null;
@@ -73,6 +79,38 @@ export function evidenceChip(evidence: Evidence): EvidenceChip {
     case "declared": return { label: "Lo que nos contaste", icon: "person" };
     default: return { label: shortName(evidence.source), icon: "search", ...href };
   }
+}
+
+export type PlanEvidenceRow = { typeLabel: string; source: string; detail: string; reference?: string; scale?: string; date?: string; href?: string };
+export type PlanEvidenceGroup = { key: string; what: string; evidence: PlanEvidenceRow[] };
+
+const EVIDENCE_TYPE_LABEL: Record<Evidence["type"], string> = {
+  "published-practice": "Práctica publicada",
+  regional: "Dato de la zona, no de tu lote",
+  declared: "Lo que nos contaste",
+  observed: "Medición",
+  estimated: "Estimación",
+};
+
+/** "20261030" → "30/10/2026"; otras fechas (p. ej. solo el año) quedan igual. */
+const readableDate = (date: string) => /^\d{8}$/.test(date) ? `${date.slice(6, 8)}/${date.slice(4, 6)}/${date.slice(0, 4)}` : date;
+
+function evidenceRow(evidence: Evidence): PlanEvidenceRow {
+  const { source, detail, reference, scale, date, sourceUrl } = evidence;
+  return { typeLabel: EVIDENCE_TYPE_LABEL[evidence.type], source, detail, ...(reference ? { reference } : {}), ...(scale ? { scale } : {}), ...(date ? { date: readableDate(date) } : {}), ...(sourceUrl ? { href: sourceUrl } : {}) };
+}
+
+/** Evidencia completa de los pasos listos para la vista técnica; una práctica que se repite en varias alternativas sale una vez. */
+export function describePlanEvidence(rotations: readonly RotationResult[]): PlanEvidenceGroup[] {
+  const groups = new Map<string, PlanEvidenceGroup>();
+  for (const { actionPlan } of rotations) {
+    for (const action of actionPlan ? allActions(actionPlan) : []) {
+      const key = `${action.ruleId ?? action.id}:${action.stage}`;
+      if (action.status !== "ready" || groups.has(key)) continue;
+      groups.set(key, { key, what: action.what, evidence: action.evidence.map(evidenceRow) });
+    }
+  }
+  return [...groups.values()];
 }
 
 /** El plan para leer en voz alta: resumen, instrucciones de los pasos listos, lo que falta en los bloqueados y los vacíos. */
